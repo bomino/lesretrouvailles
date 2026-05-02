@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}
+    {% trans "Cooptation" %}
+{% endblock %}
+{% block content %}
+    <div class="mx-auto max-w-2xl">
+        <header class="mb-6">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-tertiary">{% trans "Demande de cooptation" %}</p>
+            <h1 class="mt-2 font-display text-3xl font-semibold tracking-tight">{{ application.full_name }}</h1>
+            <p class="mt-2 text-sm text-secondary">
+                {{ application.years_attended|join:", " }} · {{ application.city }}, {{ application.country }}
+            </p>
+            {% if application.profession %}<p class="text-sm">{{ application.profession }}</p>{% endif %}
+        </header>
+        <form method="post"
+              class="rounded-2xl bg-base-200 border border-secondary/15 p-6 shadow-sm space-y-4">
+            {% csrf_token %}
+            <fieldset class="space-y-2">
+                <legend class="text-sm font-medium uppercase tracking-wider text-secondary">{% trans "Votre réponse" %}</legend>
+                {% for radio in form.response %}
+                    <label class="flex items-center gap-2.5">{{ radio.tag }} {{ radio.choice_label }}</label>
+                {% endfor %}
+            </fieldset>
+            <label class="block">
+                <span class="block text-sm font-medium mb-1.5">{% trans "Commentaire (optionnel)" %}</span>
+                {{ form.comment }}
+            </label>
+            <button type="submit"
+                    class="rounded-lg bg-tertiary px-6 py-2.5 text-base font-medium text-on-tertiary shadow-sm hover:opacity-95 min-h-tap">
+                {% trans "Envoyer ma réponse" %}
+            </button>
+        </form>
+    </div>
+{% endblock %}

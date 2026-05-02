@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.http import HttpResponseRedirect
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from django_ratelimit.decorators import ratelimit
@@ -76,3 +78,83 @@ def signup_view(request):
 @require_http_methods(["GET"])
 def signup_success_view(request):
     return render(request, "cooptation/signup_success.html")
+
+
+def _resolve_outcome(application: AdminApplication) -> str:
+    """Compute cooptation_outcome from current responses."""
+    requests = list(application.cooptation_requests.all())
+    responses = [r.response for r in requests]
+    if any(r == "pending" for r in responses):
+        return "pending"
+    accepted = sum(1 for r in responses if r == "accepted")
+    refused = sum(1 for r in responses if r == "refused")
+    if accepted == len(responses):
+        return "all_accepted"
+    if refused == len(responses):
+        return "all_refused"
+    return "mixed"
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def parrain_vouch_view(request, token: str):
+    cooptation_request = get_object_or_404(CooptationRequest, token=token)
+
+    member = getattr(request.user, "member", None)
+    if member is None or member.pk != cooptation_request.parrain_id:
+        raise PermissionDenied("Cette invitation ne vous est pas adressée.")
+
+    if cooptation_request.response != "pending":
+        return render(
+            request,
+            "cooptation/parrain_vouch_done.html",
+            {"request_obj": cooptation_request},
+            status=410,
+        )
+
+    if cooptation_request.expires_at <= timezone.now():
+        return render(
+            request,
+            "cooptation/parrain_vouch_expired.html",
+            {"request_obj": cooptation_request},
+            status=410,
+        )
+
+    if request.method == "POST":
+        from .forms import ParrainVouchForm
+
+        form = ParrainVouchForm(request.POST)
+        if form.is_valid():
+            with transaction.atomic():
+                cooptation_request.response = form.cleaned_data["response"]
+                cooptation_request.comment = form.cleaned_data["comment"]
+                cooptation_request.responded_at = timezone.now()
+                cooptation_request.save()
+
+                if cooptation_request.response == "accepted":
+                    emails.send_cooptation_accepted(cooptation_request)
+                else:
+                    emails.send_cooptation_refused(cooptation_request)
+
+                outcome = _resolve_outcome(cooptation_request.application)
+                if outcome != "pending":
+                    app = cooptation_request.application
+                    app.cooptation_outcome = outcome
+                    app.status = "awaiting_admin"
+                    app.save()
+
+            return HttpResponseRedirect(f"/cooptation/{token}/")
+    else:
+        from .forms import ParrainVouchForm
+
+        form = ParrainVouchForm()
+
+    return render(
+        request,
+        "cooptation/parrain_vouch.html",
+        {
+            "form": form,
+            "request_obj": cooptation_request,
+            "application": cooptation_request.application,
+        },
+    )

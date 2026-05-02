@@ -76,3 +76,15 @@ class SignupForm(forms.Form):
         if p2 and not Member.objects.filter(user__email=p2, status="active").exists():
             raise ValidationError(f"Email parrain inconnu ou inactif : {p2}")
         return data
+
+
+class ParrainVouchForm(forms.Form):
+    response = forms.ChoiceField(
+        choices=[("accepted", "J'accepte de coopter"), ("refused", "Je refuse")],
+        widget=forms.RadioSelect,
+    )
+    comment = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 3}),
+        required=False,
+        label="Commentaire (optionnel)",
+    )
