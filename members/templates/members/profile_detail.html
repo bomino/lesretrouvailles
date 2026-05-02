@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% load i18n member_avatar %}
+{% block extra_head %}<meta name="robots" content="noindex,nofollow">{% endblock %}
+{% block title %}{{ target.full_name }}{% endblock %}
+{% block content %}
+    <article class="mx-auto max-w-xl p-4">
+        {% member_avatar target size=160 %}
+        <h1 class="text-2xl font-semibold mt-2">{{ target.full_name }}</h1>
+        {% if target.nickname %}<p class="text-sm opacity-70">« {{ target.nickname }} »</p>{% endif %}
+        <dl class="mt-4 space-y-2">
+            {% if target.profession %}
+                <div>
+                    <dt class="font-medium">{% trans "Profession" %}</dt>
+                    <dd>
+                        {{ target.profession }}
+                    </dd>
+                </div>
+            {% endif %}
+            {% if target.show_city and target.city %}
+                <div>
+                    <dt class="font-medium">{% trans "Ville" %}</dt>
+                    <dd>
+                        {{ target.city }}, {{ target.country }}
+                    </dd>
+                </div>
+            {% endif %}
+            <div>
+                <dt class="font-medium">{% trans "Promotion" %}</dt>
+                <dd>
+                    {{ target.years_attended|join:", " }}
+                </dd>
+            </div>
+            {% if target.show_email %}
+                <div>
+                    <dt class="font-medium">{% trans "Email" %}</dt>
+                    <dd>
+                        <a href="mailto:{{ target.user.email }}">{{ target.user.email }}</a>
+                    </dd>
+                </div>
+            {% endif %}
+        </dl>
+        {% if is_self %}
+            <a href="/profil/" class="btn btn-secondary mt-6">{% trans "Modifier mon profil" %}</a>
+        {% endif %}
+    </article>
+{% endblock %}
