@@ -23,6 +23,12 @@ def avatar_hue_for_slug(slug: str) -> int:
     return int(digest[:8], 16) % 360
 
 
+@register.simple_tag
+def member_photo_url(public_id: str, size: int = 240) -> str:
+    """Return a Cloudinary thumbnail URL for the given public_id, or empty if blank."""
+    return member_thumbnail_url(public_id, size=size)
+
+
 @register.simple_tag(takes_context=True)
 def member_avatar(context, member, size: int = 240, force_initials: bool = False) -> str:
     # Honor viewer's data-saver preference (spec §10) — exposed by the

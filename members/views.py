@@ -106,10 +106,17 @@ def profile_edit_view(request):
         member_form = ProfileEditForm(instance=member)
         prefs_form = NotificationPreferenceForm(instance=member.preferences)
 
+    from django.conf import settings
+
     return render(
         request,
         "members/profile_edit.html",
-        {"member_form": member_form, "prefs_form": prefs_form, "member": member},
+        {
+            "member_form": member_form,
+            "prefs_form": prefs_form,
+            "member": member,
+            "cloudinary_cloud_name": settings.CLOUDINARY_CLOUD_NAME,
+        },
     )
 
 
