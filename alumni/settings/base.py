@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     "allauth.account",
     "core",
     "members",
+    "cooptation",
 ]
 
 MIDDLEWARE = [
@@ -94,7 +95,10 @@ STORAGES = {
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
-DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@example.local")
+DEFAULT_FROM_EMAIL = env(
+    "DEFAULT_FROM_EMAIL",
+    default="Les Retrouvailles <noreply@villageretrouvailles.com>",
+)
 
 # django-allauth (older universal config style for compatibility)
 AUTHENTICATION_BACKENDS = [
@@ -167,4 +171,9 @@ LOGIN_REQUIRED_WHITELIST = [
     "/accounts/",
     "/static/",
     "/media/",
+    "/inscription/",
+    "/questionnaire/",
 ]
+
+# Resend email
+RESEND_API_KEY = env("RESEND_API_KEY", default="")
