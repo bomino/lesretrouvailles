@@ -42,6 +42,33 @@ def test_search_matches_nickname(consenting_client, make_member):
 
 
 @pytest.mark.django_db
+def test_search_matches_city(consenting_client, make_member):
+    make_member(first_name="Alpha", last_name="One", city="Niamey")
+    make_member(first_name="Beta", last_name="Two", city="Cotonou")
+    response = consenting_client.get("/annuaire/?q=niamey")
+    assert b"Alpha One" in response.content
+    assert b"Beta Two" not in response.content
+
+
+@pytest.mark.django_db
+def test_search_matches_profession(consenting_client, make_member):
+    make_member(first_name="Alpha", last_name="One", profession="Médecin")
+    make_member(first_name="Beta", last_name="Two", profession="Enseignant")
+    response = consenting_client.get("/annuaire/?q=medecin")
+    assert b"Alpha One" in response.content
+    assert b"Beta Two" not in response.content
+
+
+@pytest.mark.django_db
+def test_search_matches_country(consenting_client, make_member):
+    make_member(first_name="Alpha", last_name="One", country="France")
+    make_member(first_name="Beta", last_name="Two", country="Niger")
+    response = consenting_client.get("/annuaire/?q=france")
+    assert b"Alpha One" in response.content
+    assert b"Beta Two" not in response.content
+
+
+@pytest.mark.django_db
 def test_filter_by_year(consenting_client, make_member):
     make_member(first_name="Alpha", last_name="X", years_attended=[1980, 1981])
     make_member(first_name="Beta", last_name="Y", years_attended=[1984, 1985])

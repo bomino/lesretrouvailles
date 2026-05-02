@@ -150,8 +150,16 @@ def directory_view(request):
             first_lc=Lower(Unaccent(F("first_name"))),
             last_lc=Lower(Unaccent(F("last_name"))),
             nick_lc=Lower(Unaccent(F("nickname"))),
+            city_lc=Lower(Unaccent(F("city"))),
+            country_lc=Lower(Unaccent(F("country"))),
+            prof_lc=Lower(Unaccent(F("profession"))),
         ).filter(
-            Q(first_lc__contains=needle) | Q(last_lc__contains=needle) | Q(nick_lc__contains=needle)
+            Q(first_lc__contains=needle)
+            | Q(last_lc__contains=needle)
+            | Q(nick_lc__contains=needle)
+            | Q(city_lc__contains=needle)
+            | Q(country_lc__contains=needle)
+            | Q(prof_lc__contains=needle)
         )
 
     if year_raw:
