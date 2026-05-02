@@ -19,36 +19,101 @@ msgstr ""
 
 #: templates/base.html
 msgid "Aller au contenu principal"
-msgstr ""
+msgstr "Aller au contenu principal"
 
 #: templates/base.html
 msgid "Alumni CEG 1 Birni"
-msgstr ""
+msgstr "Alumni CEG 1 Birni"
 
 #: templates/base.html
 msgid "Les Retrouvailles"
-msgstr ""
+msgstr "Les Retrouvailles"
 
 #: templates/base.html
 msgid "Les Retrouvailles — accueil"
-msgstr ""
+msgstr "Les Retrouvailles — accueil"
 
 #: templates/base.html
 msgid "Les Retrouvailles — CEG 1 Birni de Zinder"
-msgstr ""
+msgstr "Les Retrouvailles — CEG 1 Birni de Zinder"
 
 #: templates/base.html
 msgid "Rejoindre le groupe WhatsApp"
-msgstr ""
+msgstr "Rejoindre le groupe WhatsApp"
 
 #: templates/base.html
 msgid "Depuis le 1ᵉʳ Septembre 2020"
-msgstr ""
+msgstr "Depuis le 1ᵉʳ Septembre 2020"
 
 #: templates/core/landing_placeholder.html
 msgid "Plateforme Alumni — en construction"
-msgstr ""
+msgstr "Plateforme Alumni — en construction"
 
 #: templates/core/landing_placeholder.html
 msgid "Le site est en cours de développement."
-msgstr ""
+msgstr "Le site est en cours de développement."
+
+#: members/templates/members/directory.html
+msgid "Annuaire"
+msgstr "Annuaire"
+
+#: members/templates/members/directory.html
+msgid "Rechercher…"
+msgstr "Rechercher…"
+
+#: members/templates/members/directory.html
+msgid "Année"
+msgstr "Année"
+
+#: members/templates/members/directory.html
+msgid "Ville"
+msgstr "Ville"
+
+#: members/templates/members/directory.html
+#: members/templates/members/profile_detail.html
+msgid "Profession"
+msgstr "Profession"
+
+#: members/templates/members/profile_edit.html
+msgid "Mon profil"
+msgstr "Mon profil"
+
+#: members/templates/members/profile_edit.html
+msgid "Informations"
+msgstr "Informations"
+
+#: members/templates/members/profile_edit.html
+msgid "Notifications"
+msgstr "Notifications"
+
+#: members/templates/members/profile_edit.html
+msgid "Enregistrer"
+msgstr "Enregistrer"
+
+#: members/templates/members/charter.html
+msgid "Charte"
+msgstr "Charte"
+
+#: members/templates/members/charter.html
+msgid "J'accepte"
+msgstr "J'accepte"
+
+#: members/templates/members/profile_detail.html
+msgid "Modifier mon profil"
+msgstr "Modifier mon profil"
+
+#: members/templates/members/directory_list_partial.html
+msgid "Pagination"
+msgstr "Pagination"
+
+#: members/templates/members/directory_list_partial.html
+msgid "Aucun membre trouvé."
+msgstr "Aucun membre trouvé."
+
+#: members/templates/members/profile_detail.html
+msgid "Email"
+msgstr "Email"
+
+#: members/templates/members/profile_detail.html
+msgid "Promotion"
+msgstr "Promotion"
