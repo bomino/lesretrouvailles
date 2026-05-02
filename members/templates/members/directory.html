@@ -5,39 +5,55 @@
     {% trans "Annuaire" %}
 {% endblock %}
 {% block content %}
-    <section class="mx-auto max-w-5xl p-4">
-        <h1 class="text-2xl font-semibold mb-4">{% trans "Annuaire" %}</h1>
+    <section class="mx-auto max-w-6xl">
+        <header class="mb-6 flex items-baseline justify-between gap-4">
+            <h1 class="text-3xl font-semibold tracking-tight">{% trans "Annuaire" %}</h1>
+            <p class="text-sm text-secondary hidden md:block">{% trans "Membres de la communauté CEG 1 Birni" %}</p>
+        </header>
         <form method="get"
               id="directory-filters"
-              class="mb-4 flex flex-wrap gap-2"
+              class="mb-6 grid grid-cols-1 gap-3 md:grid-cols-12 rounded-2xl bg-base-200 border border-secondary/10 p-4"
               hx-get="/annuaire/"
               hx-target="#directory-list"
               hx-push-url="true"
               hx-trigger="input changed delay:300ms from:input, change from:select, submit">
-            <input type="text"
-                   name="q"
-                   placeholder="{% trans 'Rechercher…' %}"
-                   value="{{ request.GET.q }}"
-                   class="input">
-            <select name="year" class="select">
-                <option value="">{% trans "Année" %}</option>
-                {% for y in '012345' %}
-                    <option value="{{ y|add:1980 }}"
-                            {% if request.GET.year == y|add:1980|stringformat:'s' %}selected{% endif %}>
-                        {{ y|add:1980 }}
-                    </option>
-                {% endfor %}
-            </select>
-            <input type="text"
-                   name="city"
-                   placeholder="{% trans 'Ville' %}"
-                   value="{{ request.GET.city }}"
-                   class="input">
-            <input type="text"
-                   name="profession"
-                   placeholder="{% trans 'Profession' %}"
-                   value="{{ request.GET.profession }}"
-                   class="input">
+            <label class="md:col-span-5">
+                <span class="sr-only">{% trans "Rechercher" %}</span>
+                <input type="text"
+                       name="q"
+                       placeholder="{% trans 'Rechercher un nom ou un surnom…' %}"
+                       value="{{ request.GET.q }}"
+                       class="block w-full rounded-lg border border-secondary/20 bg-white px-3 py-2 text-base shadow-sm focus:border-tertiary focus:outline-none focus:ring-2 focus:ring-tertiary/30">
+            </label>
+            <label class="md:col-span-2">
+                <span class="sr-only">{% trans "Année" %}</span>
+                <select name="year"
+                        class="block w-full rounded-lg border border-secondary/20 bg-white px-3 py-2 text-base shadow-sm focus:border-tertiary focus:outline-none focus:ring-2 focus:ring-tertiary/30">
+                    <option value="">{% trans "Année" %}</option>
+                    {% for y in '012345' %}
+                        <option value="{{ y|add:1980 }}"
+                                {% if request.GET.year == y|add:1980|stringformat:'s' %}selected{% endif %}>
+                            {{ y|add:1980 }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="md:col-span-2">
+                <span class="sr-only">{% trans "Ville" %}</span>
+                <input type="text"
+                       name="city"
+                       placeholder="{% trans 'Ville' %}"
+                       value="{{ request.GET.city }}"
+                       class="block w-full rounded-lg border border-secondary/20 bg-white px-3 py-2 text-base shadow-sm focus:border-tertiary focus:outline-none focus:ring-2 focus:ring-tertiary/30">
+            </label>
+            <label class="md:col-span-3">
+                <span class="sr-only">{% trans "Profession" %}</span>
+                <input type="text"
+                       name="profession"
+                       placeholder="{% trans 'Profession' %}"
+                       value="{{ request.GET.profession }}"
+                       class="block w-full rounded-lg border border-secondary/20 bg-white px-3 py-2 text-base shadow-sm focus:border-tertiary focus:outline-none focus:ring-2 focus:ring-tertiary/30">
+            </label>
         </form>
         <div id="directory-list">{% include "members/directory_list_partial.html" %}</div>
     </section>

@@ -26,6 +26,7 @@
   "homepage": "https://github.com/bomino/lesretrouvailles#readme",
   "devDependencies": {
     "@google/design.md": "^0.1.1",
+    "@tailwindcss/typography": "^0.5.19",
     "autoprefixer": "^10.5.0",
     "daisyui": "^4.12.24",
     "postcss": "^8.5.13",

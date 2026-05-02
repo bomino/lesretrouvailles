@@ -6,6 +6,7 @@ module.exports = {
   content: [
     "./templates/**/*.html",
     "./core/**/*.{html,py}",
+    "./members/**/*.{html,py}",
   ],
   theme: {
     extend: {
@@ -20,7 +21,7 @@ module.exports = {
       minWidth: { tap: "44px" },
     },
   },
-  plugins: [require("daisyui")],
+  plugins: [require("@tailwindcss/typography"), require("daisyui")],
   daisyui: {
     themes: [
       {

@@ -3,44 +3,51 @@
 {% block extra_head %}<meta name="robots" content="noindex,nofollow">{% endblock %}
 {% block title %}{{ target.full_name }}{% endblock %}
 {% block content %}
-    <article class="mx-auto max-w-xl p-4">
-        {% member_avatar target size=160 %}
-        <h1 class="text-2xl font-semibold mt-2">{{ target.full_name }}</h1>
-        {% if target.nickname %}<p class="text-sm opacity-70">« {{ target.nickname }} »</p>{% endif %}
-        <dl class="mt-4 space-y-2">
-            {% if target.profession %}
-                <div>
-                    <dt class="font-medium">{% trans "Profession" %}</dt>
-                    <dd>
-                        {{ target.profession }}
-                    </dd>
+    <article class="mx-auto max-w-2xl">
+        <div class="rounded-2xl bg-base-200 border border-secondary/15 px-6 py-8 shadow-sm sm:px-10">
+            <div class="flex flex-col items-center text-center sm:flex-row sm:items-start sm:text-left sm:gap-6">
+                <div class="shrink-0">{% member_avatar target size=160 %}</div>
+                <div class="mt-4 sm:mt-0 min-w-0">
+                    <h1 class="text-3xl font-semibold tracking-tight">{{ target.full_name }}</h1>
+                    {% if target.nickname %}<p class="mt-1 text-base text-secondary italic">« {{ target.nickname }} »</p>{% endif %}
+                    {% if target.profession %}<p class="mt-2 text-base text-primary/80">{{ target.profession }}</p>{% endif %}
                 </div>
-            {% endif %}
-            {% if target.show_city and target.city %}
-                <div>
-                    <dt class="font-medium">{% trans "Ville" %}</dt>
-                    <dd>
-                        {{ target.city }}, {{ target.country }}
-                    </dd>
-                </div>
-            {% endif %}
-            <div>
-                <dt class="font-medium">{% trans "Promotion" %}</dt>
-                <dd>
-                    {{ target.years_attended|join:", " }}
-                </dd>
             </div>
-            {% if target.show_email %}
+            <dl class="mt-8 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+                {% if target.show_city and target.city %}
+                    <div>
+                        <dt class="text-xs font-medium uppercase tracking-wider text-secondary">{% trans "Ville" %}</dt>
+                        <dd class="mt-1 text-base">
+                            {{ target.city }}, {{ target.country }}
+                        </dd>
+                    </div>
+                {% endif %}
                 <div>
-                    <dt class="font-medium">{% trans "Email" %}</dt>
-                    <dd>
-                        <a href="mailto:{{ target.user.email }}">{{ target.user.email }}</a>
+                    <dt class="text-xs font-medium uppercase tracking-wider text-secondary">{% trans "Promotion" %}</dt>
+                    <dd class="mt-1 inline-flex flex-wrap gap-1.5 text-sm">
+                        {% for year in target.years_attended %}
+                            <span class="rounded-full bg-base-300/60 px-2.5 py-1">{{ year }}</span>
+                        {% endfor %}
                     </dd>
                 </div>
+                {% if target.show_email %}
+                    <div class="sm:col-span-2">
+                        <dt class="text-xs font-medium uppercase tracking-wider text-secondary">{% trans "Email" %}</dt>
+                        <dd class="mt-1 text-base">
+                            <a class="text-tertiary hover:underline"
+                               href="mailto:{{ target.user.email }}">{{ target.user.email }}</a>
+                        </dd>
+                    </div>
+                {% endif %}
+            </dl>
+            {% if is_self %}
+                <div class="mt-8 flex justify-end">
+                    <a href="/profil/"
+                       class="inline-flex items-center rounded-lg border border-secondary/20 bg-base-100 px-4 py-2 text-sm font-medium hover:border-tertiary/40 hover:text-tertiary min-h-tap">
+                        {% trans "Modifier mon profil" %}
+                    </a>
+                </div>
             {% endif %}
-        </dl>
-        {% if is_self %}
-            <a href="/profil/" class="btn btn-secondary mt-6">{% trans "Modifier mon profil" %}</a>
-        {% endif %}
+        </div>
     </article>
 {% endblock %}

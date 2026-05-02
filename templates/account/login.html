@@ -4,12 +4,58 @@
     {% trans "Connexion" %}
 {% endblock %}
 {% block content %}
-    <div class="max-w-md mx-auto card bg-base-200 p-6">
-        <h1 class="text-2xl font-bold mb-4">{% trans "Connexion" %}</h1>
-        <form method="post" action="{% url 'account_login' %}">
-            {% csrf_token %}
-            {{ form.as_p }}
-            <button type="submit" class="btn btn-primary w-full mt-4">{% trans "Se connecter" %}</button>
-        </form>
+    <div class="mx-auto max-w-md mt-12">
+        <div class="rounded-2xl bg-base-200 p-8 shadow-sm border border-secondary/10">
+            <h1 class="text-2xl font-semibold mb-6 text-center">{% trans "Connexion" %}</h1>
+            <form method="post" action="{% url 'account_login' %}" class="space-y-5">
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                    <div role="alert"
+                         class="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
+                <div class="space-y-1.5">
+                    <label for="{{ form.login.id_for_label }}" class="block text-sm font-medium">{% trans "Email" %}</label>
+                    <input type="email"
+                           name="{{ form.login.html_name }}"
+                           id="{{ form.login.id_for_label }}"
+                           value="{{ form.login.value|default:'' }}"
+                           autocomplete="email"
+                           required
+                           class="block w-full rounded-lg border border-secondary/20 bg-white px-3 py-2.5 text-base shadow-sm focus:border-tertiary focus:outline-none focus:ring-2 focus:ring-tertiary/30">
+                    {% if form.login.errors %}<p class="text-sm text-red-700">{{ form.login.errors|join:" " }}</p>{% endif %}
+                </div>
+                <div class="space-y-1.5">
+                    <div class="flex items-baseline justify-between">
+                        <label for="{{ form.password.id_for_label }}"
+                               class="block text-sm font-medium">{% trans "Mot de passe" %}</label>
+                        <a href="{% url 'account_reset_password' %}"
+                           class="text-sm text-tertiary hover:underline">{% trans "Mot de passe oublié ?" %}</a>
+                    </div>
+                    <input type="password"
+                           name="{{ form.password.html_name }}"
+                           id="{{ form.password.id_for_label }}"
+                           autocomplete="current-password"
+                           required
+                           class="block w-full rounded-lg border border-secondary/20 bg-white px-3 py-2.5 text-base shadow-sm focus:border-tertiary focus:outline-none focus:ring-2 focus:ring-tertiary/30">
+                    {% if form.password.errors %}<p class="text-sm text-red-700">{{ form.password.errors|join:" " }}</p>{% endif %}
+                </div>
+                {% if form.remember %}
+                    <label for="{{ form.remember.id_for_label }}"
+                           class="flex items-center gap-2 text-sm">
+                        <input type="checkbox"
+                               name="{{ form.remember.html_name }}"
+                               id="{{ form.remember.id_for_label }}"
+                               class="h-4 w-4 rounded border-secondary/30 text-tertiary focus:ring-tertiary">
+                        {% trans "Se souvenir de moi" %}
+                    </label>
+                {% endif %}
+                <button type="submit"
+                        class="w-full rounded-lg bg-tertiary px-4 py-2.5 text-base font-medium text-on-tertiary shadow-sm hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-tertiary/40 min-h-tap">
+                    {% trans "Se connecter" %}
+                </button>
+            </form>
+        </div>
     </div>
 {% endblock %}

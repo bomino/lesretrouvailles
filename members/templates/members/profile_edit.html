@@ -5,27 +5,122 @@
     {% trans "Mon profil" %}
 {% endblock %}
 {% block content %}
-    <form method="post"
-          class="mx-auto max-w-xl p-4 space-y-4"
-          id="profile-form">
-        {% csrf_token %}
-        <h1 class="text-2xl font-semibold">{% trans "Mon profil" %}</h1>
-        <fieldset class="space-y-3">
-            <legend class="font-medium">{% trans "Informations" %}</legend>
-            {{ member_form.nickname.label_tag }} {{ member_form.nickname }}
-            {{ member_form.city.label_tag }} {{ member_form.city }}
-            {{ member_form.country.label_tag }} {{ member_form.country }}
-            {{ member_form.profession.label_tag }} {{ member_form.profession }}
-            {{ member_form.show_email }} {{ member_form.show_email.label_tag }}
-            {{ member_form.show_whatsapp }} {{ member_form.show_whatsapp.label_tag }}
-            {{ member_form.show_city }} {{ member_form.show_city.label_tag }}
-            {{ member_form.photo_public_id }}
-        </fieldset>
-        <fieldset class="space-y-3">
-            <legend class="font-medium">{% trans "Notifications" %}</legend>
-            {{ prefs_form.as_p }}
-        </fieldset>
-        <button type="submit" class="btn btn-primary">{% trans "Enregistrer" %}</button>
-    </form>
-    <!-- Photo upload widget — Task 18 lays the persistence; full JS uploader is wired in a separate front-end task. -->
+    <div class="mx-auto max-w-2xl">
+        <h1 class="text-3xl font-semibold tracking-tight mb-6">{% trans "Mon profil" %}</h1>
+        {% if messages %}
+            {% for message in messages %}
+                <div role="alert"
+                     class="mb-4 rounded-lg border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-800">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+        <form method="post" id="profile-form" class="space-y-8">
+            {% csrf_token %}
+            <fieldset class="rounded-2xl bg-base-200 border border-secondary/15 p-6 shadow-sm">
+                <legend class="px-2 text-sm font-medium uppercase tracking-wider text-secondary">{% trans "Informations" %}</legend>
+                <div class="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <label class="block sm:col-span-2">
+                        <span class="block text-sm font-medium mb-1.5">{% trans "Surnom" %}</span>
+                        <input type="text"
+                               name="{{ member_form.nickname.html_name }}"
+                               value="{{ member_form.nickname.value|default:'' }}"
+                               class="block w-full rounded-lg border border-secondary/20 bg-white px-3 py-2 text-base shadow-sm focus:border-tertiary focus:outline-none focus:ring-2 focus:ring-tertiary/30">
+                    </label>
+                    <label class="block">
+                        <span class="block text-sm font-medium mb-1.5">{% trans "Ville" %}</span>
+                        <input type="text"
+                               name="{{ member_form.city.html_name }}"
+                               value="{{ member_form.city.value|default:'' }}"
+                               class="block w-full rounded-lg border border-secondary/20 bg-white px-3 py-2 text-base shadow-sm focus:border-tertiary focus:outline-none focus:ring-2 focus:ring-tertiary/30">
+                    </label>
+                    <label class="block">
+                        <span class="block text-sm font-medium mb-1.5">{% trans "Pays" %}</span>
+                        <input type="text"
+                               name="{{ member_form.country.html_name }}"
+                               value="{{ member_form.country.value|default:'' }}"
+                               class="block w-full rounded-lg border border-secondary/20 bg-white px-3 py-2 text-base shadow-sm focus:border-tertiary focus:outline-none focus:ring-2 focus:ring-tertiary/30">
+                    </label>
+                    <label class="block sm:col-span-2">
+                        <span class="block text-sm font-medium mb-1.5">{% trans "Profession" %}</span>
+                        <input type="text"
+                               name="{{ member_form.profession.html_name }}"
+                               value="{{ member_form.profession.value|default:'' }}"
+                               class="block w-full rounded-lg border border-secondary/20 bg-white px-3 py-2 text-base shadow-sm focus:border-tertiary focus:outline-none focus:ring-2 focus:ring-tertiary/30">
+                    </label>
+                </div>
+                <p class="mt-6 mb-2 text-sm font-medium uppercase tracking-wider text-secondary">{% trans "Confidentialité" %}</p>
+                <div class="space-y-2">
+                    <label class="flex items-center gap-2.5 text-sm">
+                        <input type="checkbox"
+                               name="{{ member_form.show_email.html_name }}"
+                               {% if member_form.show_email.value %}checked{% endif %}
+                               class="h-4 w-4 rounded border-secondary/30 text-tertiary focus:ring-tertiary">
+                        <span>{% trans "Afficher mon email aux autres membres" %}</span>
+                    </label>
+                    <label class="flex items-center gap-2.5 text-sm">
+                        <input type="checkbox"
+                               name="{{ member_form.show_whatsapp.html_name }}"
+                               {% if member_form.show_whatsapp.value %}checked{% endif %}
+                               class="h-4 w-4 rounded border-secondary/30 text-tertiary focus:ring-tertiary">
+                        <span>{% trans "Afficher mon WhatsApp aux autres membres" %}</span>
+                    </label>
+                    <label class="flex items-center gap-2.5 text-sm">
+                        <input type="checkbox"
+                               name="{{ member_form.show_city.html_name }}"
+                               {% if member_form.show_city.value %}checked{% endif %}
+                               class="h-4 w-4 rounded border-secondary/30 text-tertiary focus:ring-tertiary">
+                        <span>{% trans "Afficher ma ville aux autres membres" %}</span>
+                    </label>
+                </div>
+                {{ member_form.photo_public_id }}
+            </fieldset>
+            <fieldset class="rounded-2xl bg-base-200 border border-secondary/15 p-6 shadow-sm">
+                <legend class="px-2 text-sm font-medium uppercase tracking-wider text-secondary">{% trans "Notifications" %}</legend>
+                <div class="mt-2 space-y-2">
+                    <label class="flex items-center gap-2.5 text-sm">
+                        <input type="checkbox"
+                               name="{{ prefs_form.digest_weekly.html_name }}"
+                               {% if prefs_form.digest_weekly.value %}checked{% endif %}
+                               class="h-4 w-4 rounded border-secondary/30 text-tertiary focus:ring-tertiary">
+                        <span>{% trans "Recevoir le résumé hebdomadaire" %}</span>
+                    </label>
+                    <label class="flex items-center gap-2.5 text-sm">
+                        <input type="checkbox"
+                               name="{{ prefs_form.in_memoriam_alerts.html_name }}"
+                               {% if prefs_form.in_memoriam_alerts.value %}checked{% endif %}
+                               class="h-4 w-4 rounded border-secondary/30 text-tertiary focus:ring-tertiary">
+                        <span>{% trans "Alertes In Memoriam" %}</span>
+                    </label>
+                    <label class="flex items-center gap-2.5 text-sm">
+                        <input type="checkbox"
+                               name="{{ prefs_form.event_alerts.html_name }}"
+                               {% if prefs_form.event_alerts.value %}checked{% endif %}
+                               class="h-4 w-4 rounded border-secondary/30 text-tertiary focus:ring-tertiary">
+                        <span>{% trans "Alertes événements" %}</span>
+                    </label>
+                    <label class="flex items-center gap-2.5 text-sm">
+                        <input type="checkbox"
+                               name="{{ prefs_form.tag_alerts.html_name }}"
+                               {% if prefs_form.tag_alerts.value %}checked{% endif %}
+                               class="h-4 w-4 rounded border-secondary/30 text-tertiary focus:ring-tertiary">
+                        <span>{% trans "Alertes quand je suis identifié·e sur une photo" %}</span>
+                    </label>
+                    <label class="flex items-center gap-2.5 text-sm">
+                        <input type="checkbox"
+                               name="{{ prefs_form.data_saver.html_name }}"
+                               {% if prefs_form.data_saver.value %}checked{% endif %}
+                               class="h-4 w-4 rounded border-secondary/30 text-tertiary focus:ring-tertiary">
+                        <span>{% trans "Mode économie de données (masquer les photos)" %}</span>
+                    </label>
+                </div>
+            </fieldset>
+            <div class="flex justify-end">
+                <button type="submit"
+                        class="rounded-lg bg-tertiary px-6 py-2.5 text-base font-medium text-on-tertiary shadow-sm hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-tertiary/40 min-h-tap">
+                    {% trans "Enregistrer" %}
+                </button>
+            </div>
+        </form>
+    </div>
 {% endblock %}
