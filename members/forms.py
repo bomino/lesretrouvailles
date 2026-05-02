@@ -28,6 +28,10 @@ class ProfileEditForm(forms.ModelForm):
         if not value:
             return ""
         expected_prefix = f"members/{self.instance.slug}/"
+        # Reject path traversal: `members/<slug>/../../other` would pass startswith
+        # but escapes the member's own folder on the Cloudinary backend.
+        if ".." in value.split("/"):
+            raise ValidationError("Chemin de photo invalide.")
         if not value.startswith(expected_prefix):
             raise ValidationError("Chemin de photo invalide.")
         return value

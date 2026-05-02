@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import markdown as _markdown
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.postgres.lookups import Unaccent
@@ -105,8 +106,6 @@ def profile_edit_view(request):
     else:
         member_form = ProfileEditForm(instance=member)
         prefs_form = NotificationPreferenceForm(instance=member.preferences)
-
-    from django.conf import settings
 
     return render(
         request,

@@ -118,3 +118,44 @@ def test_long_query_is_truncated(consenting_client, make_member):
     long_q = "a" * 200
     response = consenting_client.get(f"/annuaire/?q={long_q}")
     assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_search_empty_query_returns_all_active_members(consenting_client, make_member):
+    make_member(first_name="Alpha", last_name="One")
+    make_member(first_name="Beta", last_name="Two")
+    response = consenting_client.get("/annuaire/?q=")
+    assert b"Alpha One" in response.content
+    assert b"Beta Two" in response.content
+
+
+@pytest.mark.django_db
+def test_search_query_with_only_whitespace_returns_all(consenting_client, make_member):
+    make_member(first_name="Alpha", last_name="One")
+    make_member(first_name="Beta", last_name="Two")
+    response = consenting_client.get("/annuaire/?q=%20%20%20")
+    assert b"Alpha One" in response.content
+    assert b"Beta Two" in response.content
+
+
+@pytest.mark.django_db
+def test_search_query_with_percent_chars_does_not_break(consenting_client, make_member):
+    """Postgres `%` is a LIKE wildcard. `Value(q)` must parameterize so a
+    raw `%` in user input doesn't match every row or break the query."""
+    make_member(first_name="Alpha", last_name="One")
+    response = consenting_client.get("/annuaire/?q=%25%25%25%25")  # %%% URL-encoded
+    assert response.status_code == 200
+    # Literal '%' is not in any seeded name, so result should be empty.
+    assert b"Alpha One" not in response.content
+
+
+@pytest.mark.django_db
+def test_search_query_with_sql_injection_attempt_is_safe(consenting_client, make_member):
+    make_member(first_name="Alpha", last_name="One")
+    # Classic injection attempt; ORM must parameterize.
+    response = consenting_client.get("/annuaire/?q=%27%3B+DROP+TABLE+members_member%3B--")
+    assert response.status_code == 200
+    # Confirm the table still exists by re-querying.
+    from members.models import Member
+
+    assert Member.objects.filter(first_name="Alpha").exists()

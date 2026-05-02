@@ -129,6 +129,10 @@
                 showStatus("Erreur réseau. Vérifiez votre connexion.", "error");
             } finally {
                 trigger.disabled = false;
+                // Reset so the same file can be re-selected after a failed
+                // upload (browsers suppress 'change' on identical re-selection
+                // unless the input is cleared first).
+                fileInput.value = "";
             }
         });
 

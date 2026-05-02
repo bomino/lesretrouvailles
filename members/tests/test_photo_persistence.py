@@ -102,3 +102,53 @@ def test_old_photo_deleted_on_replacement(consenting_client, monkeypatch):
     member.refresh_from_db()
     assert member.photo_public_id == new_id
     assert f"members/{member.slug}/old_photo" in fake.delete_calls
+
+
+@pytest.mark.django_db
+def test_photo_path_traversal_with_double_dot_rejected(consenting_client):
+    """`members/<slug>/../admin/evil` would pass startswith but escapes
+    the member's folder. The form must reject any path containing `..`."""
+    member = consenting_client.member
+    response = consenting_client.post(
+        "/profil/",
+        {
+            "nickname": "",
+            "city": "Niamey",
+            "country": "Niger",
+            "profession": "",
+            "show_email": "on",
+            "show_whatsapp": "on",
+            "show_city": "on",
+            "digest_weekly": "",
+            "in_memoriam_alerts": "on",
+            "event_alerts": "",
+            "tag_alerts": "on",
+            "data_saver": "",
+            "photo_public_id": f"members/{member.slug}/../admin/evil",
+        },
+    )
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_photo_path_traversal_deep_double_dot_rejected(consenting_client):
+    member = consenting_client.member
+    response = consenting_client.post(
+        "/profil/",
+        {
+            "nickname": "",
+            "city": "Niamey",
+            "country": "Niger",
+            "profession": "",
+            "show_email": "on",
+            "show_whatsapp": "on",
+            "show_city": "on",
+            "digest_weekly": "",
+            "in_memoriam_alerts": "on",
+            "event_alerts": "",
+            "tag_alerts": "on",
+            "data_saver": "",
+            "photo_public_id": f"members/{member.slug}/photo/../../other/evil",
+        },
+    )
+    assert response.status_code == 400
