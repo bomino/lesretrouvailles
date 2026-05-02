@@ -1,0 +1,10 @@
+# Force LF line endings on shell scripts and Dockerfile so they run in
+# Linux containers regardless of the contributor's OS. Without this, the
+# entrypoint.sh script breaks silently inside the Railway/Docker image
+# because bash chokes on \r characters in `if [ "$X" = "db" ]` etc.
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+.dockerignore text eol=lf
+
+# Ensure Python files stay LF too (some editors flip them on Windows).
+*.py        text eol=lf
