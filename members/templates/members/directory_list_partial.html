@@ -1,0 +1,32 @@
+{% load i18n member_avatar %}
+<ul class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+    aria-live="polite">
+    {% for member in members %}
+        <li class="member-card">
+            <div class="border rounded p-3 flex gap-3">
+                <a href="/membres/{{ member.slug }}/" class="shrink-0">{% member_avatar member size=64 %}</a>
+                <div>
+                    <a href="/membres/{{ member.slug }}/" class="font-medium">{{ member.full_name }}</a>
+                    {% if member.show_city and member.city %}<p class="text-sm opacity-70">{{ member.city }}</p>{% endif %}
+                    {% if member.profession %}<p class="text-sm">{{ member.profession }}</p>{% endif %}
+                    <p class="text-xs opacity-70">{{ member.years_attended|join:", " }}</p>
+                </div>
+            </div>
+        </li>
+    {% empty %}
+        <li class="opacity-70">{% trans "Aucun membre trouvé." %}</li>
+    {% endfor %}
+</ul>
+{% if page.paginator.num_pages > 1 %}
+    <nav class="mt-4 flex gap-2" aria-label="{% trans 'Pagination' %}">
+        {% if page.has_previous %}
+            <a href="?page={{ page.previous_page_number }}{% for k, v in request.GET.items %}{% if k != 'page' %}&{{ k }}={{ v }}{% endif %}{% endfor %}"
+               class="btn btn-sm">‹</a>
+        {% endif %}
+        <span class="self-center">{{ page.number }} / {{ page.paginator.num_pages }}</span>
+        {% if page.has_next %}
+            <a href="?page={{ page.next_page_number }}{% for k, v in request.GET.items %}{% if k != 'page' %}&{{ k }}={{ v }}{% endif %}{% endfor %}"
+               class="btn btn-sm">›</a>
+        {% endif %}
+    </nav>
+{% endif %}

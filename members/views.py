@@ -5,6 +5,7 @@ from __future__ import annotations
 import markdown as _markdown
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_http_methods
@@ -121,3 +122,31 @@ def cloudinary_sign_view(request):
     timestamp = now_timestamp()
     payload = get_client().sign_upload(folder=folder, timestamp=timestamp)
     return JsonResponse(payload)
+
+
+@login_required
+@require_http_methods(["GET"])
+def directory_view(request):
+    qs = Member.objects.filter(status="active").order_by("last_name", "first_name")
+
+    paginator = Paginator(qs, 20)
+    raw_page = request.GET.get("page", "1")
+    try:
+        page_number = max(1, int(raw_page))
+    except (TypeError, ValueError):
+        page_number = 1
+    try:
+        page = paginator.page(page_number)
+    except (EmptyPage, PageNotAnInteger):
+        page = paginator.page(paginator.num_pages or 1)
+
+    template = (
+        "members/directory_list_partial.html"
+        if request.headers.get("Hx-Request")
+        else "members/directory.html"
+    )
+    return render(
+        request,
+        template,
+        {"page": page, "members": page.object_list},
+    )

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block extra_head %}<meta name="robots" content="noindex,nofollow">{% endblock %}
+{% block title %}
+    {% trans "Annuaire" %}
+{% endblock %}
+{% block content %}
+    <section class="mx-auto max-w-5xl p-4">
+        <h1 class="text-2xl font-semibold mb-4">{% trans "Annuaire" %}</h1>
+        <form method="get"
+              id="directory-filters"
+              class="mb-4 flex flex-wrap gap-2"
+              hx-get="/annuaire/"
+              hx-target="#directory-list"
+              hx-push-url="true"
+              hx-trigger="input changed delay:300ms from:input, change from:select, submit">
+            <input type="text"
+                   name="q"
+                   placeholder="{% trans 'Rechercher…' %}"
+                   value="{{ request.GET.q }}"
+                   class="input">
+            <select name="year" class="select">
+                <option value="">{% trans "Année" %}</option>
+                {% for y in '012345' %}
+                    <option value="{{ y|add:1980 }}"
+                            {% if request.GET.year == y|add:1980|stringformat:'s' %}selected{% endif %}>
+                        {{ y|add:1980 }}
+                    </option>
+                {% endfor %}
+            </select>
+            <input type="text"
+                   name="city"
+                   placeholder="{% trans 'Ville' %}"
+                   value="{{ request.GET.city }}"
+                   class="input">
+            <input type="text"
+                   name="profession"
+                   placeholder="{% trans 'Profession' %}"
+                   value="{{ request.GET.profession }}"
+                   class="input">
+        </form>
+        <div id="directory-list">{% include "members/directory_list_partial.html" %}</div>
+    </section>
+{% endblock %}
