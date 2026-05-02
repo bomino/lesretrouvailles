@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Project base — accessibility baseline */
+html { font-size: 16px; }
+body { font-family: ui-sans-serif, system-ui, sans-serif; }
+button, .btn, a.btn { min-height: 44px; min-width: 44px; }

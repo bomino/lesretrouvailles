@@ -1,0 +1,31 @@
+{
+  "name": "retrouvailles",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "css:build": "tailwindcss -i ./static/css/input.css -o ./static/css/output.css --minify",
+    "css:watch": "tailwindcss -i ./static/css/input.css -o ./static/css/output.css --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bomino/lesretrouvailles.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/bomino/lesretrouvailles/issues"
+  },
+  "homepage": "https://github.com/bomino/lesretrouvailles#readme",
+  "devDependencies": {
+    "autoprefixer": "^10.5.0",
+    "daisyui": "^4.12.24",
+    "postcss": "^8.5.13",
+    "tailwindcss": "^3.4.19"
+  }
+}
