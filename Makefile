@@ -3,7 +3,7 @@
 dev:
 	python manage.py runserver
 
-test:
+test: css
 	pytest -v
 
 migrate:
