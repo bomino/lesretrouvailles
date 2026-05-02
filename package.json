@@ -7,6 +7,8 @@
     "doc": "docs"
   },
   "scripts": {
+    "design:lint": "node ./node_modules/@google/design.md/dist/index.js lint DESIGN.md",
+    "design:export": "node ./node_modules/@google/design.md/dist/index.js export --format tailwind DESIGN.md > tailwind.theme.json",
     "css:build": "tailwindcss -i ./static/css/input.css -o ./static/css/output.css --minify",
     "css:watch": "tailwindcss -i ./static/css/input.css -o ./static/css/output.css --watch"
   },
@@ -23,6 +25,7 @@
   },
   "homepage": "https://github.com/bomino/lesretrouvailles#readme",
   "devDependencies": {
+    "@google/design.md": "^0.1.1",
     "autoprefixer": "^10.5.0",
     "daisyui": "^4.12.24",
     "postcss": "^8.5.13",

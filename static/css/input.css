@@ -6,3 +6,11 @@
 html { font-size: 16px; }
 body { font-family: ui-sans-serif, system-ui, sans-serif; }
 button, .btn, a.btn { min-height: 44px; min-width: 44px; }
+
+/* Force emission of DESIGN.md token colors so tests verify them in output.css.
+   These rules are unused by templates but trigger Tailwind JIT emission. */
+.token-anchor-primary { color: theme(colors.primary); }
+.token-anchor-tertiary { color: theme(colors.tertiary); }
+.token-anchor-in-memoriam { color: theme(colors.in-memoriam); }
+.token-anchor-whatsapp { color: theme(colors.whatsapp-green); }
+.token-anchor-gold { color: theme(colors.ceremonial-gold); }
