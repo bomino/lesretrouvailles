@@ -1,0 +1,49 @@
+name: tests
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: alumni
+          POSTGRES_USER: alumni
+          POSTGRES_PASSWORD: alumni
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U alumni" --health-interval 5s
+          --health-timeout 3s --health-retries 5
+    env:
+      DATABASE_URL: postgres://alumni:alumni@localhost:5432/alumni
+      SECRET_KEY: ci-secret-key-not-for-production-32chars
+      DEBUG: "true"
+      ALLOWED_HOSTS: localhost
+      DJANGO_SETTINGS_MODULE: alumni.settings.dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: sudo apt-get update && sudo apt-get install -y gettext
+      - run: pip install -e ".[dev]"
+      - run: npm ci
+      - run: npm run design:lint
+      - run: npm run design:export
+      - run: npm run css:build
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: djlint templates/ --check
+      - run: python manage.py compilemessages
+      - run: pytest -v
