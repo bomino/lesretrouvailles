@@ -44,3 +44,6 @@ htmlcov/
 
 # Ruff
 .ruff_cache/
+
+# Editable install metadata
+*.egg-info/
