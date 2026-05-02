@@ -126,13 +126,39 @@ CLOUDINARY_URL = env(
     default=f"cloudinary://{CLOUDINARY_API_KEY}:{CLOUDINARY_API_SECRET}@{CLOUDINARY_CLOUD_NAME}",
 )
 
-# Rate limiting (django-ratelimit) — uses Django's default cache backend
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "alumni-default",
-    },
-}
+# Rate limiting and other cache use (django-ratelimit, etc).
+#
+# Backend selection is env-driven so the same image runs in dev (LocMem),
+# staging (DatabaseCache so all gunicorn workers share state), and prod
+# (Redis once we provision it).
+#
+# - CACHE_BACKEND=db     -> Postgres-backed DatabaseCache (cross-worker, persistent)
+# - REDIS_URL is set     -> Redis (preferred for prod)
+# - otherwise            -> LocMemCache (single-process, fine for tests)
+_CACHE_BACKEND = env("CACHE_BACKEND", default="")
+_REDIS_URL = env("REDIS_URL", default="")
+
+if _CACHE_BACKEND == "db":
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+            "LOCATION": "alumni_cache",
+        },
+    }
+elif _REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": _REDIS_URL,
+        },
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "alumni-default",
+        },
+    }
 
 # Login + consent gating
 LOGIN_REQUIRED_WHITELIST = [

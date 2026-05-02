@@ -25,28 +25,43 @@
 
 ### 3. Railway environment variables
 
-In the app service → **Variables** tab, set:
+In the app service → **Variables** tab, set the following. **Mandatory** vars are
+checked at app boot and the container will refuse to start if any are missing or
+misconfigured (so misconfigurations surface as a startup failure, not a silent
+security hole).
 
-| Variable | Value |
-|----------|-------|
-| `DJANGO_SETTINGS_MODULE` | `alumni.settings.staging` |
-| `SECRET_KEY` | (50-char token from `python -c "import secrets; print(secrets.token_urlsafe(50))"`) |
-| `ALLOWED_HOSTS` | `staging.villageretrouvailles.com,.up.railway.app` |
-| `CSRF_TRUSTED_ORIGINS` | `https://staging.villageretrouvailles.com,https://*.up.railway.app` |
-| `SITE_URL` | `https://staging.villageretrouvailles.com` |
-| `SECURE_SSL_REDIRECT` | `true` |
-| `BASIC_AUTH_REQUIRED` | `true` |
-| `BASIC_AUTH_USERNAME` | `admin` |
-| `BASIC_AUTH_PASSWORD` | (generated 24-char token) |
-| `CLOUDINARY_CLIENT_PATH` | `alumni.cloudinary.RealCloudinary` |
-| `CLOUDINARY_CLOUD_NAME` | from Cloudinary dashboard |
-| `CLOUDINARY_API_KEY` | from Cloudinary dashboard |
-| `CLOUDINARY_API_SECRET` | from Cloudinary dashboard |
-| `CLOUDINARY_URL` | from Cloudinary dashboard (`cloudinary://<key>:<secret>@<cloud>`) |
-| `WEB_CONCURRENCY` | `2` |
-| `DATABASE_URL` | `${{ Postgres.DATABASE_URL }}` (auto-set above) |
+#### Mandatory
+
+| Variable | Value | Why |
+|----------|-------|-----|
+| `DJANGO_SETTINGS_MODULE` | `alumni.settings.staging` | Selects staging settings module |
+| `SECRET_KEY` | (50-char token from `python -c "import secrets; print(secrets.token_urlsafe(50))"`) | Django session/CSRF signing |
+| `DATABASE_URL` | `${{ Postgres.DATABASE_URL }}` (auto-set when Postgres add-on is added) | DB connection |
+| `ALLOWED_HOSTS` | `staging.villageretrouvailles.com,.up.railway.app` | Django host header check |
+| `CSRF_TRUSTED_ORIGINS` | `https://staging.villageretrouvailles.com,https://*.up.railway.app` | **Without this, all POST forms 403 in HTTPS** |
+| `BASIC_AUTH_REQUIRED` | `true` | Activates the staging gate |
+| `BASIC_AUTH_USERNAME` | `admin` | **App refuses to boot if blank when REQUIRED=true** (prevents the `Authorization: Basic Og==` empty-credential bypass) |
+| `BASIC_AUTH_PASSWORD` | (24-char token from `python -c "import secrets; print(secrets.token_urlsafe(24))"`) | Same: must be non-empty |
+| `CLOUDINARY_CLIENT_PATH` | `alumni.cloudinary.RealCloudinary` | Switches off the test fake |
+| `CLOUDINARY_CLOUD_NAME` | from Cloudinary dashboard | **App refuses to boot if RealCloudinary is paired with `fake-cloud`** |
+| `CLOUDINARY_API_KEY` | from Cloudinary dashboard | Signed-upload auth |
+| `CLOUDINARY_API_SECRET` | from Cloudinary dashboard | Signed-upload auth (server-side only) |
+| `CLOUDINARY_URL` | from Cloudinary dashboard (`cloudinary://<key>:<secret>@<cloud>`) | Cloudinary SDK convenience var |
+
+#### Recommended
+
+| Variable | Value | Why |
+|----------|-------|-----|
+| `CACHE_BACKEND` | `db` | Postgres-backed cache so all gunicorn workers share the rate-limit counters. Without this, `WEB_CONCURRENCY=2` means each worker has its own counter and the per-user rate limit doubles. |
+| `SITE_URL` | `https://staging.villageretrouvailles.com` | Used for absolute links in emails (P3 onwards) |
+| `SECURE_SSL_REDIRECT` | `true` | Force HTTPS (default in staging settings) |
+| `WEB_CONCURRENCY` | `2` | Gunicorn worker count. Hobby tier handles ~2 fine. |
+| `GUNICORN_TIMEOUT` | `60` | Request timeout (default in entrypoint). Bump for slow third-party calls. |
 
 `PORT` is auto-set by Railway — do not override.
+
+When `REDIS_URL` is set later (e.g., add Railway Redis add-on), the cache backend
+auto-switches from DB to Redis without code changes.
 
 After saving, Railway redeploys automatically.
 

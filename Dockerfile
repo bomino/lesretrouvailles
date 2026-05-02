@@ -48,7 +48,8 @@ RUN pip install --upgrade pip && pip install \
     "gunicorn>=21" \
     "cloudinary>=1.40" \
     "django-ratelimit>=4.1" \
-    "markdown>=3.6"
+    "markdown>=3.6" \
+    "redis>=5.0"
 
 # Copy source code
 COPY pyproject.toml ./

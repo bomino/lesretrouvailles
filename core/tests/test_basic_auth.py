@@ -96,3 +96,33 @@ def test_basic_auth_does_not_raise_when_disabled_with_empty_creds():
     ):
         # Should construct without raising.
         BasicAuthMiddleware(lambda req: None)
+
+
+# ---- Settings-level guards added during the pre-staging audit ----
+
+
+def test_staging_settings_reject_realcloudinary_with_fake_cloud(monkeypatch):
+    """Operator pointed CLOUDINARY_CLIENT_PATH at the real client but forgot
+    to set CLOUDINARY_CLOUD_NAME, so it kept the 'fake-cloud' default. Loading
+    staging settings under that combo must raise so the misconfiguration
+    surfaces at boot, not as broken upload URLs at runtime."""
+    monkeypatch.setenv("CLOUDINARY_CLIENT_PATH", "alumni.cloudinary.RealCloudinary")
+    monkeypatch.setenv("CLOUDINARY_CLOUD_NAME", "fake-cloud")
+    # Provide the other vars so we don't trip a different guard first.
+    monkeypatch.setenv("BASIC_AUTH_REQUIRED", "false")
+
+    import importlib
+    import sys
+
+    # Drop any cached staging module so the import re-evaluates with the patched env.
+    for mod in list(sys.modules):
+        if mod.startswith("alumni.settings"):
+            del sys.modules[mod]
+
+    with pytest.raises(ImproperlyConfigured):
+        importlib.import_module("alumni.settings.staging")
+
+    # Restore for any later tests in the module.
+    for mod in list(sys.modules):
+        if mod.startswith("alumni.settings"):
+            del sys.modules[mod]

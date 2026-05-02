@@ -39,8 +39,8 @@ seed:
 docker-build:
 	docker build -t retrouvailles:local .
 
-docker-run: docker-build
-	docker compose up -d
+docker-run:
+	docker compose up -d --build
 	@echo "Staging-shaped app at http://localhost:8000 (basic-auth: admin / compose-test-pw)"
 
 docker-down:
