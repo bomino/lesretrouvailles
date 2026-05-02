@@ -62,3 +62,50 @@ def test_application_outcome_choices(make_application):
     expected = {"pending", "all_accepted", "mixed", "all_refused", "expired"}
     actual = {choice for choice, _ in AdminApplication.OUTCOME_CHOICES}
     assert actual == expected
+
+
+@pytest.mark.django_db
+def test_cooptation_request_token_is_unique_and_urlsafe(make_cooptation_request):
+    a = make_cooptation_request()
+    b = make_cooptation_request()
+    assert a.token != b.token
+    assert len(a.token) >= 40  # token_urlsafe(32) yields ~43 chars
+    for ch in a.token:
+        assert ch.isalnum() or ch in "-_"
+
+
+@pytest.mark.django_db
+def test_cooptation_request_default_response_is_pending(make_cooptation_request):
+    req = make_cooptation_request()
+    assert req.response == "pending"
+    assert req.responded_at is None
+    assert req.reminder_sent_at is None
+
+
+@pytest.mark.django_db
+def test_cooptation_request_expires_at_required(make_cooptation_request):
+    req = make_cooptation_request()
+    assert req.expires_at is not None
+
+
+@pytest.mark.django_db
+def test_cooptation_request_application_cascade(make_cooptation_request, make_application):
+    app = make_application()
+    req = make_cooptation_request(application=app)
+    req_pk = req.pk
+    app.delete()
+    from cooptation.models import CooptationRequest
+
+    assert not CooptationRequest.objects.filter(pk=req_pk).exists()
+
+
+@pytest.mark.django_db
+def test_cooptation_request_parrain_protect(make_cooptation_request):
+    """Deleting a Member that owns open cooptation requests must fail."""
+    from django.db.models import ProtectedError
+
+    req = make_cooptation_request()
+    parrain = req.parrain
+    user = parrain.user
+    with pytest.raises(ProtectedError):
+        user.delete()

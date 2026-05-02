@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import secrets
+
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
@@ -83,3 +85,43 @@ class AdminApplication(models.Model):
         self.status = "purged"
         self.purged_at = timezone.now()
         self.save()
+
+
+def _make_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+class CooptationRequest(models.Model):
+    RESPONSE_CHOICES = [
+        ("pending", "En attente"),
+        ("accepted", "Accordée"),
+        ("refused", "Refusée"),
+    ]
+
+    application = models.ForeignKey(
+        AdminApplication,
+        on_delete=models.CASCADE,
+        related_name="cooptation_requests",
+    )
+    parrain = models.ForeignKey(
+        "members.Member",
+        on_delete=models.PROTECT,
+        related_name="cooptation_requests",
+    )
+    token = models.CharField(max_length=64, unique=True, default=_make_token)
+    expires_at = models.DateTimeField()
+    reminder_sent_at = models.DateTimeField(null=True, blank=True)
+    response = models.CharField(max_length=16, choices=RESPONSE_CHOICES, default="pending")
+    responded_at = models.DateTimeField(null=True, blank=True)
+    comment = models.TextField(blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["token"]),
+            models.Index(fields=["application", "response"]),
+            models.Index(fields=["expires_at", "response"]),
+        ]
+        ordering = ["expires_at"]
+
+    def __str__(self) -> str:
+        return f"{self.parrain} → {self.application} ({self.response})"
