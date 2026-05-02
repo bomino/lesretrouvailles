@@ -5,9 +5,12 @@ from __future__ import annotations
 import markdown as _markdown
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import Http404, HttpResponseRedirect
+from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_http_methods
+from django_ratelimit.decorators import ratelimit
+
+from alumni.cloudinary import get_client, now_timestamp
 
 from .charters import CHARTER_CURRENT_VERSION, get_charter_text
 from .forms import NotificationPreferenceForm, ProfileEditForm
@@ -90,3 +93,24 @@ def profile_edit_view(request):
         "members/profile_edit.html",
         {"member_form": member_form, "prefs_form": prefs_form, "member": member},
     )
+
+
+@login_required
+@require_http_methods(["POST"])
+@ratelimit(key="user", rate="10/m", method="POST", block=False)
+def cloudinary_sign_view(request):
+    if getattr(request, "limited", False):
+        return JsonResponse(
+            {"error": "rate limit exceeded"},
+            status=429,
+            headers={"Retry-After": "60"},
+        )
+
+    member = getattr(request.user, "member", None)
+    if member is None:
+        return JsonResponse({"error": "no member"}, status=400)
+
+    folder = f"members/{member.slug}/"
+    timestamp = now_timestamp()
+    payload = get_client().sign_upload(folder=folder, timestamp=timestamp)
+    return JsonResponse(payload)
