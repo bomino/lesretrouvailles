@@ -27,3 +27,20 @@ node_modules/
 
 # Claude local-only settings
 .claude/settings.local.json
+
+# Compiled CSS
+static/css/output.css
+
+# Locale compiled files
+*.mo
+
+# Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Mypy
+.mypy_cache/
+
+# Ruff
+.ruff_cache/
