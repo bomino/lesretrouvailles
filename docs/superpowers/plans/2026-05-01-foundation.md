@@ -4,9 +4,9 @@
 
 **Goal:** Bootstrap the Django 5 project with Postgres, the HTMX + Tailwind + DaisyUI frontend stack, Allauth (email-only login, signup disabled at this layer), French i18n + accessibility baseline, pytest + ruff + pre-commit + GitHub Actions CI, and a `/health` endpoint — providing the working web shell that all subsequent feature plans depend on.
 
-**Architecture:** Single Django 5 monolith with split settings (`base` / `dev` / `staging` / `prod`). Postgres 16 in Docker Compose for development. Tailwind 3 + DaisyUI 4 compiled to a single CSS bundle via the Tailwind CLI. HTMX 1.9 served from the project's static files (not CDN — long-term reliability and offline-capable dev). French as the default and only V1 locale, with `gettext` machinery active so Hausa can be added in Phase 4 without refactor. Accessibility baseline enforced in the base template (16px root font, WCAG AA contrast tokens, no hover-only interactions, 44×44 minimum tactile targets).
+**Architecture:** Single Django 5 monolith with split settings (`base` / `dev` / `staging` / `prod`). Postgres 16 in Docker Compose for development. Tailwind 3 + DaisyUI 4 compiled to a single CSS bundle via the Tailwind CLI. HTMX 2.x served from the project's static files (not CDN — long-term reliability and offline-capable dev). French as the default and only V1 locale, with `gettext` machinery active so Hausa can be added in Phase 4 without refactor. Accessibility baseline enforced in the base template (16px root font, WCAG AA contrast tokens, no hover-only interactions, 44×44 minimum tactile targets).
 
-**Tech Stack:** Python 3.12 · Django 5.x · PostgreSQL 16 · django-allauth · Tailwind CSS 3.4 · DaisyUI 4 · HTMX 1.9 · pytest-django · factory-boy · ruff · black · pre-commit · GitHub Actions.
+**Tech Stack:** Python 3.12 · Django 5.x · PostgreSQL 16 · django-allauth · Tailwind CSS 3.4 · DaisyUI 4 · HTMX 2.x · pytest-django · factory-boy · ruff (lint + format) · pre-commit · GitHub Actions.
 
 **Reference spec:** `docs/superpowers/specs/2026-05-01-alumni-platform-design.md` (PRD v1.3).
 
@@ -109,7 +109,6 @@ dev = [
     "pytest-django>=4.8",
     "factory-boy>=3.3",
     "ruff>=0.4",
-    "black>=24",
     "pre-commit>=3.7",
     "djlint>=1.34",
 ]
@@ -121,11 +120,6 @@ extend-exclude = ["migrations"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "DJ"]
-
-[tool.black]
-line-length = 100
-target-version = ["py312"]
-extend-exclude = "migrations"
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "alumni.settings.dev"
@@ -154,6 +148,14 @@ CLOUDINARY_URL=
 
 # Site URL (used for absolute links in emails)
 SITE_URL=http://localhost:8000
+
+# Cross-origin POST allow-list (staging/prod only; comma-separated, scheme included)
+# CSRF_TRUSTED_ORIGINS=https://staging.example.org,https://example.org
+
+# Staging basic-auth (Task 14)
+# BASIC_AUTH_REQUIRED=true
+# BASIC_AUTH_USERNAME=admin
+# BASIC_AUTH_PASSWORD=change-me
 ```
 
 - [ ] **Step 4: Verify the file set is staged-ready**
@@ -178,6 +180,11 @@ git commit -m "chore: add Python project metadata and env example"
 - [ ] **Step 1: Create `docker-compose.yml`**
 
 ```yaml
+# DEVELOPMENT ONLY — do not deploy this compose file.
+# Plaintext credentials below are for local convenience.
+# Staging and production use managed Postgres (Hetzner / Railway) with
+# separate, env-injected credentials.
+
 services:
   db:
     image: postgres:16-alpine
@@ -360,13 +367,19 @@ Create `alumni/settings/staging.py`:
 
 ```python
 """Staging environment — basic-auth gated, mirrors prod otherwise."""
+import environ
+
 from .base import *  # noqa: F401,F403
+
+env = environ.Env()
 
 DEBUG = False
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
+# Required by Django 4+ for cross-origin POST (allauth login over HTTPS)
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 ```
 
 Create `alumni/settings/prod.py`:
@@ -678,13 +691,15 @@ git commit -m "feat: add tailwind + daisyui build pipeline"
 - Create: `static/js/htmx.min.js` (downloaded), `templates/base.html`, `templates/core/landing_placeholder.html`, `core/tests/test_base_template.py`
 - Modify: `core/views.py` (add `landing_placeholder` view), `core/urls.py`
 
-- [ ] **Step 1: Download HTMX 1.9 and vendor it**
+- [ ] **Step 1: Download HTMX 2.x and vendor it**
 
 Run:
 ```bash
 mkdir -p static/js
-curl -fsSL https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js -o static/js/htmx.min.js
+curl -fsSL https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js -o static/js/htmx.min.js
 ```
+
+> *HTMX 2.x is the project default. Migration from 1.x has minor breaking changes (notably `hx-on` syntax, removal of some deprecated extensions); see <https://htmx.org/migration-guide-htmx-1/>. We pin a specific 2.x patch version so the bundled file is reproducible.*
 
 Verify:
 ```bash
@@ -1052,6 +1067,19 @@ Create `templates/account/signup_closed.html`:
 Run: `python manage.py migrate`
 Expected: `allauth.account` migrations applied.
 
+> **Note for staging/prod:** `django.contrib.sites` seeds a default `Site` row with `domain=example.com`. Allauth uses `SITE_ID=1` to fetch this row when generating absolute URLs in emails. Before any staging/prod email goes out (P3), update this row:
+>
+> ```python
+> # python manage.py shell
+> from django.contrib.sites.models import Site
+> s = Site.objects.get(pk=1)
+> s.domain = "alumni-ceg1-birni.org"  # or staging.alumni-ceg1-birni.org
+> s.name = "Alumni CEG 1 Birni"
+> s.save()
+> ```
+>
+> Or do it via a data migration when the prod domain is finalized. Tracked as a P3/P7 prerequisite.
+
 - [ ] **Step 8: Run the tests and confirm they pass**
 
 Run: `pytest core/tests/test_auth.py -v`
@@ -1081,11 +1109,6 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
-  - repo: https://github.com/psf/black
-    rev: 24.4.2
-    hooks:
-      - id: black
-        args: [--line-length=100]
   - repo: https://github.com/Riverside-Healthcare/djLint
     rev: v1.34.1
     hooks:
@@ -1100,6 +1123,8 @@ repos:
       - id: check-added-large-files
         args: [--maxkb=500]
 ```
+
+> *Black is intentionally absent. `ruff format` is the project's sole formatter — running both creates conflicting fixes (parens, trailing commas). The Ruff team aims for Black-compatible output, so the migration is essentially free.*
 
 - [ ] **Step 2: Install hooks and run on all files**
 
@@ -1163,9 +1188,15 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
       - run: pip install -e ".[dev]"
+      - run: npm ci
+      - run: npm run css:build
       - run: ruff check .
-      - run: black --check .
+      - run: ruff format --check .
       - run: djlint templates/ --check
       - run: python manage.py compilemessages
       - run: pytest -v
@@ -1216,11 +1247,11 @@ css-watch:
 
 lint:
 	ruff check .
-	black --check .
+	ruff format --check .
 
 format:
 	ruff check --fix .
-	black .
+	ruff format .
 
 check:
 	python manage.py check
@@ -1434,6 +1465,8 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
+# Required by Django 4+ for cross-origin POST (allauth login over HTTPS)
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
 BASIC_AUTH_REQUIRED = env.bool("BASIC_AUTH_REQUIRED", default=True)
 BASIC_AUTH_USERNAME = env("BASIC_AUTH_USERNAME", default="")
