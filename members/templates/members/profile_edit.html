@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block extra_head %}<meta name="robots" content="noindex,nofollow">{% endblock %}
+{% block title %}
+    {% trans "Mon profil" %}
+{% endblock %}
+{% block content %}
+    <form method="post" class="mx-auto max-w-xl p-4 space-y-4">
+        {% csrf_token %}
+        <h1 class="text-2xl font-semibold">{% trans "Mon profil" %}</h1>
+        <fieldset class="space-y-3">
+            <legend class="font-medium">{% trans "Informations" %}</legend>
+            {{ member_form.as_p }}
+        </fieldset>
+        <fieldset class="space-y-3">
+            <legend class="font-medium">{% trans "Notifications" %}</legend>
+            {{ prefs_form.as_p }}
+        </fieldset>
+        <button type="submit" class="btn btn-primary">{% trans "Enregistrer" %}</button>
+    </form>
+{% endblock %}

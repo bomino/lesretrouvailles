@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import markdown as _markdown
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_http_methods
 
 from .charters import CHARTER_CURRENT_VERSION, get_charter_text
+from .forms import NotificationPreferenceForm, ProfileEditForm
 from .models import ConsentRecord, Member
 
 
@@ -60,4 +63,30 @@ def profile_detail_view(request, slug):
             "target": member,
             "is_self": getattr(request.user, "member", None) == member,
         },
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def profile_edit_view(request):
+    member = getattr(request.user, "member", None)
+    if member is None:
+        raise Http404
+
+    if request.method == "POST":
+        member_form = ProfileEditForm(request.POST, instance=member)
+        prefs_form = NotificationPreferenceForm(request.POST, instance=member.preferences)
+        if member_form.is_valid() and prefs_form.is_valid():
+            member_form.save()
+            prefs_form.save()
+            messages.success(request, "Profil mis à jour.")
+            return HttpResponseRedirect("/profil/")
+    else:
+        member_form = ProfileEditForm(instance=member)
+        prefs_form = NotificationPreferenceForm(instance=member.preferences)
+
+    return render(
+        request,
+        "members/profile_edit.html",
+        {"member_form": member_form, "prefs_form": prefs_form, "member": member},
     )
