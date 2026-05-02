@@ -5,7 +5,10 @@ from __future__ import annotations
 import markdown as _markdown
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.postgres.lookups import Unaccent
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.db.models import F, Q, Value
+from django.db.models.functions import Lower
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_http_methods
@@ -127,7 +130,38 @@ def cloudinary_sign_view(request):
 @login_required
 @require_http_methods(["GET"])
 def directory_view(request):
-    qs = Member.objects.filter(status="active").order_by("last_name", "first_name")
+    qs = Member.objects.filter(status="active")
+
+    q = (request.GET.get("q") or "").strip()[:80]
+    year_raw = request.GET.get("year")
+    city = (request.GET.get("city") or "").strip()
+    profession = (request.GET.get("profession") or "").strip()
+
+    if q:
+        needle = Lower(Unaccent(Value(q)))
+        qs = qs.annotate(
+            first_lc=Lower(Unaccent(F("first_name"))),
+            last_lc=Lower(Unaccent(F("last_name"))),
+            nick_lc=Lower(Unaccent(F("nickname"))),
+        ).filter(
+            Q(first_lc__contains=needle) | Q(last_lc__contains=needle) | Q(nick_lc__contains=needle)
+        )
+
+    if year_raw:
+        try:
+            year = int(year_raw)
+            if year in range(1980, 1986):
+                qs = qs.filter(years_attended__contains=[year])
+        except (TypeError, ValueError):
+            pass
+
+    if city:
+        qs = qs.filter(city__iexact=city)
+
+    if profession:
+        qs = qs.filter(profession__icontains=profession)
+
+    qs = qs.order_by("last_name", "first_name")
 
     paginator = Paginator(qs, 20)
     raw_page = request.GET.get("page", "1")
