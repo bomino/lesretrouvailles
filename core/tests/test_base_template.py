@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from django.urls import reverse
 
@@ -6,10 +8,12 @@ from django.urls import reverse
 def test_base_template_has_a11y_baseline(client):
     response = client.get(reverse("landing_placeholder"))
     html = response.content.decode("utf-8")
+    # Normalize whitespace so formatter wrapping doesn't break substring checks.
+    normalized = re.sub(r"\s+", " ", html)
 
     assert response.status_code == 200
     assert '<html lang="fr">' in html
-    assert '<meta name="viewport" content="width=device-width, initial-scale=1' in html
+    assert '<meta name="viewport" content="width=device-width, initial-scale=1' in normalized
     assert "output.css" in html
     assert "htmx.min.js" in html
 

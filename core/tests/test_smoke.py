@@ -1,4 +1,5 @@
 """Smoke test: prove pytest + Django settings load correctly."""
+
 from django.conf import settings
 
 

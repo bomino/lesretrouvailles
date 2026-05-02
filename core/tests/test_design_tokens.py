@@ -4,6 +4,7 @@ If any of these assertions fail, either DESIGN.md was edited and
 `npm run design:export && npm run css:build` was not re-run, or the
 tailwind.config.js stopped consuming the exported theme.
 """
+
 from pathlib import Path
 
 from django.conf import settings

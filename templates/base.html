@@ -1,46 +1,61 @@
 {% load static i18n %}
 <!DOCTYPE html>
 <html lang="{% get_current_language as LANGUAGE_CODE %}{{ LANGUAGE_CODE }}">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes">
-  {% block robots %}<meta name="robots" content="noindex">{% endblock %}
-  <title>{% block title %}{% trans "Alumni CEG 1 Birni" %}{% endblock %}</title>
-  <link rel="stylesheet" href="{% static 'css/output.css' %}">
-  <script defer src="{% static 'js/htmx.min.js' %}"></script>
-</head>
-<body data-theme="alumni" class="bg-neutral text-primary">
-  <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 btn btn-primary">
-    {% trans "Aller au contenu principal" %}
-  </a>
-
-  <header class="border-b border-secondary/20 bg-surface">
-    <div class="container mx-auto flex items-center justify-between gap-md px-md py-sm">
-      <a href="{% url 'landing_placeholder' %}" class="flex items-center gap-sm" aria-label="{% trans 'Les Retrouvailles — accueil' %}">
-        <img src="{% static 'img/logo.png' %}" alt="{% trans 'Les Retrouvailles — CEG 1 Birni de Zinder' %}" class="h-12 md:h-14 w-auto" width="112" height="112">
-        <span class="hidden md:inline-block text-lg font-medium">{% trans "Les Retrouvailles" %}</span>
-      </a>
-      {% block header_actions %}
-        <a href="https://chat.whatsapp.com/" rel="noopener noreferrer" target="_blank"
-           class="inline-flex items-center gap-xs rounded-full px-md py-xs min-h-tap text-sm font-medium"
-           style="background-color: #1F6B4F; color: #FFFFFF;">
-          <span aria-hidden="true">💬</span>
-          {% trans "Rejoindre le groupe WhatsApp" %}
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport"
+              content="width=device-width, initial-scale=1, user-scalable=yes">
+        {% block robots %}<meta name="robots" content="noindex">{% endblock %}
+        <title>
+            {% block title %}
+                {% trans "Alumni CEG 1 Birni" %}
+            {% endblock %}
+        </title>
+        <link rel="stylesheet" href="{% static 'css/output.css' %}">
+        <script defer src="{% static 'js/htmx.min.js' %}"></script>
+    </head>
+    <body data-theme="alumni" class="bg-neutral text-primary">
+        <a href="#main"
+           class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 btn btn-primary">
+            {% trans "Aller au contenu principal" %}
         </a>
-      {% endblock %}
-    </div>
-  </header>
-
-  <main id="main" class="container mx-auto p-md">
-    {% block content %}{% endblock %}
-  </main>
-
-  <footer class="container mx-auto px-md py-lg mt-2xl border-t border-secondary/20 flex items-center gap-md text-sm text-secondary">
-    <img src="{% static 'img/logo.png' %}" alt="" class="h-8 w-auto" width="64" height="64">
-    <span class="rounded-full px-md py-xs text-xs font-semibold tracking-wider uppercase"
-          style="background-color: #C9A227; color: #1A1C1E;">
-      {% trans "Depuis le 1ᵉʳ Septembre 2020" %}
-    </span>
-  </footer>
-</body>
+        <header class="border-b border-secondary/20 bg-surface">
+            <div class="container mx-auto flex items-center justify-between gap-md px-md py-sm">
+                <a href="{% url 'landing_placeholder' %}"
+                   class="flex items-center gap-sm"
+                   aria-label="{% trans 'Les Retrouvailles — accueil' %}">
+                    <img src="{% static 'img/logo.png' %}"
+                         alt="{% trans 'Les Retrouvailles — CEG 1 Birni de Zinder' %}"
+                         class="h-12 md:h-14 w-auto"
+                         width="112"
+                         height="112">
+                    <span class="hidden md:inline-block text-lg font-medium">{% trans "Les Retrouvailles" %}</span>
+                </a>
+                {% block header_actions %}
+                    <a href="https://chat.whatsapp.com/"
+                       rel="noopener noreferrer"
+                       target="_blank"
+                       class="inline-flex items-center gap-xs rounded-full px-md py-xs min-h-tap text-sm font-medium"
+                       style="background-color: #1F6B4F;
+                              color: #FFFFFF">
+                        <span aria-hidden="true">💬</span>
+                        {% trans "Rejoindre le groupe WhatsApp" %}
+                    </a>
+                {% endblock %}
+            </div>
+        </header>
+        <main id="main" class="container mx-auto p-md">
+            {% block content %}{% endblock %}
+        </main>
+        <footer class="container mx-auto px-md py-lg mt-2xl border-t border-secondary/20 flex items-center gap-md text-sm text-secondary">
+            <img src="{% static 'img/logo.png' %}"
+                 alt=""
+                 class="h-8 w-auto"
+                 width="64"
+                 height="64">
+            <span class="rounded-full px-md py-xs text-xs font-semibold tracking-wider uppercase"
+                  style="background-color: #C9A227;
+                         color: #1A1C1E">{% trans "Depuis le 1ᵉʳ Septembre 2020" %}</span>
+        </footer>
+    </body>
 </html>

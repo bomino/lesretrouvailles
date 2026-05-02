@@ -1,4 +1,5 @@
 """Settings shared across all environments. Read everything from env."""
+
 from pathlib import Path
 
 import environ

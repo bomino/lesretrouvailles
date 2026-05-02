@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% load i18n %}
-
-{% block title %}{% trans "Connexion" %}{% endblock %}
-
+{% block title %}
+    {% trans "Connexion" %}
+{% endblock %}
 {% block content %}
-  <div class="max-w-md mx-auto card bg-base-200 p-6">
-    <h1 class="text-2xl font-bold mb-4">{% trans "Connexion" %}</h1>
-    <form method="post" action="{% url 'account_login' %}">
-      {% csrf_token %}
-      {{ form.as_p }}
-      <button type="submit" class="btn btn-primary w-full mt-4">{% trans "Se connecter" %}</button>
-    </form>
-  </div>
+    <div class="max-w-md mx-auto card bg-base-200 p-6">
+        <h1 class="text-2xl font-bold mb-4">{% trans "Connexion" %}</h1>
+        <form method="post" action="{% url 'account_login' %}">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit" class="btn btn-primary w-full mt-4">{% trans "Se connecter" %}</button>
+        </form>
+    </div>
 {% endblock %}

@@ -1,4 +1,5 @@
-from django.utils.translation import activate, gettext as _
+from django.utils.translation import activate
+from django.utils.translation import gettext as _
 
 
 def test_french_translation_active():
@@ -9,8 +10,9 @@ def test_french_translation_active():
 
 
 def test_locale_path_exists():
-    from django.conf import settings
     from pathlib import Path
+
+    from django.conf import settings
 
     locale_dir = Path(settings.LOCALE_PATHS[0]) / "fr" / "LC_MESSAGES"
     assert locale_dir.exists(), "Locale directory must exist for French"
