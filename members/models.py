@@ -103,3 +103,19 @@ class Member(models.Model):
             raise ValidationError({"years_attended": "Années hors plage 1980-1985."})
         if any(c not in VALID_GRADES for c in self.classes):
             raise ValidationError({"classes": "Classe inconnue."})
+
+
+class NotificationPreference(models.Model):
+    member = models.OneToOneField(
+        Member,
+        on_delete=models.CASCADE,
+        related_name="preferences",
+    )
+    digest_weekly = models.BooleanField(default=False)
+    in_memoriam_alerts = models.BooleanField(default=True)
+    event_alerts = models.BooleanField(default=False)
+    tag_alerts = models.BooleanField(default=True)
+    data_saver = models.BooleanField(default=False)
+
+    def __str__(self) -> str:
+        return f"Preferences for {self.member.full_name}"
