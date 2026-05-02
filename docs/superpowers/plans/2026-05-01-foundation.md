@@ -44,6 +44,7 @@ Files created/modified by this plan, with one-line responsibility:
 | `static/css/input.css` | Tailwind source CSS |
 | `static/css/output.css` | Tailwind compiled CSS (gitignored) |
 | `static/js/htmx.min.js` | HTMX bundled (vendored, not CDN) |
+| `static/img/logo.png` | Brand emblem ("Les Retrouvailles") — visual anchor in header/footer |
 | `DESIGN.md` | Visual identity (tokens + rationale) authored against `@google/design.md` spec — single source of truth for colors, type, spacing, components |
 | `tailwind.theme.json` | Generated Tailwind theme exported from DESIGN.md (committed for reproducible builds) |
 | `tailwind.config.js` | Tailwind + DaisyUI config; consumes `tailwind.theme.json` |
@@ -737,6 +738,10 @@ colors:
   surface: "#FFFFFF"
   surface-variant: "#EEEAE2"
   in-memoriam: "#5A4A3D"
+  whatsapp-green: "#1F6B4F"
+  on-whatsapp-green: "#FFFFFF"
+  ceremonial-gold: "#C9A227"
+  on-ceremonial-gold: "#1A1C1E"
 typography:
   display:
     fontFamily: Playfair Display
@@ -820,6 +825,20 @@ components:
     textColor: "{colors.in-memoriam}"
     rounded: "{rounded.md}"
     padding: 32px
+  whatsapp-link:
+    backgroundColor: "{colors.whatsapp-green}"
+    textColor: "{colors.on-whatsapp-green}"
+    typography: "{typography.label-md}"
+    rounded: "{rounded.full}"
+    padding: 12px
+    height: 44px
+  promo-badge:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ceremonial-gold}"
+    typography: "{typography.label-caps}"
+    rounded: "{rounded.full}"
+    padding: 4px
+    height: 28px
 ---
 
 # Alumni CEG 1 Birni — Design System
@@ -859,16 +878,66 @@ A 12-column grid on desktop with 24px gutters; on mobile, content is full-width 
 - **button-primary:** The single CTA color (Sahel Terre Cuite) on neutral background. 44×44 minimum tactile target (spec §8.3). Used at most once per visible viewport.
 - **card:** Surface white with 24px padding, 8px radius. Houses member profiles, testimonials, photo entries.
 - **in-memoriam-frame:** Bordered surface variant (limestone shade darker than page background), earth-brown copy. Visually distinct from any other component on the site — designed to feel set apart, like a memorial plaque.
+- **whatsapp-link:** Pill-shaped button in `whatsapp-green` with white copy. Used **only** for WhatsApp-related affordances (header CTA "Rejoindre le groupe WhatsApp", share-to-WA links, in-message WA-icon links). Never used as a generic UI button.
+- **promo-badge:** Small pill in `ceremonial-gold` text on surface, used for the "Promo 1980-1985" stamp, anniversary milestone marks, and the founding-date footer chip ("Depuis le 1ᵉʳ Septembre 2020"). Decorative role only — never wraps interactive content.
+
+## Logo
+
+The platform's emblem — *Les Retrouvailles* — predates this website. It was created for the WhatsApp group founded on 1 September 2020 and is the community's existing brand mark. We do not redesign it; we **host** it.
+
+The logo combines a green crest (referencing the WhatsApp group's origin), gold laurels and ribbons (promotion / class anniversary), the *CEG 1 BIRNI DE ZINDER* wordmark, and the graduation cap and open book (school identity).
+
+### Where the logo appears
+
+- **Header (every page):** Top-left, 48px tall on mobile, 56px tall on desktop. The site's primary visual anchor.
+- **Footer:** Same logo at 32px tall, paired with the founding date chip (`promo-badge`).
+- **Favicon:** 32×32px crop of the central crest (deferred to P5 / Soft launch).
+- **OG / share images:** Full logo over a `neutral` limestone background.
+
+### Color extracts
+
+The site palette includes two colors **drawn from the logo** and used sparingly to keep the visual link to the WhatsApp origin without saturating the UI:
+
+- `whatsapp-green` (#1F6B4F): a desaturated forest variant of the logo's bright WhatsApp green. **Reserved for WhatsApp-related affordances only** (the `whatsapp-link` component, share icons, "online in WA group" indicators).
+- `ceremonial-gold` (#C9A227): a muted version of the laurel/ribbon gold. **Reserved for promotion-anniversary marks** (`promo-badge`, milestone year labels, decorative top borders on commemorative frames).
+
+The terra-cotta accent (`tertiary`, "Sahel Terre Cuite") remains the **single primary call-to-action color** — distinct from both logo-derived colors. This separation is deliberate: WhatsApp green pulls toward "the group we already are"; Sahel terra-cotta pulls toward "the new home we are building." They cohabit without competing.
+
+### Logo do's and don'ts
+
+- **Don't recolor the logo.** No alpha, no monochrome variants, no themed versions. The logo always appears full-color on a neutral or surface background.
+- **Don't crop or alter the *Les Retrouvailles* wordmark** in the logo.
+- **Don't use `whatsapp-green` as a generic UI primary** (page backgrounds, headers, CTAs unrelated to WhatsApp).
+- **Don't use `ceremonial-gold` as text color** for body or labels — its low contrast against limestone fails WCAG AA.
 
 ## Do's and Don'ts
 
 - **Do** keep the Sahel Terre Cuite accent for true calls-to-action; reusing it for decorative borders or info badges dilutes its meaning.
-- **Don't** introduce a third accent color — the design budget is one accent, deliberately.
+- **Don't** introduce a fourth accent color. The design budget is `tertiary` for primary CTAs, `whatsapp-green` for WhatsApp affordances, `ceremonial-gold` for anniversary marks. Any new highlight must come from one of these.
+- **Don't** combine `whatsapp-green` and `tertiary` (terra-cotta) in the same component — both pull attention; they fight each other if placed side by side.
 - **Do** use generous whitespace around photographs; they are the primary content.
 - **Don't** compress vertical rhythm to fit "more above the fold." This audience reads carefully, not skims.
 - **Do** keep the In Memoriam visual language reserved for In Memoriam contexts only.
 - **Don't** use icon-only buttons (spec §8.3); always pair an icon with a text label.
 ```
+
+- [ ] **Step 3b: Position the brand logo at `static/img/logo.png`**
+
+The community already has an emblem (`logo_retrouvailles.png` — green crest, gold laurels, "Les Retrouvailles" wordmark). It is the visual anchor of every page (DESIGN.md `## Logo` section).
+
+Run:
+```bash
+mkdir -p static/img
+mv logo_retrouvailles.png static/img/logo.png
+```
+
+If you are starting from a fresh checkout where the file is already at `static/img/logo.png`, skip this step.
+
+Verify:
+```bash
+test -s static/img/logo.png && echo "OK"
+```
+Expected: `OK`.
 
 - [ ] **Step 4: Lint DESIGN.md and confirm zero errors**
 
@@ -927,13 +996,15 @@ module.exports = {
 Run: `npm run css:build`
 Expected: `static/css/output.css` is rebuilt without error.
 
-Verify a known token compiled into a utility class:
+Verify the key tokens compiled into utility classes:
 ```bash
 grep -q "1A1C1E" static/css/output.css && echo "primary OK"
 grep -q "A04A2C" static/css/output.css && echo "tertiary OK"
 grep -q "5A4A3D" static/css/output.css && echo "in-memoriam OK"
+grep -q "1F6B4F" static/css/output.css && echo "whatsapp-green OK"
+grep -q "C9A227" static/css/output.css && echo "ceremonial-gold OK"
 ```
-Expected: all three lines print `OK`.
+Expected: all five lines print `OK`. Lowercase variants (`a04a2c` etc.) are also valid since Tailwind may emit either case.
 
 - [ ] **Step 8: Write the design-token smoke test**
 
@@ -969,6 +1040,20 @@ def test_sahel_terra_cotta_token_compiled():
 def test_in_memoriam_brown_compiled():
     css = _read_compiled_css()
     assert "5A4A3D" in css or "5a4a3d" in css
+
+
+def test_whatsapp_green_compiled():
+    """The logo-derived WhatsApp green must reach the compiled CSS so
+    the `whatsapp-link` component can be styled."""
+    css = _read_compiled_css()
+    assert "1F6B4F" in css or "1f6b4f" in css
+
+
+def test_ceremonial_gold_compiled():
+    """The logo-derived ceremonial gold must reach the compiled CSS so
+    the `promo-badge` component can be styled."""
+    css = _read_compiled_css()
+    assert "C9A227" in css or "c9a227" in css
 ```
 
 - [ ] **Step 9: Run the new tests and confirm they pass**
@@ -992,7 +1077,7 @@ Modify `.github/workflows/test.yml` — insert one step **after** `npm ci` and *
 - [ ] **Step 11: Commit**
 
 ```bash
-git add DESIGN.md tailwind.theme.json package.json package-lock.json tailwind.config.js core/tests/test_design_tokens.py .github/workflows/test.yml
+git add DESIGN.md static/img/logo.png tailwind.theme.json package.json package-lock.json tailwind.config.js core/tests/test_design_tokens.py .github/workflows/test.yml
 git commit -m "feat: adopt DESIGN.md as single source of truth for visual identity"
 ```
 
@@ -1042,6 +1127,21 @@ def test_base_template_has_a11y_baseline(client):
 
 
 @pytest.mark.django_db
+def test_base_template_renders_logo_and_whatsapp_link(client):
+    """The header must render the brand logo and a WhatsApp affordance
+    (DESIGN.md §Logo). The footer must render the founding-date badge."""
+    response = client.get(reverse("landing_placeholder"))
+    html = response.content.decode("utf-8")
+
+    assert "img/logo.png" in html
+    assert "Les Retrouvailles" in html
+    assert "Rejoindre le groupe WhatsApp" in html
+    assert "1F6B4F" in html  # whatsapp-green
+    assert "C9A227" in html  # ceremonial-gold
+    assert "1ᵉʳ Septembre 2020" in html or "1er Septembre 2020" in html
+
+
+@pytest.mark.django_db
 def test_base_template_blocks_robots_for_member_pages(client):
     """Default behavior: pages opt-in to indexing. Landing placeholder
     is NOT yet the public landing — it must be noindex by default."""
@@ -1071,16 +1171,43 @@ Create `templates/base.html`:
   <link rel="stylesheet" href="{% static 'css/output.css' %}">
   <script defer src="{% static 'js/htmx.min.js' %}"></script>
 </head>
-<body class="bg-base-100 text-base-content">
+<body class="bg-neutral text-primary">
   <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 btn btn-primary">
     {% trans "Aller au contenu principal" %}
   </a>
-  <main id="main" class="container mx-auto p-4">
+
+  <header class="border-b border-secondary/20 bg-surface">
+    <div class="container mx-auto flex items-center justify-between gap-md px-md py-sm">
+      <a href="{% url 'landing_placeholder' %}" class="flex items-center gap-sm" aria-label="{% trans 'Les Retrouvailles — accueil' %}">
+        <img src="{% static 'img/logo.png' %}" alt="{% trans 'Les Retrouvailles — CEG 1 Birni de Zinder' %}" class="h-12 md:h-14 w-auto" width="112" height="112">
+        <span class="hidden md:inline-block text-lg font-medium">{% trans "Les Retrouvailles" %}</span>
+      </a>
+      {% block header_actions %}
+        <a href="https://chat.whatsapp.com/" rel="noopener noreferrer" target="_blank"
+           class="inline-flex items-center gap-xs rounded-full px-md py-xs min-h-tap text-sm font-medium"
+           style="background-color: #1F6B4F; color: #FFFFFF;">
+          <span aria-hidden="true">💬</span>
+          {% trans "Rejoindre le groupe WhatsApp" %}
+        </a>
+      {% endblock %}
+    </div>
+  </header>
+
+  <main id="main" class="container mx-auto p-md">
     {% block content %}{% endblock %}
   </main>
+
+  <footer class="container mx-auto px-md py-lg mt-2xl border-t border-secondary/20 flex items-center gap-md text-sm text-secondary">
+    <img src="{% static 'img/logo.png' %}" alt="" class="h-8 w-auto" width="64" height="64">
+    <span class="rounded-full bg-surface px-md py-xs text-xs font-semibold tracking-wider uppercase" style="color: #C9A227;">
+      {% trans "Depuis le 1ᵉʳ Septembre 2020" %}
+    </span>
+  </footer>
 </body>
 </html>
 ```
+
+> *Inline `style` attributes for `whatsapp-green` and `ceremonial-gold` are a deliberate Foundation-stage shortcut: the Tailwind theme exported from DESIGN.md doesn't auto-generate utility classes for arbitrary token names (it generates `bg-whatsapp-green` only if Tailwind's color plugin recognizes the key, which depends on the export shape). Once Task 6.5 step 7 is verified, switch these to `bg-whatsapp-green text-on-whatsapp-green` and `text-ceremonial-gold` utility classes if they resolve. The colors-as-inline-style fallback is documented but discouraged for ongoing work.*
 
 Create `templates/core/landing_placeholder.html`:
 
