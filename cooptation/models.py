@@ -125,3 +125,45 @@ class CooptationRequest(models.Model):
 
     def __str__(self) -> str:
         return f"{self.parrain} → {self.application} ({self.response})"
+
+
+class KnowledgeQuestion(models.Model):
+    KIND_CHOICES = [
+        ("closed", "Réponse courte"),
+        ("open", "Réponse libre"),
+    ]
+    position = models.PositiveSmallIntegerField()
+    kind = models.CharField(max_length=8, choices=KIND_CHOICES)
+    text = models.CharField(max_length=500)
+    answer_keys = ArrayField(
+        models.CharField(max_length=80),
+        default=list,
+        blank=True,
+        help_text="Clés de réponse acceptées (insensible à accents/casse).",
+    )
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["position"]
+
+    def __str__(self) -> str:
+        return f"Q{self.position}: {self.text[:40]}"
+
+
+class QuestionnaireResponse(models.Model):
+    application = models.ForeignKey(
+        AdminApplication,
+        on_delete=models.CASCADE,
+        related_name="questionnaire_responses",
+    )
+    question = models.ForeignKey(KnowledgeQuestion, on_delete=models.PROTECT)
+    candidate_answer = models.TextField()
+    auto_grade = models.BooleanField(null=True, blank=True)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [("application", "question")]
+        ordering = ["question__position"]
+
+    def __str__(self) -> str:
+        return f"Q{self.question.position} → {self.application}"

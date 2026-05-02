@@ -109,3 +109,46 @@ def test_cooptation_request_parrain_protect(make_cooptation_request):
     user = parrain.user
     with pytest.raises(ProtectedError):
         user.delete()
+
+
+@pytest.mark.django_db
+def test_knowledge_question_kinds():
+    from cooptation.models import KnowledgeQuestion
+
+    expected = {"closed", "open"}
+    actual = {choice for choice, _ in KnowledgeQuestion.KIND_CHOICES}
+    assert actual == expected
+
+
+@pytest.mark.django_db
+def test_knowledge_question_ordered_by_position():
+    from cooptation.models import KnowledgeQuestion
+
+    KnowledgeQuestion.objects.create(position=2, kind="open", text="Souvenir")
+    KnowledgeQuestion.objects.create(position=1, kind="closed", text="Prof", answer_keys=["x"])
+    KnowledgeQuestion.objects.create(position=3, kind="closed", text="Salle", answer_keys=["y"])
+    qs = list(KnowledgeQuestion.objects.all())
+    assert [q.position for q in qs] == [1, 2, 3]
+
+
+@pytest.mark.django_db
+def test_questionnaire_response_unique_per_question_per_application(make_application):
+    from django.db import IntegrityError
+
+    from cooptation.models import KnowledgeQuestion, QuestionnaireResponse
+
+    app = make_application()
+    q = KnowledgeQuestion.objects.create(position=1, kind="open", text="t")
+    QuestionnaireResponse.objects.create(application=app, question=q, candidate_answer="first")
+    with pytest.raises(IntegrityError):
+        QuestionnaireResponse.objects.create(application=app, question=q, candidate_answer="second")
+
+
+@pytest.mark.django_db
+def test_questionnaire_response_auto_grade_is_nullable(make_application):
+    from cooptation.models import KnowledgeQuestion, QuestionnaireResponse
+
+    app = make_application()
+    q = KnowledgeQuestion.objects.create(position=1, kind="open", text="t")
+    r = QuestionnaireResponse.objects.create(application=app, question=q, candidate_answer="x")
+    assert r.auto_grade is None
