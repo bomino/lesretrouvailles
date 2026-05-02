@@ -4,13 +4,17 @@
 {% block title %}{{ target.full_name }}{% endblock %}
 {% block content %}
     <article class="mx-auto max-w-2xl">
-        <div class="rounded-2xl bg-base-200 border border-secondary/15 px-6 py-8 shadow-sm sm:px-10">
-            <div class="flex flex-col items-center text-center sm:flex-row sm:items-start sm:text-left sm:gap-6">
+        <div class="relative overflow-hidden rounded-2xl border border-secondary/15 bg-surface px-6 py-10 shadow-sm sm:px-10">
+            <div class="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-tertiary/10 via-tertiary/5 to-transparent"
+                 aria-hidden="true"></div>
+            <div class="relative flex flex-col items-center text-center sm:flex-row sm:items-start sm:text-left sm:gap-8">
                 <div class="shrink-0">{% member_avatar target size=160 %}</div>
-                <div class="mt-4 sm:mt-0 min-w-0">
-                    <h1 class="text-3xl font-semibold tracking-tight">{{ target.full_name }}</h1>
-                    {% if target.nickname %}<p class="mt-1 text-base text-secondary italic">« {{ target.nickname }} »</p>{% endif %}
-                    {% if target.profession %}<p class="mt-2 text-base text-primary/80">{{ target.profession }}</p>{% endif %}
+                <div class="mt-5 sm:mt-1 min-w-0">
+                    <h1 class="font-display text-3xl font-semibold tracking-tight md:text-4xl">{{ target.full_name }}</h1>
+                    {% if target.nickname %}
+                        <p class="mt-1 font-display italic text-lg text-tertiary">« {{ target.nickname }} »</p>
+                    {% endif %}
+                    {% if target.profession %}<p class="mt-3 text-base text-primary/85">{{ target.profession }}</p>{% endif %}
                 </div>
             </div>
             <dl class="mt-8 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">

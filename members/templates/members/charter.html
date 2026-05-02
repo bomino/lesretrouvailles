@@ -6,7 +6,11 @@
 {% endblock %}
 {% block content %}
     <div class="mx-auto max-w-2xl">
-        <article class="prose prose-neutral max-w-none rounded-2xl bg-base-200 px-8 py-10 shadow-sm border border-secondary/10 prose-headings:font-semibold prose-headings:tracking-tight prose-h1:text-3xl prose-h1:mb-4 prose-h2:text-xl prose-h2:mt-8 prose-h2:mb-3 prose-p:text-base prose-p:leading-relaxed prose-strong:text-primary">
+        <header class="mb-8 text-center">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-tertiary">{% trans "Notre engagement commun" %}</p>
+            <p class="mt-3 text-sm text-secondary">{% trans "Veuillez prendre un instant pour la lire." %}</p>
+        </header>
+        <article class="prose prose-neutral max-w-none rounded-2xl bg-surface px-8 py-10 shadow-sm border border-secondary/15 prose-headings:font-display prose-headings:font-semibold prose-headings:tracking-tight prose-h1:text-3xl prose-h1:md:text-4xl prose-h1:mb-6 prose-h2:text-xl prose-h2:mt-10 prose-h2:mb-3 prose-h2:text-tertiary prose-p:text-base prose-p:leading-relaxed prose-strong:text-primary prose-hr:border-secondary/20">
             {{ charter_html|safe }}
         </article>
         <form method="post"

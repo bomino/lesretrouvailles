@@ -1,6 +1,64 @@
 {% extends "base.html" %}
 {% load i18n %}
+{% block title %}
+    {% trans "Les Retrouvailles" %}
+{% endblock %}
 {% block content %}
-    <h1 class="text-3xl font-bold">{% trans "Plateforme Alumni — en construction" %}</h1>
-    <p class="mt-4">{% trans "Le site est en cours de développement." %}</p>
+    <section class="relative isolate mx-auto max-w-4xl text-center bg-paper">
+        <span class="inline-block rounded-full border border-tertiary/30 bg-surface px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-tertiary shadow-sm">
+            {% trans "Promotion 1980 — 1985" %}
+        </span>
+        <h1 class="mt-6 font-display text-4xl font-semibold tracking-tight md:text-6xl md:leading-[1.05]">
+            {% trans "Le foyer numérique" %}
+            <span class="block italic text-tertiary">{% trans "des anciens du CEG 1 Birni." %}</span>
+        </h1>
+        <p class="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-secondary md:text-xl">
+            {% trans "Quarante ans après nos années à Zinder, retrouvons les visages, les histoires et les nouvelles. Cet espace privé est dédié à ceux et celles qui ont partagé les bancs du CEG 1." %}
+        </p>
+        {% if request.user.is_authenticated %}
+            <div class="mt-10 flex flex-wrap items-center justify-center gap-3">
+                <a href="/annuaire/"
+                   class="inline-flex items-center gap-2 rounded-lg bg-tertiary px-6 py-3 text-base font-medium text-on-tertiary shadow-sm hover:opacity-95 transition min-h-tap">
+                    {% trans "Parcourir l'annuaire" %}
+                    <span aria-hidden="true">→</span>
+                </a>
+                <a href="/profil/"
+                   class="inline-flex items-center rounded-lg border border-secondary/25 bg-surface px-5 py-3 text-base font-medium hover:border-tertiary/40 hover:text-tertiary transition min-h-tap">
+                    {% trans "Mon profil" %}
+                </a>
+            </div>
+        {% else %}
+            <div class="mt-10 flex flex-wrap items-center justify-center gap-3">
+                <a href="{% url 'account_login' %}"
+                   class="inline-flex items-center gap-2 rounded-lg bg-tertiary px-6 py-3 text-base font-medium text-on-tertiary shadow-sm hover:opacity-95 transition min-h-tap">
+                    {% trans "Se connecter" %}
+                    <span aria-hidden="true">→</span>
+                </a>
+                <p class="text-sm text-secondary">{% trans "Site en construction — accès réservé." %}</p>
+            </div>
+        {% endif %}
+    </section>
+    <section class="mx-auto mt-20 grid max-w-5xl grid-cols-1 gap-6 md:mt-28 md:grid-cols-3">
+        <article class="rounded-2xl border border-secondary/15 bg-surface/70 p-6 shadow-sm">
+            <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-tertiary/10 text-tertiary text-xl">📖</span>
+            <h2 class="mt-4 font-display text-xl font-semibold tracking-tight">{% trans "Annuaire" %}</h2>
+            <p class="mt-2 text-sm text-secondary leading-relaxed">
+                {% trans "Retrouvez vos camarades par nom, ville ou profession. Recherche insensible aux accents." %}
+            </p>
+        </article>
+        <article class="rounded-2xl border border-secondary/15 bg-surface/70 p-6 shadow-sm">
+            <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-ceremonial-gold/15 text-ceremonial-gold text-xl">🕊️</span>
+            <h2 class="mt-4 font-display text-xl font-semibold tracking-tight">{% trans "In Memoriam" %}</h2>
+            <p class="mt-2 text-sm text-secondary leading-relaxed">
+                {% trans "Un espace de recueillement pour celles et ceux qui nous ont quittés." %}
+            </p>
+        </article>
+        <article class="rounded-2xl border border-secondary/15 bg-surface/70 p-6 shadow-sm">
+            <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-whatsapp-green/15 text-whatsapp-green text-xl">🤝</span>
+            <h2 class="mt-4 font-display text-xl font-semibold tracking-tight">{% trans "Cooptation" %}</h2>
+            <p class="mt-2 text-sm text-secondary leading-relaxed">
+                {% trans "Une inscription validée par deux camarades — entre nous, pour nous." %}
+            </p>
+        </article>
+    </section>
 {% endblock %}

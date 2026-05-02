@@ -28,8 +28,11 @@ def test_base_template_renders_logo_and_whatsapp_link(client):
     assert "img/logo.png" in html
     assert "Les Retrouvailles" in html
     assert "Rejoindre le groupe WhatsApp" in html
-    assert "1F6B4F" in html  # whatsapp-green
-    assert "C9A227" in html  # ceremonial-gold
+    # Brand tokens are referenced. Accept inline-hex (legacy) OR Tailwind
+    # utility class (current); both satisfy the design contract that the
+    # WhatsApp affordance and the founding-date badge use brand colors.
+    assert "1F6B4F" in html or "whatsapp-green" in html  # whatsapp-green
+    assert "C9A227" in html or "ceremonial-gold" in html  # ceremonial-gold
     assert "1ᵉʳ Septembre 2020" in html or "1er Septembre 2020" in html
 
 

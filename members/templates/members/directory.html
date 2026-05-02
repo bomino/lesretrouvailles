@@ -6,9 +6,12 @@
 {% endblock %}
 {% block content %}
     <section class="mx-auto max-w-6xl">
-        <header class="mb-6 flex items-baseline justify-between gap-4">
-            <h1 class="text-3xl font-semibold tracking-tight">{% trans "Annuaire" %}</h1>
-            <p class="text-sm text-secondary hidden md:block">{% trans "Membres de la communauté CEG 1 Birni" %}</p>
+        <header class="mb-8">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-tertiary">{% trans "La communauté" %}</p>
+            <h1 class="mt-2 font-display text-4xl font-semibold tracking-tight hero-rule">{% trans "Annuaire" %}</h1>
+            <p class="mt-4 max-w-2xl text-base text-secondary leading-relaxed">
+                {% trans "Anciens élèves du CEG 1 Birni — Zinder, promotions 1980 à 1985. Recherchez par nom, surnom, ville ou profession." %}
+            </p>
         </header>
         <form method="get"
               id="directory-filters"

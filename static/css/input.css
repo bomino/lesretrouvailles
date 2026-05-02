@@ -2,10 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Project base — accessibility baseline */
+/* Project base — accessibility + brand fonts */
 html { font-size: 16px; }
-body { font-family: ui-sans-serif, system-ui, sans-serif; }
+body {
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: "cv11", "ss03";  /* Inter stylistic alternates: open digits, single-story 'g' */
+    text-rendering: optimizeLegibility;
+}
+h1, h2, h3, .font-display {
+    font-family: "Playfair Display", ui-serif, Georgia, serif;
+    font-feature-settings: "lnum";  /* lining figures inside serif headings */
+}
 button, .btn, a.btn { min-height: 44px; min-width: 44px; }
+
+/* Subtle paper-like grain on cream surfaces; intentionally low-opacity */
+.bg-paper {
+    background-image: radial-gradient(circle at 30% 20%, rgba(160, 74, 44, 0.04) 0%, transparent 40%),
+                      radial-gradient(circle at 70% 80%, rgba(201, 162, 39, 0.04) 0%, transparent 50%);
+}
+
+/* Hero accent: thin gold rule under page titles */
+.hero-rule::after {
+    content: "";
+    display: block;
+    width: 56px;
+    height: 3px;
+    background: linear-gradient(90deg, #C9A227 0%, #A04A2C 100%);
+    margin-top: 12px;
+    border-radius: 2px;
+}
 
 /* DO NOT REMOVE — load-bearing token anchors.
    These rules force Tailwind JIT to emit the 5 DESIGN.md brand colors
