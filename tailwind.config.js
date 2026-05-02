@@ -22,7 +22,31 @@ module.exports = {
   },
   plugins: [require("daisyui")],
   daisyui: {
-    themes: ["light"],
+    themes: [
+      {
+        alumni: {
+          // Map DaisyUI semantic slots to DESIGN.md tokens.
+          // DaisyUI components (btn-primary, alert-info, etc.) now render
+          // in brand colors instead of DaisyUI defaults.
+          primary: tokens.colors.tertiary,
+          "primary-content": tokens.colors["on-tertiary"],
+          secondary: tokens.colors["whatsapp-green"],
+          "secondary-content": tokens.colors["on-whatsapp-green"],
+          accent: tokens.colors["ceremonial-gold"],
+          "accent-content": tokens.colors["on-ceremonial-gold"],
+          neutral: tokens.colors.primary,
+          "neutral-content": tokens.colors["on-primary"],
+          "base-100": tokens.colors.neutral,
+          "base-200": tokens.colors["surface-variant"],
+          "base-300": tokens.colors.surface,
+          "base-content": tokens.colors.primary,
+          info: tokens.colors["whatsapp-green"],
+          success: tokens.colors["whatsapp-green"],
+          warning: tokens.colors["ceremonial-gold"],
+          error: "#B91C1C",
+        },
+      },
+    ],
     logs: false,
   },
 };

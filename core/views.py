@@ -1,5 +1,6 @@
 from django.db import connection
 from django.http import JsonResponse
+from django.shortcuts import render
 
 
 def health(_request):
@@ -13,3 +14,7 @@ def health(_request):
     payload = {"status": "ok" if db_ok else "degraded", "db": "ok" if db_ok else "fail"}
     status_code = 200 if db_ok else 503
     return JsonResponse(payload, status=status_code)
+
+
+def landing_placeholder(request):
+    return render(request, "core/landing_placeholder.html")
