@@ -69,11 +69,16 @@ def test_photo_rejected_when_public_id_outside_member_folder(consenting_client):
 
 
 @pytest.mark.django_db
-def test_old_photo_deleted_on_replacement(consenting_client, settings):
-    settings.CLOUDINARY_CLIENT_PATH = "alumni.cloudinary.FakeCloudinary"
+def test_old_photo_deleted_on_replacement(consenting_client, monkeypatch):
+    from alumni.cloudinary import FakeCloudinary
+    from members import views as members_views
+
     member = consenting_client.member
     member.photo_public_id = f"members/{member.slug}/old_photo"
     member.save()
+
+    fake = FakeCloudinary()
+    monkeypatch.setattr(members_views, "get_client", lambda: fake)
 
     new_id = f"members/{member.slug}/new_photo"
     consenting_client.post(
@@ -96,3 +101,4 @@ def test_old_photo_deleted_on_replacement(consenting_client, settings):
     )
     member.refresh_from_db()
     assert member.photo_public_id == new_id
+    assert f"members/{member.slug}/old_photo" in fake.delete_calls

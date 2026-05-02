@@ -52,3 +52,10 @@ def test_charter_post_requires_login():
 def test_charter_get_includes_noindex_meta(member_client):
     response = member_client.get("/charte/")
     assert b'<meta name="robots" content="noindex"' in response.content
+
+
+@pytest.mark.django_db
+def test_charter_post_blocks_external_redirect(member_client):
+    response = member_client.post("/charte/?next=https://evil.example.com/path")
+    assert response.status_code == 302
+    assert response["Location"] == "/"

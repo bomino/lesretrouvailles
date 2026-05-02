@@ -11,6 +11,7 @@ from django.db.models import F, Q, Value
 from django.db.models.functions import Lower
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods
 from django_ratelimit.decorators import ratelimit
 
@@ -40,6 +41,12 @@ def charter_view(request):
             )
             request.session["consent_ok_for"] = CHARTER_CURRENT_VERSION
         next_url = request.GET.get("next") or request.POST.get("next") or "/"
+        if not url_has_allowed_host_and_scheme(
+            url=next_url,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            next_url = "/"
         return HttpResponseRedirect(next_url)
 
     body_html = _markdown.markdown(
@@ -81,10 +88,10 @@ def profile_edit_view(request):
         raise Http404
 
     if request.method == "POST":
+        old_photo_id = member.photo_public_id
         member_form = ProfileEditForm(request.POST, instance=member)
         prefs_form = NotificationPreferenceForm(request.POST, instance=member.preferences)
         if member_form.is_valid() and prefs_form.is_valid():
-            old_photo_id = member.photo_public_id
             new_photo_id = member_form.cleaned_data.get("photo_public_id", "")
             member_form.save()
             prefs_form.save()
