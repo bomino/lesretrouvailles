@@ -119,3 +119,21 @@ class NotificationPreference(models.Model):
 
     def __str__(self) -> str:
         return f"Preferences for {self.member.full_name}"
+
+
+class ConsentRecord(models.Model):
+    member = models.ForeignKey(
+        Member,
+        on_delete=models.CASCADE,
+        related_name="consents",
+    )
+    charter_version = models.CharField(max_length=20)
+    accepted_at = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField()
+
+    class Meta:
+        indexes = [models.Index(fields=["member", "charter_version"])]
+        ordering = ["-accepted_at"]
+
+    def __str__(self) -> str:
+        return f"{self.member.full_name} → charter v{self.charter_version}"
