@@ -23,9 +23,21 @@ CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
 # ALLOWED_HOSTS overridable so Railway and the eventual custom domain
 # can be injected without touching code.
+#
+# `healthcheck.railway.app` is the hostname Railway's internal probe sends
+# in the Host header. Django's `.up.railway.app` wildcard only matches
+# subdomains of `up.railway.app`, NOT siblings under `railway.app`, so
+# the probe must be listed explicitly or every healthcheck returns 400
+# (DisallowedHost) and the deploy never goes green.
 ALLOWED_HOSTS = env.list(
     "ALLOWED_HOSTS",
-    default=["staging.villageretrouvailles.com", ".up.railway.app", "localhost", "127.0.0.1"],
+    default=[
+        "staging.villageretrouvailles.com",
+        ".up.railway.app",
+        "healthcheck.railway.app",
+        "localhost",
+        "127.0.0.1",
+    ],
 )
 
 # Defense-in-depth: prod sets X_FRAME_OPTIONS="DENY" too, but staging should

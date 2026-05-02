@@ -37,7 +37,7 @@ security hole).
 | `DJANGO_SETTINGS_MODULE` | `alumni.settings.staging` | Selects staging settings module |
 | `SECRET_KEY` | (50-char token from `python -c "import secrets; print(secrets.token_urlsafe(50))"`) | Django session/CSRF signing |
 | `DATABASE_URL` | `${{ Postgres.DATABASE_URL }}` (auto-set when Postgres add-on is added) | DB connection |
-| `ALLOWED_HOSTS` | `staging.villageretrouvailles.com,.up.railway.app` | Django host header check |
+| `ALLOWED_HOSTS` | `staging.villageretrouvailles.com,.up.railway.app,healthcheck.railway.app` | Django host header check. `healthcheck.railway.app` is required because Railway's internal probe sends that exact Host; the `.up.railway.app` wildcard does not cover it. |
 | `CSRF_TRUSTED_ORIGINS` | `https://staging.villageretrouvailles.com,https://*.up.railway.app` | **Without this, all POST forms 403 in HTTPS** |
 | `BASIC_AUTH_REQUIRED` | `true` | Activates the staging gate |
 | `BASIC_AUTH_USERNAME` | `admin` | **App refuses to boot if blank when REQUIRED=true** (prevents the `Authorization: Basic Og==` empty-credential bypass) |
