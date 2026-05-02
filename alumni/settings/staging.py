@@ -21,24 +21,28 @@ CSRF_COOKIE_SAMESITE = env("CSRF_COOKIE_SAMESITE", default="Lax")
 # Required by Django 4+ for cross-origin POST (allauth login over HTTPS)
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
-# ALLOWED_HOSTS overridable so Railway and the eventual custom domain
-# can be injected without touching code.
+# Hosts that MUST be allowed regardless of the operator's ALLOWED_HOSTS
+# env var. These are platform-coupled values the operator should not have
+# to know about — Railway sends its internal healthcheck probe with
+# `Host: healthcheck.railway.app`, and `.up.railway.app` does not match it
+# (Django's leading-dot wildcard matches subdomains of `up.railway.app`,
+# not siblings under `railway.app`).
 #
-# `healthcheck.railway.app` is the hostname Railway's internal probe sends
-# in the Host header. Django's `.up.railway.app` wildcard only matches
-# subdomains of `up.railway.app`, NOT siblings under `railway.app`, so
-# the probe must be listed explicitly or every healthcheck returns 400
-# (DisallowedHost) and the deploy never goes green.
-ALLOWED_HOSTS = env.list(
+# We merge these into whatever ALLOWED_HOSTS the operator set, so the
+# deploy can never go red just because the env var omitted them.
+_PLATFORM_REQUIRED_HOSTS = ["healthcheck.railway.app"]
+
+_user_hosts = env.list(
     "ALLOWED_HOSTS",
     default=[
         "staging.villageretrouvailles.com",
         ".up.railway.app",
-        "healthcheck.railway.app",
         "localhost",
         "127.0.0.1",
     ],
 )
+# dict.fromkeys preserves order and dedupes.
+ALLOWED_HOSTS = list(dict.fromkeys(_PLATFORM_REQUIRED_HOSTS + _user_hosts))
 
 # Defense-in-depth: prod sets X_FRAME_OPTIONS="DENY" too, but staging should
 # match the production posture so embedding-in-iframe surprises surface here
