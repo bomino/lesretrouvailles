@@ -80,10 +80,17 @@ def profile_edit_view(request):
         member_form = ProfileEditForm(request.POST, instance=member)
         prefs_form = NotificationPreferenceForm(request.POST, instance=member.preferences)
         if member_form.is_valid() and prefs_form.is_valid():
+            old_photo_id = member.photo_public_id
+            new_photo_id = member_form.cleaned_data.get("photo_public_id", "")
             member_form.save()
             prefs_form.save()
+            if old_photo_id and old_photo_id != new_photo_id:
+                get_client().delete(old_photo_id)
             messages.success(request, "Profil mis à jour.")
             return HttpResponseRedirect("/profil/")
+        # Form invalid — if the failure is photo_public_id, return 400 (security signal).
+        if "photo_public_id" in member_form.errors:
+            return JsonResponse({"error": "invalid photo path"}, status=400)
     else:
         member_form = ProfileEditForm(instance=member)
         prefs_form = NotificationPreferenceForm(instance=member.preferences)

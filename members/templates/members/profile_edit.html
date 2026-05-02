@@ -5,12 +5,21 @@
     {% trans "Mon profil" %}
 {% endblock %}
 {% block content %}
-    <form method="post" class="mx-auto max-w-xl p-4 space-y-4">
+    <form method="post"
+          class="mx-auto max-w-xl p-4 space-y-4"
+          id="profile-form">
         {% csrf_token %}
         <h1 class="text-2xl font-semibold">{% trans "Mon profil" %}</h1>
         <fieldset class="space-y-3">
             <legend class="font-medium">{% trans "Informations" %}</legend>
-            {{ member_form.as_p }}
+            {{ member_form.nickname.label_tag }} {{ member_form.nickname }}
+            {{ member_form.city.label_tag }} {{ member_form.city }}
+            {{ member_form.country.label_tag }} {{ member_form.country }}
+            {{ member_form.profession.label_tag }} {{ member_form.profession }}
+            {{ member_form.show_email }} {{ member_form.show_email.label_tag }}
+            {{ member_form.show_whatsapp }} {{ member_form.show_whatsapp.label_tag }}
+            {{ member_form.show_city }} {{ member_form.show_city.label_tag }}
+            {{ member_form.photo_public_id }}
         </fieldset>
         <fieldset class="space-y-3">
             <legend class="font-medium">{% trans "Notifications" %}</legend>
@@ -18,4 +27,5 @@
         </fieldset>
         <button type="submit" class="btn btn-primary">{% trans "Enregistrer" %}</button>
     </form>
+    <!-- Photo upload widget — Task 18 lays the persistence; full JS uploader is wired in a separate front-end task. -->
 {% endblock %}
