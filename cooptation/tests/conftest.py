@@ -79,3 +79,15 @@ def make_cooptation_request(db, make_application):
         return CooptationRequest.objects.create(**defaults)
 
     return _make
+
+
+@pytest.fixture(autouse=True)
+def _clear_django_cache():
+    """django-ratelimit uses Django's default cache (LocMemCache in tests).
+    Clear it between cooptation tests so signup-view IP rate limits don't
+    bleed across tests sharing the 127.0.0.1 client address."""
+    from django.core.cache import cache
+
+    cache.clear()
+    yield
+    cache.clear()
