@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="fr">
+    <body style="font-family: Inter, system-ui, sans-serif; color: #1a1c1e">
+        <p>Bonjour,</p>
+        <p>Une nouvelle demande d'inscription a été soumise :</p>
+        <table style="border-collapse: collapse">
+            <tr>
+                <td style="padding: 4px 12px 4px 0; color: #6c7278">Nom</td>
+                <td>
+                    <strong>{{ application.full_name }}</strong>
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 4px 12px 4px 0; color: #6c7278">Email</td>
+                <td>{{ application.email }}</td>
+            </tr>
+            <tr>
+                <td style="padding: 4px 12px 4px 0; color: #6c7278">Ville</td>
+                <td>{{ application.city }}, {{ application.country }}</td>
+            </tr>
+            <tr>
+                <td style="padding: 4px 12px 4px 0; color: #6c7278">Promotion</td>
+                <td>{{ application.years_attended|join:", " }}</td>
+            </tr>
+        </table>
+        <p>
+            <a href="https://staging.villageretrouvailles.com/admin/cooptation/adminapplication/{{ application.pk }}/change/">Voir le dossier</a>
+        </p>
+        <p>L'équipe Les Retrouvailles</p>
+    </body>
+</html>

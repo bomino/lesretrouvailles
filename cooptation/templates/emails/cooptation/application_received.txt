@@ -1,0 +1,10 @@
+Bonjour {{ application.full_name }},
+
+Merci pour votre demande d'inscription à la communauté Les Retrouvailles. Nous avons bien reçu votre dossier le {{ application.submitted_at|date:"d F Y" }}.
+
+Vos parrains vont recevoir une demande de cooptation par email. Dès qu'ils auront répondu, vous recevrez une nouvelle notification de notre part.
+
+Délai indicatif : sous 14 jours.
+
+À très bientôt,
+L'équipe Les Retrouvailles

@@ -1,0 +1,1 @@
+{{ request.parrain.full_name }} vous a coopté !

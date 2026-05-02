@@ -58,8 +58,6 @@ class FakeResendBackend(BaseEmailBackend):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Reset on each backend construction so test ordering does not bleed.
-        type(self).sent_messages = []
 
     def send_messages(self, email_messages):
         sent = 0

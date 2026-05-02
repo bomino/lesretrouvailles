@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="fr">
+    <body style="font-family: Inter, system-ui, sans-serif; color: #1a1c1e">
+        <p>
+            Bonjour <strong>{{ request.parrain.first_name }}</strong>,
+        </p>
+        <p>
+            <strong>{{ application.full_name }}</strong> a déposé une demande
+            d'inscription aux Retrouvailles et vous a nommé·e comme parrain·e.
+        </p>
+        <p>
+            Voulez-vous coopter cette personne ? Cliquez ci-dessous pour voir le
+            dossier et répondre :
+        </p>
+        <p>
+            <a href="https://staging.villageretrouvailles.com/cooptation/{{ request.token }}/">https://staging.villageretrouvailles.com/cooptation/{{ request.token }}/</a>
+        </p>
+        <p>
+            Vous avez 14 jours pour répondre. Une relance automatique sera envoyée à
+            J+7.
+        </p>
+        <p>
+            Merci pour votre temps,
+            <br />
+            L'équipe Les Retrouvailles
+        </p>
+    </body>
+</html>

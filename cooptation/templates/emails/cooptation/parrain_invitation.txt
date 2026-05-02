@@ -1,0 +1,12 @@
+Bonjour {{ request.parrain.first_name }},
+
+{{ application.full_name }} a déposé une demande d'inscription aux Retrouvailles et vous a nommé·e comme parrain·e.
+
+Voulez-vous coopter cette personne ? Cliquez ci-dessous pour voir le dossier et répondre :
+
+https://staging.villageretrouvailles.com/cooptation/{{ request.token }}/
+
+Vous avez 14 jours pour répondre. Une relance automatique sera envoyée à J+7.
+
+Merci pour votre temps,
+L'équipe Les Retrouvailles

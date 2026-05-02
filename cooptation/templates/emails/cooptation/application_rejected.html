@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="fr">
+    <body style="font-family: Inter, system-ui, sans-serif; color: #1a1c1e">
+        <p>
+            Bonjour <strong>{{ application.full_name }}</strong>,
+        </p>
+        <p>
+            Après examen, l'admin n'a pas pu valider votre demande d'inscription pour
+            la raison suivante :
+        </p>
+        <p style="color: #6c7278">{{ reason }}</p>
+        <p>
+            Si vous pensez qu'il s'agit d'une erreur ou si vous souhaitez fournir des
+            éléments supplémentaires, vous pouvez redéposer une demande dans 6 mois.
+        </p>
+        <p>L'équipe Les Retrouvailles</p>
+    </body>
+</html>

@@ -1,0 +1,9 @@
+Bonjour {{ application.full_name }},
+
+Le délai de cooptation de 14 jours a expiré sans que vos deux parrains aient pu répondre. Pour valider votre identité, merci de compléter le bref questionnaire ci-dessous :
+
+{{ questionnaire_url }}
+
+Le questionnaire ne prend que quelques minutes. Une fois soumis, l'admin examinera votre dossier.
+
+L'équipe Les Retrouvailles

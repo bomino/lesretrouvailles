@@ -1,0 +1,12 @@
+Bonjour,
+
+Une nouvelle demande d'inscription a été soumise :
+
+Nom : {{ application.full_name }}
+Email : {{ application.email }}
+Ville : {{ application.city }}, {{ application.country }}
+Promotion : {{ application.years_attended|join:", " }}
+
+Voir le dossier : https://staging.villageretrouvailles.com/admin/cooptation/adminapplication/{{ application.pk }}/change/
+
+L'équipe Les Retrouvailles
