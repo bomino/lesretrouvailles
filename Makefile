@@ -1,4 +1,4 @@
-.PHONY: dev test migrate css css-watch lint format check db-up db-down
+.PHONY: dev test migrate css css-watch lint format check db-up db-down seed
 
 dev:
 	python manage.py runserver
@@ -32,3 +32,6 @@ db-up:
 
 db-down:
 	docker compose down
+
+seed:
+	python manage.py loaddata seed_members
