@@ -107,3 +107,10 @@ ACCOUNT_EMAIL_VERIFICATION = "none"
 ACCOUNT_ADAPTER = "core.allauth_adapter.NoSignupAdapter"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
+
+# Cloudinary — overridden per environment. Tests fall through to the fake.
+CLOUDINARY_CLIENT_PATH = env(
+    "CLOUDINARY_CLIENT_PATH",
+    default="alumni.cloudinary.FakeCloudinary",
+)
+CLOUDINARY_CLOUD_NAME = env("CLOUDINARY_CLOUD_NAME", default="fake-cloud")
