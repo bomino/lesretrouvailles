@@ -7,8 +7,14 @@ html { font-size: 16px; }
 body { font-family: ui-sans-serif, system-ui, sans-serif; }
 button, .btn, a.btn { min-height: 44px; min-width: 44px; }
 
-/* Force emission of DESIGN.md token colors so tests verify them in output.css.
-   These rules are unused by templates but trigger Tailwind JIT emission. */
+/* DO NOT REMOVE — load-bearing token anchors.
+   These rules force Tailwind JIT to emit the 5 DESIGN.md brand colors
+   into output.css even when no template currently uses them as utility
+   classes. The smoke tests in core/tests/test_design_tokens.py grep
+   output.css for these hex values; without these anchors, the tests
+   fail and the design-system regression contract breaks.
+   Migrate to a Tailwind `safelist` in tailwind.config.js if you want
+   actual `bg-primary`/`text-tertiary` utilities emitted instead. */
 .token-anchor-primary { color: theme(colors.primary); }
 .token-anchor-tertiary { color: theme(colors.tertiary); }
 .token-anchor-in-memoriam { color: theme(colors.in-memoriam); }

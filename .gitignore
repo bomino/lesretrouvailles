@@ -21,6 +21,7 @@ mediafiles/
 # Editors
 .idea/
 *.swp
+.vscode/
 
 # Node (if used for tooling)
 node_modules/
