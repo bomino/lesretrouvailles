@@ -10,7 +10,7 @@ Single dashboard for tracking phase and task completion across all plans. Update
 | Phase | Title | Status | Plan |
 |-------|-------|--------|------|
 | P1 | Foundation | Complete (tag `v0.1.0-foundation`, 2026-05-02) | [plan](plans/2026-05-01-foundation.md) |
-| P2 | Membership | Not started | — |
+| P2 | Membership | Complete (tag `v0.2.0-membership`, 2026-05-02) | [plan](plans/2026-05-02-membership.md) |
 | P3 | Cooptation | Not started | — |
 | P4 | Public surface | Not started | — |
 | P5 | Mémoire seed | Not started | — |
@@ -48,9 +48,38 @@ Single dashboard for tracking phase and task completion across all plans. Update
 
 ## P2 — Membership
 
-**Status:** Not started.
-**Scope:** `Member` model, profile pages, directory with search/filters/pagination, Cloudinary upload integration, `NotificationPreference`, `ConsentRecord`.
-**Plan:** not yet written.
+**Shipped:** 2026-05-02 (branch `feat/membership`, tag `v0.2.0-membership`)
+**Plan:** [plans/2026-05-02-membership.md](plans/2026-05-02-membership.md)
+**Spec:** [specs/2026-05-02-membership-design.md](specs/2026-05-02-membership-design.md)
+**Test suite:** 128 passing (19 P1 + 109 new in `members/`)
+
+| # | Task | Done | Commit |
+|---|------|------|--------|
+| 1 | Scaffold members app + add P2 dependencies | [x] | `0d56289` (+ `be6f0f3` review nits) |
+| 2 | Cloudinary client with fake adapter and lazy URL builder | [x] | `69897f7` |
+| 3 | Cloudinary env vars and ratelimit cache config | [x] | `bb59314` |
+| 4 | Member model with split name, array fields, soft-delete status | [x] | `1a249aa` |
+| 5 | NotificationPreference with GDPR-safe defaults and auto-create signal | [x] | `0c3fb25` |
+| 6 | Append-only ConsentRecord model | [x] | `c59605b` |
+| 7 | Postgres unaccent extension, functional indexes, CHECK constraints | [x] | `01033dc` |
+| 8 | Admin registrations for Member, NotificationPreference, ConsentRecord | [x] | `9be9a65` |
+| 9 | Versioned charter package with v1.0 French content | [x] | `3cd8c79` |
+| 10 | LoginRequiredMiddleware with public-paths whitelist | [x] | `e661abd` |
+| 11 | ConsentRequiredMiddleware with session caching | [x] | `cf22cb7` |
+| 12 | CharterView with markdown render and consent capture | [x] | `1aac593` |
+| 13 | member_avatar template tag with initials fallback | [x] | `6ae5773` |
+| 14 | Context processor exposing member_prefs to templates | [x] | `2cd2296` |
+| 15 | ProfileDetailView with status gating and privacy toggles | [x] | `a9853f3` |
+| 16 | ProfileEditView with locked fields and notification preferences form | [x] | `dbe5780` |
+| 17 | Rate-limited cloudinary sign endpoint with folder pinning | [x] | `99a9494` |
+| 18 | Cloudinary photo persistence with folder validation and old-photo cleanup | [x] | `5e76a77` |
+| 19 | DirectoryView with pagination and HTMX-aware partial | [x] | `5863559` |
+| 20 | Accent-insensitive search and filters in directory | [x] | `4e11651` |
+| 21 | HTMX partial behavior tests | [x] | `2f1ec75` |
+| 22 | create_member management command for dev seeding | [x] | `d0ee077` |
+| 23 | Seed fixture with 6 representative members | [x] | `a1bc809` |
+| 24 | French translations generated and compiled | [x] | `8c233cb` |
+| 25 | a11y baseline assertions (label, aria-live, aria-label) | [x] | `b02d422` |
 
 ---
 
