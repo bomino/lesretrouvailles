@@ -1,0 +1,19 @@
+# NOT the canonical dep list — pyproject.toml is. This file exists so that
+# Railway's Railpack auto-builder (which doesn't read pyproject.toml's
+# [project].dependencies cleanly) installs the runtime deps. The Dockerfile
+# is the preferred build path; requirements.txt is the fallback when the
+# Railway service is still using Railpack.
+#
+# Keep in sync with pyproject.toml manually until we either drop Railpack
+# entirely (force Dockerfile) or move to a single-source via pip-compile.
+
+django>=5.0,<5.1
+psycopg[binary]>=3.1
+django-allauth>=0.61
+django-environ>=0.11
+whitenoise>=6.6
+gunicorn>=21
+cloudinary>=1.40
+django-ratelimit>=4.1
+markdown>=3.6
+redis>=5.0
