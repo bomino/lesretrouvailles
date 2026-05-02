@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Bootstrap the Django 5 project with Postgres, the HTMX + Tailwind + DaisyUI frontend stack, Allauth (email-only login, signup disabled at this layer), French i18n + accessibility baseline, pytest + ruff + pre-commit + GitHub Actions CI, and a `/health` endpoint — providing the working web shell that all subsequent feature plans depend on.
+**Goal:** Bootstrap the Django 5 project with Postgres, the HTMX + Tailwind + DaisyUI frontend stack driven by a `DESIGN.md` token file (Google Labs `@google/design.md` alpha standard), Allauth (email-only login, signup disabled at this layer), French i18n + accessibility baseline, pytest + ruff + pre-commit + GitHub Actions CI, and a `/health` endpoint — providing the working web shell that all subsequent feature plans depend on.
 
-**Architecture:** Single Django 5 monolith with split settings (`base` / `dev` / `staging` / `prod`). Postgres 16 in Docker Compose for development. Tailwind 3 + DaisyUI 4 compiled to a single CSS bundle via the Tailwind CLI. HTMX 2.x served from the project's static files (not CDN — long-term reliability and offline-capable dev). French as the default and only V1 locale, with `gettext` machinery active so Hausa can be added in Phase 4 without refactor. Accessibility baseline enforced in the base template (16px root font, WCAG AA contrast tokens, no hover-only interactions, 44×44 minimum tactile targets).
+**Architecture:** Single Django 5 monolith with split settings (`base` / `dev` / `staging` / `prod`). Postgres 16 in Docker Compose for development. Tailwind 3 + DaisyUI 4 compiled to a single CSS bundle via the Tailwind CLI, with the theme tokens (colors, type, spacing) sourced from a `DESIGN.md` file authored against the **`@google/design.md`** alpha standard — exporting `tailwind.theme.json` that the Tailwind config consumes. HTMX 2.x served from the project's static files (not CDN — long-term reliability and offline-capable dev). French as the default and only V1 locale, with `gettext` machinery active so Hausa can be added in Phase 4 without refactor. Accessibility baseline enforced in the base template (16px root font, WCAG AA contrast tokens, no hover-only interactions, 44×44 minimum tactile targets); contrast ratios are checked in CI by `designmd lint`.
 
-**Tech Stack:** Python 3.12 · Django 5.x · PostgreSQL 16 · django-allauth · Tailwind CSS 3.4 · DaisyUI 4 · HTMX 2.x · pytest-django · factory-boy · ruff (lint + format) · pre-commit · GitHub Actions.
+**Tech Stack:** Python 3.12 · Django 5.x · PostgreSQL 16 · django-allauth · Tailwind CSS 3.4 · DaisyUI 4 · `@google/design.md` (alpha) · HTMX 2.x · pytest-django · factory-boy · ruff (lint + format) · pre-commit · GitHub Actions.
 
 **Reference spec:** `docs/superpowers/specs/2026-05-01-alumni-platform-design.md` (PRD v1.3).
 
@@ -18,7 +18,7 @@ Files created/modified by this plan, with one-line responsibility:
 
 | Path | Responsibility |
 |---|---|
-| `pyproject.toml` | Python project metadata, runtime + dev dependencies, tool config (ruff, black, pytest) |
+| `pyproject.toml` | Python project metadata, runtime + dev dependencies, tool config (ruff, pytest) |
 | `docker-compose.yml` | Postgres 16 service for local development |
 | `.env.example` | Documented environment variables (no secrets) |
 | `manage.py` | Django entry point |
@@ -44,12 +44,14 @@ Files created/modified by this plan, with one-line responsibility:
 | `static/css/input.css` | Tailwind source CSS |
 | `static/css/output.css` | Tailwind compiled CSS (gitignored) |
 | `static/js/htmx.min.js` | HTMX bundled (vendored, not CDN) |
-| `tailwind.config.js` | Tailwind + DaisyUI config |
+| `DESIGN.md` | Visual identity (tokens + rationale) authored against `@google/design.md` spec — single source of truth for colors, type, spacing, components |
+| `tailwind.theme.json` | Generated Tailwind theme exported from DESIGN.md (committed for reproducible builds) |
+| `tailwind.config.js` | Tailwind + DaisyUI config; consumes `tailwind.theme.json` |
 | `postcss.config.js` | PostCSS pipeline |
-| `package.json` | Node tooling for Tailwind build |
+| `package.json` | Node tooling for Tailwind build + `@google/design.md` CLI |
 | `locale/fr/LC_MESSAGES/django.po` | French translations file (placeholder) |
-| `.pre-commit-config.yaml` | Pre-commit hooks (ruff, black, prettier) |
-| `.github/workflows/test.yml` | CI: pytest + ruff + black + djlint on push/PR |
+| `.pre-commit-config.yaml` | Pre-commit hooks (ruff lint + format, djlint, file hygiene) |
+| `.github/workflows/test.yml` | CI: ruff + djlint + designmd lint + pytest on push/PR |
 | `Makefile` | Common dev commands (`make dev`, `make test`, `make migrate`, `make css`) |
 
 ---
@@ -685,6 +687,317 @@ git commit -m "feat: add tailwind + daisyui build pipeline"
 
 ---
 
+## Task 6.5: Author DESIGN.md and wire export to Tailwind theme
+
+> **Why this task:** The platform's visual identity (Sahelien gravitas, accessibility for 55-65 year olds, distinct In Memoriam treatment) is too important to encode only in `tailwind.config.js`. We use **`@google/design.md`** — a Google Labs alpha standard for describing visual identity to coding agents — as the **single source of truth** for design tokens. Subsequent plans (P2 Membership, P4 Public surface, P5 Mémoire seed) all read from this file rather than reinventing colors and type each time. The `lint` command verifies WCAG AA contrast ratios in CI, satisfying spec §8.3 *as a CI check*, not as documentation.
+
+**Files:**
+- Create: `DESIGN.md`
+- Create: `tailwind.theme.json` (generated, committed)
+- Create: `core/tests/test_design_tokens.py`
+- Modify: `package.json` (add `@google/design.md` devDep + scripts)
+- Modify: `tailwind.config.js` (consume `tailwind.theme.json`)
+- Modify: `.github/workflows/test.yml` (add `designmd lint` step)
+
+- [ ] **Step 1: Install the `@google/design.md` CLI as a dev dependency**
+
+Run: `npm install -D @google/design.md`
+
+> *Windows note: invoke via the `designmd` alias (not `design.md`) when calling from `package.json` scripts. The `.md` suffix collides with Markdown file association on Windows.*
+
+- [ ] **Step 2: Add `design:lint` and `design:export` scripts to `package.json`**
+
+Edit `package.json`'s `"scripts"` block to read:
+
+```json
+{
+  "scripts": {
+    "design:lint": "designmd lint DESIGN.md",
+    "design:export": "designmd export --format tailwind DESIGN.md > tailwind.theme.json",
+    "css:build": "tailwindcss -i ./static/css/input.css -o ./static/css/output.css --minify",
+    "css:watch": "tailwindcss -i ./static/css/input.css -o ./static/css/output.css --watch"
+  }
+}
+```
+
+- [ ] **Step 3: Create `DESIGN.md` at the project root**
+
+```markdown
+---
+version: alpha
+name: Alumni CEG 1 Birni
+description: Visual identity for the Alumni CEG 1 Birni — Zinder platform. A digital memory home for the 1980-1985 promotion. Journalistic gravitas, Sahelien restraint.
+colors:
+  primary: "#1A1C1E"
+  secondary: "#6C7278"
+  tertiary: "#A04A2C"
+  neutral: "#F5F1EA"
+  on-primary: "#F5F1EA"
+  on-tertiary: "#FFFFFF"
+  surface: "#FFFFFF"
+  surface-variant: "#EEEAE2"
+  in-memoriam: "#5A4A3D"
+typography:
+  display:
+    fontFamily: Playfair Display
+    fontSize: 48px
+    fontWeight: 600
+    lineHeight: 1.15
+    letterSpacing: -0.01em
+  h1:
+    fontFamily: Playfair Display
+    fontSize: 32px
+    fontWeight: 600
+    lineHeight: 1.2
+  h2:
+    fontFamily: Playfair Display
+    fontSize: 24px
+    fontWeight: 500
+    lineHeight: 1.3
+  body-lg:
+    fontFamily: Inter
+    fontSize: 18px
+    fontWeight: 400
+    lineHeight: 1.6
+  body-md:
+    fontFamily: Inter
+    fontSize: 16px
+    fontWeight: 400
+    lineHeight: 1.6
+  body-sm:
+    fontFamily: Inter
+    fontSize: 14px
+    fontWeight: 400
+    lineHeight: 1.5
+  label-md:
+    fontFamily: Inter
+    fontSize: 14px
+    fontWeight: 500
+    lineHeight: 1.4
+    letterSpacing: 0.02em
+  label-caps:
+    fontFamily: Inter
+    fontSize: 12px
+    fontWeight: 600
+    lineHeight: 1
+    letterSpacing: 0.08em
+rounded:
+  sm: 4px
+  md: 8px
+  lg: 12px
+  full: 9999px
+spacing:
+  xs: 4px
+  sm: 8px
+  md: 16px
+  lg: 24px
+  xl: 32px
+  2xl: 48px
+  3xl: 64px
+components:
+  button-primary:
+    backgroundColor: "{colors.tertiary}"
+    textColor: "{colors.on-tertiary}"
+    typography: "{typography.label-md}"
+    rounded: "{rounded.sm}"
+    padding: 12px
+    height: 44px
+  button-primary-hover:
+    backgroundColor: "#8A3F26"
+    textColor: "{colors.on-tertiary}"
+  button-secondary:
+    backgroundColor: "{colors.neutral}"
+    textColor: "{colors.primary}"
+    typography: "{typography.label-md}"
+    rounded: "{rounded.sm}"
+    height: 44px
+  card:
+    backgroundColor: "{colors.surface}"
+    rounded: "{rounded.md}"
+    padding: 24px
+  in-memoriam-frame:
+    backgroundColor: "{colors.surface-variant}"
+    textColor: "{colors.in-memoriam}"
+    rounded: "{rounded.md}"
+    padding: 32px
+---
+
+# Alumni CEG 1 Birni — Design System
+
+## Overview
+
+The visual identity for the Alumni CEG 1 Birni platform serves a single purpose: to feel like a permanent home for the memory of a generation that shared decisive years in Zinder, Niger, between 1980 and 1985. It is journalistic in posture — unhurried, legible, archival — and Sahelien in palette: warm limestone foundations and a single terra-cotta accent that nods to the earthen architecture of Zinder's old city without resorting to ornamental cliché.
+
+The platform must feel respectful enough to host an In Memoriam, structured enough to function as a directory, and quiet enough to recede when the photographs and testimonies take over. Decoration is restrained. Whitespace is generous. The design should not call attention to itself; it should call attention to the people it remembers.
+
+## Colors
+
+The palette is built around high-contrast neutrals with one warm accent. There is no second accent; chromatic restraint is itself a design decision. Reading the alumni directory or an In Memoriam page should feel like turning the page of a quality print publication, not browsing a corporate web app.
+
+- **Primary (#1A1C1E):** Deep ink for headlines, body copy, and structural elements. Conveys gravity and permanence.
+- **Secondary (#6C7278):** Sophisticated slate for borders, captions, dates, profession labels, and metadata. Never used as primary text.
+- **Tertiary (#A04A2C):** "Sahel Terre Cuite" — the single interaction color. Used exclusively for primary CTAs ("Je suis un ancien"), active states, and rare highlights. Its scarcity makes each appearance meaningful.
+- **Neutral (#F5F1EA):** Warm limestone — the page foundation. Softer than pure white, with a faint earthy undertone.
+- **In Memoriam (#5A4A3D):** Earth brown reserved exclusively for In Memoriam frames and copy. Never appears outside that context.
+
+## Typography
+
+The type system pairs **Playfair Display** for editorial weight with **Inter** for utilitarian clarity. The juxtaposition mirrors the platform's dual nature: a place of memory (Playfair) and a place of function (Inter).
+
+- **Display & Headlines:** Playfair Display 600. Used sparingly for major page titles, member names on profile pages, and In Memoriam dedications. Negative letter-spacing tightens display sizes.
+- **Body:** Inter 400 at 16px is the floor. Per spec §8.3, the platform's audience is 55-65 years old and 16px is a non-negotiable accessibility baseline.
+- **Labels:** Inter 500/600 with positive letter-spacing for metadata, button text, and tags.
+
+Avoid Playfair below 18px — its serifs collapse and undermine readability for older users.
+
+## Layout
+
+A 12-column grid on desktop with 24px gutters; on mobile, content is full-width with 16px page padding. The maximum readable line length for body copy is 65ch — beyond that, prose becomes uncomfortable for the cohort. Card-based components stack vertically on mobile, never carousel-paged. Vertical rhythm follows the spacing scale (8/16/24/32/48/64).
+
+## Components
+
+- **button-primary:** The single CTA color (Sahel Terre Cuite) on neutral background. 44×44 minimum tactile target (spec §8.3). Used at most once per visible viewport.
+- **card:** Surface white with 24px padding, 8px radius. Houses member profiles, testimonials, photo entries.
+- **in-memoriam-frame:** Bordered surface variant (limestone shade darker than page background), earth-brown copy. Visually distinct from any other component on the site — designed to feel set apart, like a memorial plaque.
+
+## Do's and Don'ts
+
+- **Do** keep the Sahel Terre Cuite accent for true calls-to-action; reusing it for decorative borders or info badges dilutes its meaning.
+- **Don't** introduce a third accent color — the design budget is one accent, deliberately.
+- **Do** use generous whitespace around photographs; they are the primary content.
+- **Don't** compress vertical rhythm to fit "more above the fold." This audience reads carefully, not skims.
+- **Do** keep the In Memoriam visual language reserved for In Memoriam contexts only.
+- **Don't** use icon-only buttons (spec §8.3); always pair an icon with a text label.
+```
+
+- [ ] **Step 4: Lint DESIGN.md and confirm zero errors**
+
+Run: `npm run design:lint`
+Expected: JSON output with `"summary": { "errors": 0, ... }`. Warnings are acceptable; errors fail the task.
+
+If contrast warnings appear (e.g. `secondary` text on `surface` falling under WCAG AA 4.5:1), adjust the affected color in DESIGN.md and re-lint.
+
+- [ ] **Step 5: Export DESIGN.md to a Tailwind theme JSON**
+
+Run: `npm run design:export`
+Expected: `tailwind.theme.json` is created with `colors`, `fontFamily`, `fontSize`, `borderRadius`, `spacing` keys derived from DESIGN.md tokens.
+
+Inspect the file and confirm the alumni-specific colors are present:
+```bash
+grep -E '"primary"|"tertiary"|"in-memoriam"' tailwind.theme.json
+```
+Expected: all three keys appear.
+
+- [ ] **Step 6: Modify `tailwind.config.js` to consume the exported theme**
+
+Replace the contents of `tailwind.config.js`:
+
+```javascript
+const theme = require("./tailwind.theme.json");
+
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    "./templates/**/*.html",
+    "./core/**/*.{html,py}",
+  ],
+  theme: {
+    extend: {
+      // Tokens from DESIGN.md (single source of truth for visual identity)
+      ...(theme.colors && { colors: theme.colors }),
+      ...(theme.fontFamily && { fontFamily: theme.fontFamily }),
+      ...(theme.fontSize && { fontSize: theme.fontSize }),
+      ...(theme.borderRadius && { borderRadius: theme.borderRadius }),
+      ...(theme.spacing && { spacing: theme.spacing }),
+      // Project-specific extensions not expressed in DESIGN.md
+      minHeight: { tap: "44px" },
+      minWidth: { tap: "44px" },
+    },
+  },
+  plugins: [require("daisyui")],
+  daisyui: {
+    themes: ["light"],
+    logs: false,
+  },
+};
+```
+
+- [ ] **Step 7: Rebuild the CSS and verify token application**
+
+Run: `npm run css:build`
+Expected: `static/css/output.css` is rebuilt without error.
+
+Verify a known token compiled into a utility class:
+```bash
+grep -q "1A1C1E" static/css/output.css && echo "primary OK"
+grep -q "A04A2C" static/css/output.css && echo "tertiary OK"
+grep -q "5A4A3D" static/css/output.css && echo "in-memoriam OK"
+```
+Expected: all three lines print `OK`.
+
+- [ ] **Step 8: Write the design-token smoke test**
+
+Create `core/tests/test_design_tokens.py`:
+
+```python
+"""Anti-regression smoke test: DESIGN.md tokens must reach compiled CSS.
+
+If any of these assertions fail, either DESIGN.md was edited and
+`npm run design:export && npm run css:build` was not re-run, or the
+tailwind.config.js stopped consuming the exported theme.
+"""
+from pathlib import Path
+
+from django.conf import settings
+
+
+def _read_compiled_css() -> str:
+    css_path = Path(settings.STATICFILES_DIRS[0]) / "css" / "output.css"
+    assert css_path.exists(), "Run `npm run css:build` first"
+    return css_path.read_text(encoding="utf-8")
+
+
+def test_primary_color_token_compiled():
+    assert "1A1C1E" in _read_compiled_css() or "1a1c1e" in _read_compiled_css()
+
+
+def test_sahel_terra_cotta_token_compiled():
+    css = _read_compiled_css()
+    assert "A04A2C" in css or "a04a2c" in css
+
+
+def test_in_memoriam_brown_compiled():
+    css = _read_compiled_css()
+    assert "5A4A3D" in css or "5a4a3d" in css
+```
+
+- [ ] **Step 9: Run the new tests and confirm they pass**
+
+Run: `pytest core/tests/test_design_tokens.py -v`
+Expected: `3 passed`.
+
+- [ ] **Step 10: Add `designmd lint` to CI**
+
+Modify `.github/workflows/test.yml` — insert one step **after** `npm ci` and **before** `npm run css:build`:
+
+```yaml
+      - run: npm ci
+      - run: npm run design:lint
+      - run: npm run design:export
+      - run: npm run css:build
+```
+
+> *We re-export in CI to catch drift between committed `tailwind.theme.json` and `DESIGN.md`. If the freshly-generated theme differs from the committed one, the subsequent CSS build still succeeds (the new theme overwrites the committed file in the CI workspace), but a developer running `git status` after CI would see the diff. To make drift a hard CI failure, add a follow-up `git diff --exit-code tailwind.theme.json` step — left out of Foundation to avoid CI flakiness during early iteration.*
+
+- [ ] **Step 11: Commit**
+
+```bash
+git add DESIGN.md tailwind.theme.json package.json package-lock.json tailwind.config.js core/tests/test_design_tokens.py .github/workflows/test.yml
+git commit -m "feat: adopt DESIGN.md as single source of truth for visual identity"
+```
+
+---
+
 ## Task 7: Vendor HTMX and base template with a11y baseline
 
 **Files:**
@@ -1141,7 +1454,7 @@ Expected: hooks run; some may fix files in-place. Re-run until clean.
 ```bash
 git add .pre-commit-config.yaml
 git add -u  # stage any auto-fixes
-git commit -m "chore: add pre-commit hooks (ruff, black, djlint)"
+git commit -m "chore: add pre-commit hooks (ruff, djlint)"
 ```
 
 ---
@@ -1493,10 +1806,12 @@ git commit -m "feat: add basic-auth middleware for staging gate"
 
 **Files:** none (verification only)
 
-- [ ] **Step 1: Build CSS, compile messages, run all checks**
+- [ ] **Step 1: Lint design tokens, rebuild CSS, compile messages, run all checks**
 
 Run:
 ```bash
+npm run design:lint
+npm run design:export
 npm run css:build
 python manage.py compilemessages
 make check
@@ -1504,7 +1819,7 @@ make lint
 make test
 ```
 
-Expected: all four exit cleanly. Final pytest output should show all tests passing across `test_smoke.py`, `test_health.py`, `test_base_template.py`, `test_i18n.py`, `test_auth.py`, `test_static_assets.py`, `test_basic_auth.py`.
+Expected: all commands exit cleanly. Final pytest output should show all tests passing across `test_smoke.py`, `test_health.py`, `test_base_template.py`, `test_i18n.py`, `test_design_tokens.py`, `test_auth.py`, `test_static_assets.py`, `test_basic_auth.py`.
 
 - [ ] **Step 2: Manually browse the running site one last time**
 
