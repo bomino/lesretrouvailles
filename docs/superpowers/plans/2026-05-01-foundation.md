@@ -833,8 +833,8 @@ components:
     padding: 12px
     height: 44px
   promo-badge:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.ceremonial-gold}"
+    backgroundColor: "{colors.ceremonial-gold}"
+    textColor: "{colors.on-ceremonial-gold}"
     typography: "{typography.label-caps}"
     rounded: "{rounded.full}"
     padding: 4px
@@ -879,7 +879,7 @@ A 12-column grid on desktop with 24px gutters; on mobile, content is full-width 
 - **card:** Surface white with 24px padding, 8px radius. Houses member profiles, testimonials, photo entries.
 - **in-memoriam-frame:** Bordered surface variant (limestone shade darker than page background), earth-brown copy. Visually distinct from any other component on the site — designed to feel set apart, like a memorial plaque.
 - **whatsapp-link:** Pill-shaped button in `whatsapp-green` with white copy. Used **only** for WhatsApp-related affordances (header CTA "Rejoindre le groupe WhatsApp", share-to-WA links, in-message WA-icon links). Never used as a generic UI button.
-- **promo-badge:** Small pill in `ceremonial-gold` text on surface, used for the "Promo 1980-1985" stamp, anniversary milestone marks, and the founding-date footer chip ("Depuis le 1ᵉʳ Septembre 2020"). Decorative role only — never wraps interactive content.
+- **promo-badge:** Small pill with **`ceremonial-gold` background and deep-ink text** (gold-medal feel, WCAG AA compliant). Used for the "Promo 1980-1985" stamp, anniversary milestone marks, and the founding-date footer chip ("Depuis le 1ᵉʳ Septembre 2020"). Decorative role only — never wraps interactive content.
 
 ## Logo
 
@@ -1199,7 +1199,8 @@ Create `templates/base.html`:
 
   <footer class="container mx-auto px-md py-lg mt-2xl border-t border-secondary/20 flex items-center gap-md text-sm text-secondary">
     <img src="{% static 'img/logo.png' %}" alt="" class="h-8 w-auto" width="64" height="64">
-    <span class="rounded-full bg-surface px-md py-xs text-xs font-semibold tracking-wider uppercase" style="color: #C9A227;">
+    <span class="rounded-full px-md py-xs text-xs font-semibold tracking-wider uppercase"
+          style="background-color: #C9A227; color: #1A1C1E;">
       {% trans "Depuis le 1ᵉʳ Septembre 2020" %}
     </span>
   </footer>
