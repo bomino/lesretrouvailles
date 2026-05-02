@@ -12,6 +12,12 @@ DEBUG = False
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 # SECURE_SSL_REDIRECT is env-overridable so docker-compose (HTTP only) can disable it.
 SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=True)
+# Railway's internal healthcheck probe hits the container directly over HTTP
+# (no X-Forwarded-Proto), so SecurityMiddleware would otherwise return a 301
+# redirect to https. Exempting /health from the redirect lets the probe see
+# a real 200 response. The pattern is matched against request.path with the
+# leading slash stripped (Django's documented behavior).
+SECURE_REDIRECT_EXEMPT = [r"^health$"]
 SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE", default=True)
 CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=True)
 # Explicit SameSite stance — Lax matches Django's default but locking it down
