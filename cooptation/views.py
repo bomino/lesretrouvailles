@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import unicodedata
 from datetime import timedelta
 
 from django.contrib.auth.decorators import login_required
@@ -157,4 +158,46 @@ def parrain_vouch_view(request, token: str):
             "request_obj": cooptation_request,
             "application": cooptation_request.application,
         },
+    )
+
+
+def _strip_accents(s: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
+
+
+def _grade_closed(answer: str, keys: list[str]) -> bool:
+    haystack = _strip_accents(answer.lower())
+    return any(_strip_accents(key.lower()) in haystack for key in keys if key)
+
+
+@require_http_methods(["GET", "POST"])
+def questionnaire_view(request, token: str):
+    try:
+        application = AdminApplication.objects.get(questionnaire_token=token)
+    except AdminApplication.DoesNotExist:
+        return render(request, "cooptation/questionnaire_done.html", {"unknown": True}, status=410)
+
+    if application.questionnaire_responses.exists():
+        return render(request, "cooptation/questionnaire_done.html", {"unknown": False}, status=410)
+
+    from .models import KnowledgeQuestion, QuestionnaireResponse
+
+    questions = list(KnowledgeQuestion.objects.filter(is_active=True))
+
+    if request.method == "POST":
+        with transaction.atomic():
+            for q in questions:
+                answer = (request.POST.get(f"q{q.position}") or "").strip()
+                grade = _grade_closed(answer, q.answer_keys) if q.kind == "closed" else None
+                QuestionnaireResponse.objects.create(
+                    application=application, question=q, candidate_answer=answer, auto_grade=grade
+                )
+            application.status = "awaiting_admin"
+            application.save()
+        return HttpResponseRedirect(f"/questionnaire/{token}/")
+
+    return render(
+        request,
+        "cooptation/questionnaire.html",
+        {"questions": questions, "application": application},
     )

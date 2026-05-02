@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}
+    {% trans "Questionnaire de connaissance" %}
+{% endblock %}
+{% block content %}
+    <div class="mx-auto max-w-2xl">
+        <header class="mb-6">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-tertiary">{% trans "Vérification" %}</p>
+            <h1 class="mt-2 font-display text-3xl font-semibold tracking-tight hero-rule">
+                {% trans "Questionnaire de connaissance" %}
+            </h1>
+            <p class="mt-4 text-secondary">{% trans "Cooptation expirée — quelques questions pour valider votre identité." %}</p>
+        </header>
+        <form method="post"
+              class="rounded-2xl bg-base-200 border border-secondary/15 p-6 shadow-sm space-y-5">
+            {% csrf_token %}
+            {% for q in questions %}
+                <label class="block">
+                    <span class="block text-sm font-medium mb-1.5">{{ q.position }}. {{ q.text }}</span>
+                    {% if q.kind == "closed" %}
+                        <input type="text"
+                               name="q{{ q.position }}"
+                               required
+                               class="block w-full rounded-lg border border-secondary/20 bg-white px-3 py-2 text-base shadow-sm focus:border-tertiary focus:outline-none focus:ring-2 focus:ring-tertiary/30">
+                    {% else %}
+                        <textarea name="q{{ q.position }}"
+                                  rows="4"
+                                  required
+                                  class="block w-full rounded-lg border border-secondary/20 bg-white px-3 py-2 text-base shadow-sm focus:border-tertiary focus:outline-none focus:ring-2 focus:ring-tertiary/30"></textarea>
+                    {% endif %}
+                </label>
+            {% endfor %}
+            <button type="submit"
+                    class="rounded-lg bg-tertiary px-6 py-2.5 text-base font-medium text-on-tertiary shadow-sm hover:opacity-95 min-h-tap">
+                {% trans "Envoyer mes réponses" %}
+            </button>
+        </form>
+    </div>
+{% endblock %}

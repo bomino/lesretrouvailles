@@ -59,6 +59,7 @@ class AdminApplication(models.Model):
     retention_until = models.DateTimeField(null=True, blank=True)
     purged_at = models.DateTimeField(null=True, blank=True)
     source_ip = models.GenericIPAddressField(null=True, blank=True)
+    questionnaire_token = models.CharField(max_length=64, unique=True, null=True, blank=True)
 
     class Meta:
         indexes = [
