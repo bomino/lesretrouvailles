@@ -13,6 +13,7 @@
         </title>
         <link rel="stylesheet" href="{% static 'css/output.css' %}">
         <script defer src="{% static 'js/htmx.min.js' %}"></script>
+        {% block extra_head %}{% endblock %}
     </head>
     <body data-theme="alumni" class="bg-neutral text-primary">
         <a href="#main"

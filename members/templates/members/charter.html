@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block extra_head %}<meta name="robots" content="noindex,nofollow">{% endblock %}
+{% block title %}
+    {% trans "Charte" %} v{{ charter_version }}
+{% endblock %}
+{% block content %}
+    <article class="prose mx-auto max-w-2xl p-4">{{ charter_html|safe }}</article>
+    <form method="post"
+          action="?next={{ next|urlencode }}"
+          class="mx-auto max-w-2xl p-4">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary">{% trans "J'accepte" %}</button>
+    </form>
+{% endblock %}
