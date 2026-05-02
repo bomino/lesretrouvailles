@@ -114,3 +114,28 @@ CLOUDINARY_CLIENT_PATH = env(
     default="alumni.cloudinary.FakeCloudinary",
 )
 CLOUDINARY_CLOUD_NAME = env("CLOUDINARY_CLOUD_NAME", default="fake-cloud")
+
+# Real Cloudinary credentials (only required when CLOUDINARY_CLIENT_PATH points at RealCloudinary)
+CLOUDINARY_API_KEY = env("CLOUDINARY_API_KEY", default="")
+CLOUDINARY_API_SECRET = env("CLOUDINARY_API_SECRET", default="")
+CLOUDINARY_URL = env(
+    "CLOUDINARY_URL",
+    default=f"cloudinary://{CLOUDINARY_API_KEY}:{CLOUDINARY_API_SECRET}@{CLOUDINARY_CLOUD_NAME}",
+)
+
+# Rate limiting (django-ratelimit) — uses Django's default cache backend
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "alumni-default",
+    },
+}
+
+# Login + consent gating
+LOGIN_REQUIRED_WHITELIST = [
+    "/",
+    "/health",
+    "/accounts/",
+    "/static/",
+    "/media/",
+]
