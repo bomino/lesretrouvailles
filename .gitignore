@@ -1,0 +1,29 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Python / Django
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.sqlite3
+db.sqlite3
+staticfiles/
+mediafiles/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Editors
+.idea/
+*.swp
+
+# Node (if used for tooling)
+node_modules/
+
+# Claude local-only settings
+.claude/settings.local.json
