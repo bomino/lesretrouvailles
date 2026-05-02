@@ -1,7 +1,6 @@
 # DEVELOPMENT ONLY — do not deploy this compose file.
 # Plaintext credentials below are for local convenience.
-# Staging and production use managed Postgres (Hetzner / Railway) with
-# separate, env-injected credentials.
+# Staging and production use Railway with separate, env-injected credentials.
 
 services:
   db:
@@ -19,6 +18,31 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DJANGO_SETTINGS_MODULE: alumni.settings.staging
+      SECRET_KEY: dev-compose-secret-not-for-production-aaaaaaaaaaaaaaa
+      DATABASE_URL: postgres://alumni:alumni@db:5432/alumni
+      ALLOWED_HOSTS: localhost,127.0.0.1,app
+      CSRF_TRUSTED_ORIGINS: http://localhost:8000
+      SITE_URL: http://localhost:8000
+      SECURE_SSL_REDIRECT: "false"
+      BASIC_AUTH_REQUIRED: "true"
+      BASIC_AUTH_USERNAME: admin
+      BASIC_AUTH_PASSWORD: compose-test-pw
+      CLOUDINARY_CLIENT_PATH: alumni.cloudinary.FakeCloudinary
+      CLOUDINARY_CLOUD_NAME: fake-cloud
+      PORT: "8000"
+      WEB_CONCURRENCY: "1"
+    ports:
+      - "8000:8000"
 
 volumes:
   alumni_pgdata:

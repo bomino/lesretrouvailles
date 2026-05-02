@@ -1,0 +1,50 @@
+# Version control
+.git
+.gitignore
+.github
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache
+.ruff_cache
+.venv
+venv
+env
+.coverage
+htmlcov
+
+# Node
+node_modules
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Editor / OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+Screenshot*.png
+
+# Project-specific
+.env
+.env.*
+!.env.example
+docs/
+*.md
+!DESIGN.md
+
+# Compiled assets we rebuild in image
+staticfiles/
+static/css/output.css
+
+# Tests / dev-only
+core/tests/
+members/tests/
+*/migrations/__pycache__
+
+# Pre-commit
+.pre-commit-config.yaml
