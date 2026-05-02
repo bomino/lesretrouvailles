@@ -29,6 +29,10 @@
         const cloudName = root.dataset.cloudName;
         const signEndpoint = root.dataset.signEndpoint || "/api/cloudinary/sign/";
         const csrfToken = root.dataset.csrfToken || readCsrfFromCookie();
+        // Optional: when present, the uploader runs in admin-on-behalf-of mode.
+        // The sign endpoint pins the Cloudinary folder to this member's slug
+        // (only honored if the requester is staff).
+        const memberSlug = root.dataset.memberSlug || "";
 
         if (!fileInput || !trigger || !hidden || !cloudName || !csrfToken) {
             console.warn("[photo-uploader] missing required element/dataset; widget disabled");
@@ -72,10 +76,15 @@
             showStatus("Préparation…", "info");
 
             try {
+                const signBody = new FormData();
+                if (memberSlug) {
+                    signBody.append("member_slug", memberSlug);
+                }
                 const signResp = await fetch(signEndpoint, {
                     method: "POST",
                     headers: { "X-CSRFToken": csrfToken, "Accept": "application/json" },
                     credentials: "same-origin",
+                    body: signBody,
                 });
 
                 if (signResp.status === 429) {
@@ -115,9 +124,15 @@
 
                 if (previewEl) {
                     previewEl.src = result.secure_url;
+                    // Show the preview regardless of how it was hidden — Tailwind
+                    // class on member-facing pages, inline style in Django admin.
                     previewEl.classList.remove("hidden");
+                    previewEl.style.display = "";
                     const fallback = root.querySelector("[data-photo-fallback]");
-                    if (fallback) fallback.classList.add("hidden");
+                    if (fallback) {
+                        fallback.classList.add("hidden");
+                        fallback.style.display = "none";
+                    }
                 }
 
                 showStatus(

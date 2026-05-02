@@ -87,3 +87,71 @@ def test_sign_endpoint_rate_limit_is_per_user_not_global(make_member, make_user)
     # User B starts fresh — must NOT be affected by A's budget.
     b = make_consenting("bbb-pw")
     assert b.post("/api/cloudinary/sign/").status_code == 200
+
+
+@pytest.mark.django_db
+def test_sign_endpoint_allows_staff_to_upload_for_another_member(make_member, make_user):
+    """An admin uploads a photo on behalf of another member from /admin/.
+    The request includes member_slug and the requester is is_staff=True;
+    the sign endpoint must pin the folder to the target member's slug."""
+    from members.charters import CHARTER_CURRENT_VERSION
+    from members.models import ConsentRecord
+
+    admin_user = make_user(password="admin-pw", is_staff=True)
+    admin_member = make_member(user=admin_user)
+    ConsentRecord.objects.create(
+        member=admin_member, charter_version=CHARTER_CURRENT_VERSION, ip_address="127.0.0.1"
+    )
+
+    target = make_member(first_name="Target", last_name="User")
+
+    c = Client()
+    c.login(username=admin_user.username, password="admin-pw")
+    response = c.post("/api/cloudinary/sign/", {"member_slug": str(target.slug)})
+
+    assert response.status_code == 200
+    assert response.json()["folder"] == f"members/{target.slug}/"
+
+
+@pytest.mark.django_db
+def test_sign_endpoint_ignores_member_slug_for_non_staff(make_member, make_user):
+    """Non-staff members cannot hijack the upload to another member's folder."""
+    from members.charters import CHARTER_CURRENT_VERSION
+    from members.models import ConsentRecord
+
+    user = make_user(password="user-pw")
+    own_member = make_member(user=user)
+    ConsentRecord.objects.create(
+        member=own_member, charter_version=CHARTER_CURRENT_VERSION, ip_address="127.0.0.1"
+    )
+
+    other = make_member()
+
+    c = Client()
+    c.login(username=user.username, password="user-pw")
+    response = c.post("/api/cloudinary/sign/", {"member_slug": str(other.slug)})
+
+    assert response.status_code == 200
+    # member_slug ignored; folder still points at the requester's own member.
+    assert response.json()["folder"] == f"members/{own_member.slug}/"
+
+
+@pytest.mark.django_db
+def test_sign_endpoint_returns_400_for_unknown_member_slug(make_member, make_user):
+    from members.charters import CHARTER_CURRENT_VERSION
+    from members.models import ConsentRecord
+
+    admin_user = make_user(password="admin-pw", is_staff=True)
+    admin_member = make_member(user=admin_user)
+    ConsentRecord.objects.create(
+        member=admin_member, charter_version=CHARTER_CURRENT_VERSION, ip_address="127.0.0.1"
+    )
+
+    c = Client()
+    c.login(username=admin_user.username, password="admin-pw")
+    response = c.post(
+        "/api/cloudinary/sign/",
+        {"member_slug": "11111111-1111-1111-1111-111111111111"},
+    )
+
+    assert response.status_code == 400

@@ -1,4 +1,6 @@
+from django.conf import settings
 from django.contrib import admin
+from django.utils.html import format_html
 
 from .models import ConsentRecord, Member, NotificationPreference
 
@@ -8,7 +10,84 @@ class MemberAdmin(admin.ModelAdmin):
     list_display = ("full_name", "city", "country", "profession", "status", "created_at")
     list_filter = ("status", "country", "city")
     search_fields = ("first_name", "last_name", "nickname")
-    readonly_fields = ("slug", "created_at", "updated_at")
+    readonly_fields = ("slug", "created_at", "updated_at", "photo_uploader")
+
+    fieldsets = (
+        (
+            "Identité",
+            {
+                "fields": (
+                    "user",
+                    "slug",
+                    ("first_name", "last_name"),
+                    "nickname",
+                    ("years_attended", "classes"),
+                ),
+            },
+        ),
+        (
+            "Localisation et profession",
+            {"fields": (("city", "country"), "profession")},
+        ),
+        (
+            "Photo",
+            {
+                "fields": ("photo_uploader", "photo_public_id"),
+                "description": (
+                    "Le champ « Photo public id » contient l'identifiant Cloudinary "
+                    "(ex. <code>members/&lt;slug&gt;/photo_xyz</code>). "
+                    "Utilisez le téléverseur ci-dessus pour le remplir automatiquement."
+                ),
+            },
+        ),
+        (
+            "Confidentialité",
+            {"fields": (("show_email", "show_whatsapp", "show_city"), "status")},
+        ),
+        ("Métadonnées", {"fields": (("created_at", "updated_at"),)}),
+    )
+
+    class Media:
+        js = ("js/photo-uploader.js",)
+
+    @admin.display(description="Téléversement Cloudinary")
+    def photo_uploader(self, obj):
+        """Render a Cloudinary signed-direct-upload widget targeting this member.
+
+        Only on the change form — the add form doesn't have a slug yet, so
+        we show a hint instead. After the admin saves a new member, they
+        return to the change form and the uploader appears.
+        """
+        if not obj or not obj.pk:
+            return format_html(
+                '<p style="color:#666;">'
+                "Sauvegardez d'abord le membre, puis revenez sur cette page "
+                "pour téléverser une photo."
+                "</p>"
+            )
+
+        return format_html(
+            "<div data-photo-uploader "
+            'data-cloud-name="{cloud}" '
+            'data-member-slug="{slug}" '
+            'data-sign-endpoint="/api/cloudinary/sign/" '
+            'style="display:flex; align-items:center; gap:1rem; padding:.5rem 0;">'
+            '  <input type="file" accept="image/jpeg,image/png,image/webp" '
+            '         style="display:none;">'
+            '  <button type="button" data-photo-trigger '
+            '          style="padding:.5rem 1rem; border:1px solid #ccc; '
+            '                 background:#fff; border-radius:4px; cursor:pointer;">'
+            "    📷 Choisir une photo"
+            "  </button>"
+            '  <img data-photo-preview src="" alt="" '
+            '       style="display:none; height:64px; width:64px; '
+            "              object-fit:cover; border-radius:50%; "
+            '              border:1px solid #ddd;">'
+            '  <span data-photo-status style="font-size:.9em;"></span>'
+            "</div>",
+            cloud=settings.CLOUDINARY_CLOUD_NAME,
+            slug=obj.slug,
+        )
 
 
 @admin.register(NotificationPreference)

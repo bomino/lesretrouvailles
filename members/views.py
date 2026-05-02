@@ -130,11 +130,22 @@ def cloudinary_sign_view(request):
             headers={"Retry-After": "60"},
         )
 
-    member = getattr(request.user, "member", None)
-    if member is None:
-        return JsonResponse({"error": "no member"}, status=400)
+    # Staff can upload on behalf of any member by passing member_slug.
+    # Regular members always upload to their own folder; the slug field is
+    # ignored if the requester is not staff.
+    target_slug = (request.POST.get("member_slug") or "").strip()
+    if target_slug and request.user.is_staff:
+        try:
+            target = Member.objects.get(slug=target_slug)
+        except (Member.DoesNotExist, ValueError):
+            return JsonResponse({"error": "unknown member"}, status=400)
+        folder = f"members/{target.slug}/"
+    else:
+        member = getattr(request.user, "member", None)
+        if member is None:
+            return JsonResponse({"error": "no member"}, status=400)
+        folder = f"members/{member.slug}/"
 
-    folder = f"members/{member.slug}/"
     timestamp = now_timestamp()
     payload = get_client().sign_upload(folder=folder, timestamp=timestamp)
     return JsonResponse(payload)
