@@ -1,0 +1,17 @@
+# Railway service config for the Les Retrouvailles app.
+# Forces Dockerfile builds — Railway's default Nixpacks autodetect picks up
+# pyproject.toml but does not install the dependencies cleanly, leading to
+# `ModuleNotFoundError: django` at boot. Locking to Dockerfile keeps the
+# build identical to local `docker compose up --build`.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Healthcheck: /health bypasses basic-auth (BASIC_AUTH_BYPASS_PATHS) so
+# Railway's probe can reach it without credentials.
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
