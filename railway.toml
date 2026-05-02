@@ -1,27 +1,21 @@
 # Railway service config for the Les Retrouvailles app.
 #
-# Two-path build:
-# - Preferred: Builder=Dockerfile in dashboard. Uses our multi-stage Dockerfile.
-# - Fallback: if Builder=Railpack stays sticky, requirements.txt + the
-#   startCommand below give Railpack enough to boot a working staging.
-#
-# Either way, the [deploy] startCommand below runs the full boot sequence
-# so the deployed image always migrates, creates the cache table, and
-# serves static via WhiteNoise.
+# Build is locked to the multi-stage Dockerfile. Startup is handled by
+# docker/entrypoint.sh (referenced as ENTRYPOINT in the Dockerfile),
+# NOT by a startCommand override here — Railway runs startCommand in
+# exec form (no shell), so chained commands and $PORT expansion break.
+# entrypoint.sh is a real bash script and handles those correctly.
 
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-# Boot sequence: migrate -> create cache table (DB cache backend) ->
-# collectstatic -> gunicorn. Each step idempotent and fast.
-startCommand = "python manage.py migrate --noinput && python manage.py createcachetable && python manage.py collectstatic --noinput && gunicorn alumni.wsgi:application --bind 0.0.0.0:$PORT --workers ${WEB_CONCURRENCY:-2} --timeout ${GUNICORN_TIMEOUT:-60} --access-logfile - --error-logfile -"
-
-# Healthcheck: /health bypasses basic-auth (BASIC_AUTH_BYPASS_PATHS) so
-# Railway's probe can reach it without credentials.
+# /health bypasses basic-auth via BASIC_AUTH_BYPASS_PATHS, so the probe
+# can reach it without credentials. 60s gives migrations + cache-table
+# creation room on a cold deploy.
 healthcheckPath = "/health"
-healthcheckTimeout = 30
+healthcheckTimeout = 60
 
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
