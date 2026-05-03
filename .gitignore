@@ -50,3 +50,5 @@ htmlcov/
 *.egg-info/
 Screenshot*.png
 .superpowers/
+.claude/scheduled_tasks.lock
+img*.jpeg
