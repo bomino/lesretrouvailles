@@ -45,3 +45,27 @@ def send_admin_removal_notification(removal_request: RemovalRequest) -> None:
         "members/admin_removal_notification",
         {"request": removal_request, "entry": removal_request.entry},
     )
+
+
+def send_admin_quarterly_ghost_digest(*, purged_logs, currently_listed, since) -> None:
+    """Quarterly FYI to staff: list of ghost entries auto-removed in the
+    last 90 days because they were >12 months old without admin renewal,
+    plus a snapshot of the currently-listed entries with their age in
+    months. No-op if no staff users (mirrors send_admin_removal_notification)."""
+    User = get_user_model()  # noqa: N806
+    staff_emails = list(
+        User.objects.filter(is_staff=True, is_active=True).values_list("email", flat=True)
+    )
+    if not staff_emails:
+        return
+    send_email(
+        staff_emails,
+        "members/admin_stale_ghost_digest",
+        {
+            "logs": purged_logs,
+            "currently_listed": currently_listed,
+            "since": since,
+            "purged_count": len(purged_logs),
+            "listed_count": len(currently_listed),
+        },
+    )

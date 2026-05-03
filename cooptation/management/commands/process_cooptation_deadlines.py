@@ -25,6 +25,7 @@ from cooptation import emails, services
 from cooptation.models import AdminApplication, CooptationRequest
 
 # Cross-app: P4c housekeeping operates on members.PublicSearchEntry.
+from members import emails as members_emails
 from members.models import AuditLog, PublicSearchEntry
 
 PACING_SECONDS = 0.5
@@ -182,8 +183,36 @@ class Command(BaseCommand):
         return count
 
     def _send_quarterly_ghost_digest(self, now) -> int:
-        # Filled in by Task 2.
-        return 0
+        """Once on day 1 of Jan/Apr/Jul/Oct: email staff a digest of every
+        ghost.entry.purged AuditLog entry from the last 90 days, plus a
+        snapshot of currently-listed entries with their age in months.
+
+        No-op if zero entries were auto-removed in that window.
+        """
+        since = now - timedelta(days=GHOST_DIGEST_LOOKBACK_DAYS)
+        purged = list(
+            AuditLog.objects.filter(action="ghost.entry.purged", created_at__gte=since).order_by(
+                "-created_at"
+            )
+        )
+        if not purged:
+            return 0
+
+        currently_listed = list(
+            PublicSearchEntry.objects.filter(removed_at__isnull=True)
+            .annotate(n=Count("added_by_admins"))
+            .filter(n__gte=2)
+            .order_by("added_at")
+        )
+        for e in currently_listed:
+            e.age_months = round((now - e.added_at).days / 30)
+
+        members_emails.send_admin_quarterly_ghost_digest(
+            purged_logs=purged,
+            currently_listed=currently_listed,
+            since=since,
+        )
+        return len(purged)
 
     def _purge_old_rejections(self, now) -> int:
         qs = AdminApplication.objects.filter(status="rejected", retention_until__lte=now)

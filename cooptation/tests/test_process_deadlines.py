@@ -323,3 +323,184 @@ def test_purge_stale_ghosts_audit_metadata_uses_date_strings(make_admin, setting
     date_re = re.compile(r"^\d{4}-\d{2}-\d{2}$")
     assert date_re.match(log.metadata["added_at"]), log.metadata["added_at"]
     assert date_re.match(log.metadata["auto_removed_at"]), log.metadata["auto_removed_at"]
+
+
+@pytest.mark.django_db
+def test_digest_fires_on_jan_1_when_purges_in_window(make_admin, settings):
+    """On Jan 1 (quarterly trigger), if there's been any auto-removal in
+    the last 90 days, email the admin staff a digest."""
+    from freezegun import freeze_time
+
+    from alumni.email import FakeResendBackend
+    from members.models import PublicSearchEntry
+
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    a, b = make_admin(), make_admin()  # 2 staff users
+
+    with freeze_time("2025-12-15"):
+        e = PublicSearchEntry.objects.create(
+            first_name="Idrissa", last_name_initial="S.", years_at_ceg=[1980]
+        )
+        e.added_by_admins.add(a, b)
+        # Backdate added_at via raw save so it's already stale
+        PublicSearchEntry.objects.filter(pk=e.pk).update(
+            added_at=timezone.now() - timedelta(days=400)
+        )
+
+    FakeResendBackend.sent_messages.clear()
+    with freeze_time("2026-01-01"):
+        call_command("process_cooptation_deadlines")
+
+    digests = [m for m in FakeResendBackend.sent_messages if "Revue trimestrielle" in m["subject"]]
+    assert len(digests) == 1
+    assert sorted(digests[0]["to"]) == sorted([a.email, b.email])
+    assert "Idrissa" in digests[0]["text"]
+    assert "S." in digests[0]["text"]
+
+
+@pytest.mark.django_db
+def test_digest_does_not_fire_on_other_days(make_admin, settings):
+    """Jan 2 must not fire the digest even with recent purges."""
+    from freezegun import freeze_time
+
+    from alumni.email import FakeResendBackend
+    from members.models import PublicSearchEntry
+
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    a, b = make_admin(), make_admin()
+    with freeze_time("2025-12-15"):
+        e = PublicSearchEntry.objects.create(
+            first_name="X", last_name_initial="X.", years_at_ceg=[1980]
+        )
+        e.added_by_admins.add(a, b)
+        PublicSearchEntry.objects.filter(pk=e.pk).update(
+            added_at=timezone.now() - timedelta(days=400)
+        )
+
+    FakeResendBackend.sent_messages.clear()
+    with freeze_time("2026-01-02"):
+        call_command("process_cooptation_deadlines")
+
+    digests = [m for m in FakeResendBackend.sent_messages if "Revue trimestrielle" in m["subject"]]
+    assert digests == []
+
+
+@pytest.mark.django_db
+def test_digest_does_not_fire_on_first_of_non_quarterly_months(make_admin, settings):
+    """Feb 1, Mar 1, May 1 etc. — only Jan/Apr/Jul/Oct day 1 fires the digest."""
+    from freezegun import freeze_time
+
+    from alumni.email import FakeResendBackend
+    from members.models import PublicSearchEntry
+
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    a, b = make_admin(), make_admin()
+    with freeze_time("2025-12-15"):
+        e = PublicSearchEntry.objects.create(
+            first_name="X", last_name_initial="X.", years_at_ceg=[1980]
+        )
+        e.added_by_admins.add(a, b)
+        PublicSearchEntry.objects.filter(pk=e.pk).update(
+            added_at=timezone.now() - timedelta(days=400)
+        )
+
+    for date_str in ("2026-02-01", "2026-03-01", "2026-05-01", "2026-06-01"):
+        FakeResendBackend.sent_messages.clear()
+        with freeze_time(date_str):
+            call_command("process_cooptation_deadlines")
+        digests = [
+            m for m in FakeResendBackend.sent_messages if "Revue trimestrielle" in m["subject"]
+        ]
+        assert digests == [], f"Digest fired on {date_str}, should not have"
+
+
+@pytest.mark.django_db
+def test_digest_no_op_when_no_recent_purges(make_admin, settings):
+    """Apr 1 with empty AuditLog → 0 emails (no spam during quiet quarters)."""
+    from freezegun import freeze_time
+
+    from alumni.email import FakeResendBackend
+    from members.models import AuditLog
+
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    make_admin()  # ensure at least 1 staff
+    AuditLog.objects.filter(action="ghost.entry.purged").delete()
+
+    FakeResendBackend.sent_messages.clear()
+    with freeze_time("2026-04-01"):
+        call_command("process_cooptation_deadlines")
+
+    digests = [m for m in FakeResendBackend.sent_messages if "Revue trimestrielle" in m["subject"]]
+    assert digests == []
+
+
+@pytest.mark.django_db
+def test_digest_no_op_with_no_staff(settings):
+    """0 staff users → no crash, no digest sent (mirrors send_admin_removal_notification)."""
+    from freezegun import freeze_time
+
+    from alumni.email import FakeResendBackend
+    from members.models import AuditLog
+
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    AuditLog.objects.create(
+        actor=None,
+        action="ghost.entry.purged",
+        target_type="members.PublicSearchEntry",
+        target_id="999",
+        metadata={
+            "first_name": "X",
+            "last_name_initial": "X.",
+            "added_at": "2025-01-01",
+            "auto_removed_at": "2026-01-01",
+        },
+    )
+
+    FakeResendBackend.sent_messages.clear()
+    with freeze_time("2026-04-01"):
+        call_command("process_cooptation_deadlines")
+
+    digests = [m for m in FakeResendBackend.sent_messages if "Revue trimestrielle" in m["subject"]]
+    assert digests == []  # no staff → no digest
+
+
+@pytest.mark.django_db
+def test_digest_includes_currently_listed_snapshot(make_admin, settings):
+    """Beyond the removal log, the digest lists currently-listed entries
+    with their age in months so admins see runway."""
+    from freezegun import freeze_time
+
+    from alumni.email import FakeResendBackend
+    from members.models import PublicSearchEntry
+
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    a, b = make_admin(), make_admin()
+
+    # 1 stale entry to trigger the digest
+    with freeze_time("2025-12-15"):
+        e_stale = PublicSearchEntry.objects.create(
+            first_name="StaleOne", last_name_initial="S.", years_at_ceg=[1980]
+        )
+        e_stale.added_by_admins.add(a, b)
+        PublicSearchEntry.objects.filter(pk=e_stale.pk).update(
+            added_at=timezone.now() - timedelta(days=400)
+        )
+
+    # 1 currently-listed entry (4 months old)
+    with freeze_time("2025-09-01"):
+        e_active = PublicSearchEntry.objects.create(
+            first_name="ActiveOne", last_name_initial="A.", years_at_ceg=[1980]
+        )
+        e_active.added_by_admins.add(a, b)
+
+    FakeResendBackend.sent_messages.clear()
+    with freeze_time("2026-01-01"):
+        call_command("process_cooptation_deadlines")
+
+    digests = [m for m in FakeResendBackend.sent_messages if "Revue trimestrielle" in m["subject"]]
+    assert len(digests) == 1
+    body = digests[0]["text"]
+    assert "ActiveOne" in body
+    assert "A." in body
+    # Age in months from Sep 2025 → Jan 2026 should be ~4 months (allow 3-5 for rounding)
+    assert "4 mois" in body or "3 mois" in body or "5 mois" in body

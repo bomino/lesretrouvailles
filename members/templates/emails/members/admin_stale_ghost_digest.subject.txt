@@ -1,0 +1,1 @@
+[admin] Revue trimestrielle ghost-list — {{ purged_count }} retrait{{ purged_count|pluralize }} automatique{{ purged_count|pluralize }}

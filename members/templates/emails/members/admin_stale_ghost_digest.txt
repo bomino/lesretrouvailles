@@ -1,0 +1,19 @@
+Bonjour,
+
+Revue trimestrielle de la liste publique « Nous recherchons aussi… »
+
+== Retraits automatiques (90 derniers jours) ==
+
+{{ purged_count }} fiche{{ purged_count|pluralize }} ont été automatiquement retirées depuis le {{ since|date:"j F Y" }} (publiées depuis plus de 12 mois sans renouvellement par les admins) :
+
+{% for log in logs %}- {{ log.metadata.first_name }} {{ log.metadata.last_name_initial }} (publiée le {{ log.metadata.added_at }}, retirée le {{ log.metadata.auto_removed_at }})
+{% endfor %}
+
+== Liste actuelle ({{ listed_count }} fiche{{ listed_count|pluralize }} publiée{{ listed_count|pluralize }}) ==
+
+{% for entry in currently_listed %}- {{ entry.first_name }} {{ entry.last_name_initial }} — publiée il y a {{ entry.age_months }} mois
+{% endfor %}
+
+Si l'une des fiches retirées doit être réinscrite, recréez-la dans l'admin Django avec 2 cosignatures, comme à l'origine.
+
+L'équipe Les Retrouvailles
