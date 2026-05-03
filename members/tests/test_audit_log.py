@@ -76,3 +76,17 @@ def test_audit_log_str_includes_action_and_target():
     s = str(log)
     assert "ghost.removal.executed" in s
     assert "members.PublicSearchEntry:7" in s
+
+
+@pytest.mark.django_db
+def test_audit_log_admin_is_append_only():
+    """AuditLogAdmin disables add/change/delete in all paths."""
+    from django.contrib import admin
+
+    from members.models import AuditLog
+
+    admin_cls = admin.site._registry[AuditLog].__class__
+    a = admin_cls(AuditLog, admin.site)
+    assert a.has_add_permission(None) is False
+    assert a.has_change_permission(None) is False
+    assert a.has_delete_permission(None) is False
