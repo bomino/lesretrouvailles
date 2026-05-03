@@ -90,7 +90,12 @@
             </div>
         {% endif %}
     </section>
-    {% if ghost_list_enabled %}
+    {# Public-discovery surface — anonymous visitors only, and only when there #}
+    {# are actual published entries to show. Logged-in members already have the #}
+    {# full directory; the empty-state copy ("Liste en cours de constitution") #}
+    {# read as "under construction" and was removed in favor of hiding the #}
+    {# section entirely until real entries exist. #}
+    {% if not request.user.is_authenticated and ghost_list_enabled and ghosts %}
         <section class="mx-auto mt-20 max-w-4xl md:mt-28">
             <div class="text-center">
                 <span class="inline-block rounded-full border border-secondary/25 bg-surface px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary shadow-sm">
@@ -100,28 +105,24 @@
                     {% trans "Anciens encore à retrouver" %}
                 </h2>
             </div>
-            {% if ghosts %}
-                <div class="mt-10 space-y-4">
-                    {% for entry in ghosts %}
-                        <article class="rounded-2xl border border-secondary/15 bg-surface/70 p-5 shadow-sm">
-                            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                                <strong class="font-display text-lg">{{ entry.first_name }} {{ entry.last_name_initial }}</strong>
-                                <span class="text-sm text-secondary">{% trans "au CEG" %} {{ entry.first_year }}-{{ entry.last_year }}</span>
-                            </div>
-                            {% if entry.note %}<p class="mt-1 text-sm text-secondary">{{ entry.note }}</p>{% endif %}
-                            <p class="mt-2 text-sm italic text-secondary">
-                                {% trans "Vous le reconnaissez ? Partagez cette page avec votre entourage." %}
-                            </p>
-                            <p class="mt-2 text-xs text-secondary">
-                                <a href="{% url 'members:removal_request_form' entry.removal_token %}"
-                                   class="underline hover:text-tertiary">{% trans "Retirer mon nom" %}</a>
-                            </p>
-                        </article>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <p class="mt-10 text-center text-secondary">{% trans "Liste en cours de constitution — bientôt." %}</p>
-            {% endif %}
+            <div class="mt-10 space-y-4">
+                {% for entry in ghosts %}
+                    <article class="rounded-2xl border border-secondary/15 bg-surface/70 p-5 shadow-sm">
+                        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                            <strong class="font-display text-lg">{{ entry.first_name }} {{ entry.last_name_initial }}</strong>
+                            <span class="text-sm text-secondary">{% trans "au CEG" %} {{ entry.first_year }}-{{ entry.last_year }}</span>
+                        </div>
+                        {% if entry.note %}<p class="mt-1 text-sm text-secondary">{{ entry.note }}</p>{% endif %}
+                        <p class="mt-2 text-sm italic text-secondary">
+                            {% trans "Vous le reconnaissez ? Partagez cette page avec votre entourage." %}
+                        </p>
+                        <p class="mt-2 text-xs text-secondary">
+                            <a href="{% url 'members:removal_request_form' entry.removal_token %}"
+                               class="underline hover:text-tertiary">{% trans "Retirer mon nom" %}</a>
+                        </p>
+                    </article>
+                {% endfor %}
+            </div>
         </section>
     {% endif %}
     <section class="mx-auto mt-20 grid max-w-5xl grid-cols-1 gap-6 md:mt-28 md:grid-cols-3">

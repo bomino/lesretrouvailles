@@ -90,6 +90,8 @@ def test_authenticated_landing_shows_member_ctas_not_public(client, authed_membe
     assert "Mon profil" in body
     assert "Je suis un ancien" not in body
     assert "Partager sur WhatsApp" not in body
+    # Ghost section is a public-discovery surface, not a member feature.
+    assert "Nous recherchons aussi" not in body
 
 
 @pytest.mark.django_db
@@ -100,11 +102,34 @@ def test_ghost_section_hidden_when_flag_off(client, settings):
 
 
 @pytest.mark.django_db
-def test_ghost_section_visible_with_empty_state_when_flag_on_no_entries(client, settings):
+def test_ghost_section_hidden_when_flag_on_but_no_entries(client, settings):
+    """The empty-state copy ('Liste en cours de constitution') was removed —
+    it read as 'under construction' and was off-brand. The section now only
+    renders when there are actual published entries to show."""
     settings.PUBLIC_GHOST_LIST_ENABLED = True
     body = client.get("/").content.decode("utf-8")
-    assert "Nous recherchons aussi" in body
-    assert "Liste en cours de constitution" in body
+    assert "Nous recherchons aussi" not in body
+    assert "Liste en cours de constitution" not in body
+
+
+@pytest.mark.django_db
+def test_ghost_section_hidden_for_authenticated_user_even_with_entries(
+    client, authed_member, settings, make_admin
+):
+    """Even when the flag is on AND entries are published, an authenticated
+    member sees no ghost section — it's a recruitment surface for non-members."""
+    settings.PUBLIC_GHOST_LIST_ENABLED = True
+    from members.models import PublicSearchEntry
+
+    e = PublicSearchEntry.objects.create(
+        first_name="Idrissa", last_name_initial="S.", years_at_ceg=[1980]
+    )
+    e.added_by_admins.add(make_admin(), make_admin())
+
+    body = client.get("/").content.decode("utf-8")
+    assert "Nous recherchons aussi" not in body
+    assert "Idrissa" not in body
+    assert "Retirer mon nom" not in body
 
 
 @pytest.mark.django_db
