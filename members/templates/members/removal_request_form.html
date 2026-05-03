@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}
+    {% trans "Retirer mon nom" %}
+{% endblock %}
+{% block content %}
+    <section class="mx-auto max-w-2xl px-4 py-10 md:py-16">
+        <h1 class="font-display text-3xl font-semibold tracking-tight md:text-4xl">{% trans "Retirer mon nom" %}</h1>
+        <p class="mt-4 text-secondary">{% trans "Vous demandez le retrait du nom suivant de la liste publique :" %}</p>
+        <article class="mt-4 rounded-2xl border border-secondary/15 bg-surface/70 p-5 shadow-sm">
+            <strong class="font-display text-lg">{{ entry.first_name }} {{ entry.last_name_initial }}</strong>
+            <p class="mt-1 text-sm text-secondary">{% trans "années" %} {{ entry.first_year }}-{{ entry.last_year }}</p>
+        </article>
+        {% if error %}<p class="mt-6 rounded-md bg-red-50 p-3 text-sm text-red-800">{{ error }}</p>{% endif %}
+        <form method="post" class="mt-8 space-y-5">
+            {% csrf_token %}
+            <div>
+                <label for="email" class="mb-1 block text-sm font-medium">{% trans "Votre email" %}</label>
+                <input id="email"
+                       type="email"
+                       name="email"
+                       required
+                       class="block w-full rounded-lg border border-secondary/20 bg-white px-3 py-2 text-base shadow-sm focus:border-tertiary focus:outline-none focus:ring-2 focus:ring-tertiary/30">
+                <p class="mt-1 text-xs text-secondary">
+                    {% trans "Un email de confirmation vous sera envoyé. Le lien expire dans 30 jours." %}
+                </p>
+            </div>
+            <div>
+                <label for="reason" class="mb-1 block text-sm font-medium">{% trans "Raison (optionnel)" %}</label>
+                <textarea id="reason"
+                          name="reason"
+                          rows="3"
+                          maxlength="200"
+                          class="block w-full rounded-lg border border-secondary/20 bg-white px-3 py-2 text-base shadow-sm focus:border-tertiary focus:outline-none focus:ring-2 focus:ring-tertiary/30"></textarea>
+            </div>
+            <button type="submit"
+                    class="inline-flex items-center gap-2 rounded-lg bg-tertiary px-6 py-3 text-base font-medium text-on-tertiary shadow-sm hover:opacity-95 transition min-h-tap">
+                {% trans "Envoyer la demande" %}
+            </button>
+        </form>
+    </section>
+{% endblock %}

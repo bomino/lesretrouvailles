@@ -216,3 +216,59 @@ def directory_view(request):
         template,
         {"page": page, "members": page.object_list},
     )
+
+
+from . import emails as members_emails  # noqa: E402
+from .models import RemovalRequest  # noqa: E402
+
+
+@require_http_methods(["GET", "POST"])
+@ratelimit(key="ip", rate="5/h", method="POST", block=True)
+def removal_request_form_view(request, entry_token: str):
+    from .models import PublicSearchEntry
+
+    entry = get_object_or_404(PublicSearchEntry, removal_token=entry_token)
+
+    if request.method == "POST":
+        email = (request.POST.get("email") or "").strip()[:254]
+        reason = (request.POST.get("reason") or "").strip()[:200]
+        if not email:
+            return render(
+                request,
+                "members/removal_request_form.html",
+                {"entry": entry, "error": "Email requis."},
+                status=400,
+            )
+
+        forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+        ip = forwarded.split(",")[0].strip() if forwarded else request.META.get("REMOTE_ADDR")
+
+        rreq = RemovalRequest.objects.create(
+            entry=entry,
+            requester_email=email,
+            reason=reason,
+            requester_ip=ip,
+        )
+
+        from .models import AuditLog
+
+        AuditLog.objects.create(
+            actor=None,
+            action="ghost.removal.requested",
+            target_type="members.RemovalRequest",
+            target_id=str(rreq.pk),
+            metadata={
+                "entry_pk": entry.pk,
+                "requester_email": email,
+                "reason": reason,
+            },
+        )
+        members_emails.send_removal_confirmation_pending(rreq)
+        return HttpResponseRedirect("/retrait/merci/")
+
+    return render(request, "members/removal_request_form.html", {"entry": entry})
+
+
+@require_http_methods(["GET"])
+def removal_request_done_view(request):
+    return render(request, "members/removal_request_done.html")
