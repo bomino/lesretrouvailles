@@ -102,13 +102,21 @@ def test_reject_emails_candidate_with_reason(make_application, staff_user, setti
 
 
 @pytest.mark.django_db
-def test_password_set_url_uses_base36_resolvable_by_allauth(
+def test_password_set_url_validates_through_allauth_end_to_end(
     make_application, staff_user, client, settings
 ):
-    """Regression: the URL emitted to a candidate must be parseable by
-    allauth's password-reset-from-key view. Allauth decodes the leading
-    segment with `base36_to_int` (NOT base64); using `urlsafe_base64_encode`
-    silently produces a string that decodes to the wrong integer.
+    """Regression for two stacked bugs:
+
+    1. base64 encoding of the user pk silently decodes to the wrong integer
+       under allauth's base36_to_int.
+    2. Django's contrib.auth.tokens.default_token_generator produces tokens
+       that look syntactically valid but fail allauth's check_token (allauth
+       hashes the user's email into the token; Django's generator does not).
+
+    A successful first GET on the key URL must 302-redirect to the
+    /set-password/ form (allauth's "valid token" path). A 200 with
+    `token_fail=True` in the context — what bug #2 produced — is the silent
+    failure mode this test guards against.
     """
     from urllib.parse import urlparse
 
@@ -122,12 +130,16 @@ def test_password_set_url_uses_base36_resolvable_by_allauth(
     path = urlparse(url).path
     assert path.startswith("/accounts/password/reset/key/")
 
-    # Allauth's first GET on the key URL stashes the token in the session
-    # and 302-redirects to .../set-password/. A 404 here means the URL
-    # didn't resolve to a known user.
     resp = client.get(path)
-    assert resp.status_code in (200, 302), (
-        f"Expected allauth to resolve the password-set URL; got {resp.status_code}"
+    assert resp.status_code == 302, (
+        f"Allauth should redirect on a valid token; got {resp.status_code}"
+    )
+    # Allauth swaps the actual key for the literal string "set-password" in
+    # the redirect URL so the token doesn't leak through the Referer header.
+    # If the token were invalid, allauth would return 200 with token_fail=True
+    # in the template context and would NOT redirect.
+    assert "set-password" in resp["Location"], (
+        f"Expected redirect to .../<uidb36>-set-password/; got Location={resp['Location']}"
     )
 
 
