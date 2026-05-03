@@ -108,16 +108,3 @@ def test_removal_token_unique_when_set():
                 years_at_ceg=[1980],
                 removal_token="tok1",
             )
-
-
-@pytest.mark.django_db
-def test_removal_token_nullable_allows_multiple_unset():
-    from members.models import PublicSearchEntry
-
-    PublicSearchEntry.objects.create(
-        first_name="A", last_name_initial="A.", years_at_ceg=[1980], removal_token=None
-    )
-    PublicSearchEntry.objects.create(
-        first_name="B", last_name_initial="B.", years_at_ceg=[1980], removal_token=None
-    )
-    assert PublicSearchEntry.objects.filter(removal_token__isnull=True).count() == 2

@@ -140,6 +140,12 @@ class ConsentRecord(models.Model):
         return f"{self.member.full_name} → charter v{self.charter_version}"
 
 
+def _make_token() -> str:
+    """Opaque random token. Used for PublicSearchEntry.removal_token and
+    RemovalRequest.confirm_token. Mirrors cooptation.models._make_token."""
+    return secrets.token_urlsafe(32)
+
+
 class PublicSearchEntry(models.Model):
     """A name on the public 'Nous recherchons aussi…' list.
 
@@ -169,7 +175,7 @@ class PublicSearchEntry(models.Model):
     added_at = models.DateTimeField(auto_now_add=True)
 
     # Reserved for P4b's public removal flow.
-    removal_token = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    removal_token = models.CharField(max_length=64, unique=True, default=_make_token)
     removed_at = models.DateTimeField(null=True, blank=True)
     removed_reason = models.CharField(max_length=200, blank=True)
 
@@ -210,12 +216,6 @@ class PublicSearchEntry(models.Model):
     @property
     def last_year(self) -> int | None:
         return max(self.years_at_ceg) if self.years_at_ceg else None
-
-
-def _make_token() -> str:
-    """Opaque random token. Used for PublicSearchEntry.removal_token and
-    RemovalRequest.confirm_token. Mirrors cooptation.models._make_token."""
-    return secrets.token_urlsafe(32)
 
 
 class AuditLog(models.Model):
@@ -262,3 +262,48 @@ class AuditLog(models.Model):
     def __str__(self) -> str:
         target = f"{self.target_type}:{self.target_id}"
         return f"{self.action} on {target} @ {self.created_at:%Y-%m-%d %H:%M}"
+
+
+class RemovalRequest(models.Model):
+    """A public 'Retirer mon nom' request awaiting email confirmation.
+
+    Created when the visitor submits the removal form; rendered
+    redundant once the entry is removed (via on_delete=CASCADE) but
+    the AuditLog entries about the request remain.
+    """
+
+    STATUS_CHOICES = [
+        ("pending_confirmation", "En attente de confirmation"),
+        ("confirmed", "Confirmée — retrait exécuté"),
+        ("expired", "Expirée — non confirmée"),
+    ]
+
+    entry = models.ForeignKey(
+        "members.PublicSearchEntry",
+        on_delete=models.CASCADE,
+        related_name="removal_requests",
+    )
+    requester_email = models.EmailField()
+    reason = models.CharField(max_length=200, blank=True)
+    confirm_token = models.CharField(max_length=64, unique=True, db_index=True, default=_make_token)
+    status = models.CharField(max_length=24, choices=STATUS_CHOICES, default="pending_confirmation")
+    requester_ip = models.GenericIPAddressField(null=True, blank=True)
+    requested_at = models.DateTimeField(auto_now_add=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["-requested_at"]
+        indexes = [models.Index(fields=["status", "expires_at"])]
+
+    def __str__(self) -> str:
+        return f"RemovalRequest({self.requester_email}, {self.status})"
+
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            from datetime import timedelta
+
+            from django.utils import timezone
+
+            self.expires_at = (self.requested_at or timezone.now()) + timedelta(days=30)
+        super().save(*args, **kwargs)
