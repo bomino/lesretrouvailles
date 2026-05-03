@@ -119,6 +119,32 @@ Log in as `seed1@example.test` / `TestPass123!`, accept the charter, browse the 
 
 ---
 
+## Email — Resend
+
+Mandatory env vars on the app service:
+- `RESEND_API_KEY` — from Resend dashboard, "Sending access" scope
+- `DEFAULT_FROM_EMAIL` — `Les Retrouvailles <noreply@villageretrouvailles.com>`
+
+DNS records (one-time, on Cloudflare for villageretrouvailles.com):
+- DKIM: TXT `resend._domainkey` with the value from Resend
+- SPF: TXT `send` with `v=spf1 include:amazonses.com ~all`
+- SPF MX: MX `send` with `feedback-smtp.us-east-1.amazonses.com` priority 10
+- DMARC: TXT `_dmarc` with `v=DMARC1; p=none;`
+
+Verify in Resend dashboard before first deploy.
+
+## Cron — process_cooptation_deadlines
+
+Create a second Railway service in the same project named `cooptation-cron`:
+- Build mode: same Dockerfile (shares image)
+- Start command override: `python manage.py process_cooptation_deadlines`
+- Schedule: `0 6 * * *` (daily 06:00 UTC)
+- Env: shares DATABASE_URL, RESEND_API_KEY, SECRET_KEY, DJANGO_SETTINGS_MODULE from app service. Set `BASIC_AUTH_REQUIRED=false` for the cron service (no web traffic).
+
+Cap warning: Resend free tier 100 emails/day. With ~5 emails per cooptation, do not batch more than 50 candidates in a single onboarding session.
+
+---
+
 ## Daily operations
 
 | Task | Command |
