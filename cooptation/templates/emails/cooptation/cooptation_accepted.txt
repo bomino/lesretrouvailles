@@ -1,0 +1,7 @@
+Bonjour {{ application.full_name }},
+
+Bonne nouvelle : {{ request.parrain.full_name }} vient d'accepter de vous coopter dans la communauté Les Retrouvailles.
+
+Nous attendons encore la réponse de votre second parrain. Dès que tous vos parrains auront répondu, l'admin examinera votre dossier et vous recevrez une décision finale.
+
+L'équipe Les Retrouvailles

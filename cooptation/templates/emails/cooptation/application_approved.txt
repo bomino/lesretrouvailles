@@ -1,0 +1,12 @@
+Bonjour {{ application.full_name }},
+
+Votre demande a été approuvée. Bienvenue dans la communauté Les Retrouvailles !
+
+Pour activer votre compte, choisissez votre mot de passe ici :
+
+{{ password_set_url }}
+
+Ce lien est valable pendant 7 jours. Passé ce délai, contactez l'administrateur pour en recevoir un nouveau.
+
+À très bientôt,
+L'équipe Les Retrouvailles

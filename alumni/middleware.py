@@ -38,7 +38,7 @@ class LoginRequiredMiddleware:
 class ConsentRequiredMiddleware:
     """Block authenticated users until they accept the current charter version."""
 
-    SKIP_PREFIXES = ("/charte/", "/accounts/logout/")
+    SKIP_PREFIXES = ("/charte/", "/accounts/logout/", "/cooptation/")
     SESSION_KEY = "consent_ok_for"
 
     def __init__(self, get_response):

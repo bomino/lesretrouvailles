@@ -1,0 +1,133 @@
+"""Daily idempotent cron: J+7 reminders, J+14 expiry transitions, 6-month retention purge.
+
+Run via Railway cron service; sharing the app's image and env."""
+
+from __future__ import annotations
+
+import secrets
+import time
+from datetime import timedelta
+
+from django.conf import settings
+from django.core.management.base import BaseCommand
+from django.utils import timezone
+
+from cooptation import emails, services
+from cooptation.models import AdminApplication, CooptationRequest
+
+PACING_SECONDS = 0.5
+# After both parrains time out and we email the questionnaire link, give the
+# candidate this many days to submit it. After that, push the application to
+# awaiting_admin so the admin can decide manually instead of letting it rot
+# in cooptation_pending forever.
+QUESTIONNAIRE_GRACE_DAYS = 7
+
+
+class Command(BaseCommand):
+    help = "Daily processor for cooptation deadlines (J+7, J+14, retention purge)."
+
+    def handle(self, *args, **opts):
+        now = timezone.now()
+        sent_reminders = self._send_j7_reminders(now)
+        expired_apps = self._expire_j14(now)
+        stale_apps = self._sweep_stale_questionnaires(now)
+        purged_apps = self._purge_old_rejections(now)
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Done. reminders={sent_reminders} expired={expired_apps} "
+                f"stale={stale_apps} purged={purged_apps}"
+            )
+        )
+
+    def _send_j7_reminders(self, now) -> int:
+        """For each pending CooptationRequest where now is within 7 days of expires_at
+        and no reminder has been sent, send one and stamp reminder_sent_at."""
+        threshold_low = now
+        threshold_high = now + timedelta(days=7)
+        qs = CooptationRequest.objects.filter(
+            response="pending",
+            reminder_sent_at__isnull=True,
+            expires_at__gt=threshold_low,
+            expires_at__lte=threshold_high,
+        )
+        count = 0
+        for req in qs:
+            emails.send_parrain_reminder(req)
+            req.reminder_sent_at = now
+            req.save()
+            count += 1
+            time.sleep(PACING_SECONDS)
+        return count
+
+    def _expire_j14(self, now) -> int:
+        """For each AdminApplication in cooptation_pending whose all requests are
+        either non-pending or past expires_at, transition to awaiting_admin (or
+        questionnaire fallback via questionnaire_token if any timed out)."""
+        apps = AdminApplication.objects.filter(status="cooptation_pending").distinct()
+        count = 0
+        for app in apps:
+            requests = list(app.cooptation_requests.all())
+            still_open = [r for r in requests if r.response == "pending" and r.expires_at > now]
+            if still_open:
+                continue
+            timed_out = [r for r in requests if r.response == "pending" and r.expires_at <= now]
+            if timed_out:
+                # At least one expired without a response — fallback to
+                # questionnaire. Skip if we've already sent the email on a
+                # previous run, otherwise the candidate gets a duplicate
+                # every day until they submit.
+                if app.cooptation_expired_at is not None:
+                    continue
+                app.cooptation_outcome = "expired"
+                if not app.questionnaire_token:
+                    app.questionnaire_token = secrets.token_urlsafe(32)
+                app.cooptation_expired_at = now
+                app.save()
+                site_url = getattr(settings, "SITE_URL", "https://staging.villageretrouvailles.com")
+                qurl = f"{site_url}/questionnaire/{app.questionnaire_token}/"
+                emails.send_cooptation_expired(app, questionnaire_url=qurl)
+                count += 1
+                time.sleep(PACING_SECONDS)
+            else:
+                # All responded — derive outcome and move to awaiting_admin
+                app.cooptation_outcome = self._derive_outcome(requests)
+                app.status = "awaiting_admin"
+                app.save()
+                count += 1
+        return count
+
+    def _sweep_stale_questionnaires(self, now) -> int:
+        """Push to awaiting_admin any application whose cooptation expired,
+        the candidate was emailed the questionnaire, and they never submitted
+        within the grace window. Without this sweep the application sits
+        in cooptation_pending indefinitely (admin sees nothing actionable)."""
+        cutoff = now - timedelta(days=QUESTIONNAIRE_GRACE_DAYS)
+        qs = AdminApplication.objects.filter(
+            status="cooptation_pending",
+            cooptation_outcome="expired",
+            cooptation_expired_at__lte=cutoff,
+            questionnaire_responses__isnull=True,
+        ).distinct()
+        count = 0
+        for app in qs:
+            app.status = "awaiting_admin"
+            app.save()
+            count += 1
+        return count
+
+    @staticmethod
+    def _derive_outcome(requests) -> str:
+        responses = [r.response for r in requests]
+        if all(r == "accepted" for r in responses):
+            return "all_accepted"
+        if all(r == "refused" for r in responses):
+            return "all_refused"
+        return "mixed"
+
+    def _purge_old_rejections(self, now) -> int:
+        qs = AdminApplication.objects.filter(status="rejected", retention_until__lte=now)
+        count = 0
+        for app in qs:
+            services.purge_application(app)
+            count += 1
+        return count

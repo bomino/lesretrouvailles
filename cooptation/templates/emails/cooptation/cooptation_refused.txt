@@ -1,0 +1,7 @@
+Bonjour {{ application.full_name }},
+
+{{ request.parrain.full_name }} a indiqué ne pas être en mesure de vous coopter à ce stade. Cela ne signifie pas que votre dossier est rejeté ; l'admin examinera l'ensemble des réponses avant de décider.
+
+Vous serez notifié·e de la décision finale.
+
+L'équipe Les Retrouvailles

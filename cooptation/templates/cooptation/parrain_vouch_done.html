@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}
+    {% trans "Cooptation déjà répondue" %}
+{% endblock %}
+{% block content %}
+    <div class="mx-auto max-w-md text-center py-16">
+        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-tertiary">{% trans "Cooptation" %}</p>
+        <h1 class="mt-3 font-display text-3xl font-semibold tracking-tight">{% trans "Vous avez déjà répondu." %}</h1>
+        <p class="mt-4 text-secondary">
+            {% blocktrans with date=request_obj.responded_at|date:"d F Y" %}
+        Réponse enregistrée le {{ date }}.
+        {% endblocktrans %}
+        </p>
+    </div>
+{% endblock %}

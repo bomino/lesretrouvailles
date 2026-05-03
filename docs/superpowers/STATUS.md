@@ -11,7 +11,7 @@ Single dashboard for tracking phase and task completion across all plans. Update
 |-------|-------|--------|------|
 | P1 | Foundation | Complete (tag `v0.1.0-foundation`, 2026-05-02) | [plan](plans/2026-05-01-foundation.md) |
 | P2 | Membership | Complete (tag `v0.2.0-membership`, 2026-05-02) | [plan](plans/2026-05-02-membership.md) |
-| P3 | Cooptation | Not started | — |
+| P3 | Cooptation | Complete (tag `v0.3.0-cooptation`, 2026-05-02) | [plan](plans/2026-05-02-cooptation.md) |
 | P4 | Public surface | Not started | — |
 | P5 | Mémoire seed | Not started | — |
 | P6 | Ops & RGPD | Not started | — |
@@ -85,9 +85,28 @@ Single dashboard for tracking phase and task completion across all plans. Update
 
 ## P3 — Cooptation
 
-**Status:** Not started.
-**Scope:** `AdminApplication`, `CooptationRequest`, J+7/J+14 deadline machinery (Django management command + cron), knowledge questionnaire, admin moderation UI, email templates, Resend integration, `AdminApplication` 6-month retention purge.
-**Plan:** not yet written.
+**Shipped:** 2026-05-02 (branch `feat/cooptation`, tag `v0.3.0-cooptation`)
+**Plan:** [plans/2026-05-02-cooptation.md](plans/2026-05-02-cooptation.md)
+**Spec:** [specs/2026-05-02-cooptation-design.md](specs/2026-05-02-cooptation-design.md)
+**Test suite:** 217 passing total
+
+| # | Task | Done | Commit |
+|---|------|------|--------|
+| 1 | Scaffold cooptation app + P3 deps | [x] | `6b49649` |
+| 2 | Resend backend + send_email helper | [x] | `d309b98` |
+| 3 | AdminApplication model with 5-state machine + purge() | [x] | `96be728` |
+| 4 | CooptationRequest with token + parrain PROTECT | [x] | `89d57de` |
+| 5 | KnowledgeQuestion + QuestionnaireResponse | [x] | `f51bbc6` |
+| 6 | seed_questions management command | [x] | `ac436cb` |
+| 7 | 10 email templates + emails.py wrappers | [x] | `a639a9f` |
+| 8 | services.py approve/reject/purge with Allauth URL | [x] | `cc63e13` |
+| 9 | Public signup form, view, success page | [x] | `b32b4bb` (+ `ecdd3c4` cache fix) |
+| 10 | Parrain vouch view with identity check + 410 pages | [x] | `81a4097` |
+| 11 | Questionnaire view with accent-insensitive auto-grading | [x] | `43cbe29` |
+| 12 | Admin moderation UI with custom actions | [x] | `4f2998a` |
+| 13 | process_cooptation_deadlines cron command | [x] | `79ed951` |
+| 14 | a11y + e2e happy path tests | [x] | `541e99a` |
+| 15 | Settings, runbook, STATUS.md, tag | [x] | `<this commit>` |
 
 ---
 

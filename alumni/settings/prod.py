@@ -9,3 +9,6 @@ SECURE_HSTS_PRELOAD = True
 X_FRAME_OPTIONS = "DENY"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+
+EMAIL_BACKEND = "alumni.email.ResendBackend"
+PASSWORD_RESET_TIMEOUT = 7 * 24 * 60 * 60  # 7 days for the post-approval password-set link

@@ -71,3 +71,6 @@ if CLOUDINARY_CLIENT_PATH.endswith("RealCloudinary") and CLOUDINARY_CLOUD_NAME =
         "CLOUDINARY_CLIENT_PATH=RealCloudinary requires CLOUDINARY_CLOUD_NAME "
         "to be set to your real Cloudinary cloud (currently 'fake-cloud')."
     )
+
+EMAIL_BACKEND = "alumni.email.ResendBackend"
+PASSWORD_RESET_TIMEOUT = 7 * 24 * 60 * 60  # 7 days for the post-approval password-set link

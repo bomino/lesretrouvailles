@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}
+    {% trans "Lien expiré" %}
+{% endblock %}
+{% block content %}
+    <div class="mx-auto max-w-md text-center py-16">
+        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-tertiary">{% trans "Cooptation" %}</p>
+        <h1 class="mt-3 font-display text-3xl font-semibold tracking-tight">{% trans "Cette demande a expiré." %}</h1>
+        <p class="mt-4 text-secondary">
+            {% blocktrans with date=request_obj.expires_at|date:"d F Y" %}
+        Le délai de 14 jours a été atteint le {{ date }}. Le candidat sera contacté par d'autres voies.
+        {% endblocktrans %}
+        </p>
+    </div>
+{% endblock %}

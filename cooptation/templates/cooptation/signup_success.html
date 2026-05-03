@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}
+    {% trans "Demande reçue" %}
+{% endblock %}
+{% block content %}
+    <div class="mx-auto max-w-2xl text-center">
+        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-tertiary">{% trans "Merci !" %}</p>
+        <h1 class="mt-2 font-display text-4xl font-semibold tracking-tight hero-rule mx-auto">
+            {% trans "Votre demande a été reçue." %}
+        </h1>
+        <p class="mt-6 text-base text-secondary leading-relaxed">
+            {% trans "Vous allez recevoir un email de confirmation. Vos parrains seront contactés dans la foulée. Vous serez notifié·e dès qu'ils auront répondu." %}
+        </p>
+    </div>
+{% endblock %}

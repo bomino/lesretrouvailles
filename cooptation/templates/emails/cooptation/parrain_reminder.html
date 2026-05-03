@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="fr">
+    <body style="font-family: Inter, system-ui, sans-serif; color: #1a1c1e">
+        <p>
+            Bonjour <strong>{{ request.parrain.first_name }}</strong>,
+        </p>
+        <p>
+            Nous n'avons pas encore reçu votre réponse pour la cooptation de
+            <strong>{{ application.full_name }}</strong>. Il vous reste 7 jours pour
+            répondre.
+        </p>
+        <p>
+            <a href="{{ site_url }}/cooptation/{{ request.token }}/">{{ site_url }}/cooptation/{{ request.token }}/</a>
+        </p>
+        <p>
+            Si vous ne pouvez pas vous prononcer, vous pouvez aussi cliquer
+            "Refuser" — cela ne bloque pas la procédure ; l'admin réexaminera le
+            dossier.
+        </p>
+        <p>
+            Merci,
+            <br />
+            L'équipe Les Retrouvailles
+        </p>
+    </body>
+</html>

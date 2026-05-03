@@ -1,0 +1,8 @@
+Bonjour {{ application.full_name }},
+
+Une demande de cooptation a été envoyée à :
+{% for email in parrain_emails %}- {{ email }}
+{% endfor %}
+Vous serez notifié·e dès qu'ils auront répondu. Si vous ne recevez pas de nouvelles sous 7 jours, nous leur enverrons une relance.
+
+L'équipe Les Retrouvailles

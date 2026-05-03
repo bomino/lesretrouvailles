@@ -1,0 +1,9 @@
+Bonjour {{ application.full_name }},
+
+Après examen, l'admin n'a pas pu valider votre demande d'inscription pour la raison suivante :
+
+{{ reason }}
+
+Si vous pensez qu'il s'agit d'une erreur ou si vous souhaitez fournir des éléments supplémentaires, vous pouvez redéposer une demande dans 6 mois.
+
+L'équipe Les Retrouvailles
