@@ -16,6 +16,16 @@ urlpatterns = [
         name="removal_request_done",
     ),
     path(
+        "retrait/expire/",
+        views.removal_expired_view,
+        name="removal_expired",
+    ),
+    path(
+        "retrait/confirme/<str:confirm_token>/",
+        views.removal_confirm_view,
+        name="removal_confirm",
+    ),
+    path(
         "retrait/<str:entry_token>/",
         views.removal_request_form_view,
         name="removal_request_form",

@@ -12,6 +12,7 @@ from django.db.models import F, Q, Value
 from django.db.models.functions import Lower
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
+from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods
 from django_ratelimit.decorators import ratelimit
@@ -223,9 +224,14 @@ from .models import RemovalRequest  # noqa: E402
 
 
 @require_http_methods(["GET", "POST"])
-@ratelimit(key="ip", rate="5/h", method="POST", block=True)
+@ratelimit(key="ip", rate="5/h", method="POST", block=False)
 def removal_request_form_view(request, entry_token: str):
     from .models import PublicSearchEntry
+
+    if getattr(request, "limited", False):
+        from django.http import HttpResponse
+
+        return HttpResponse(status=429, headers={"Retry-After": "3600"})
 
     entry = get_object_or_404(PublicSearchEntry, removal_token=entry_token)
 
@@ -272,3 +278,75 @@ def removal_request_form_view(request, entry_token: str):
 @require_http_methods(["GET"])
 def removal_request_done_view(request):
     return render(request, "members/removal_request_done.html")
+
+
+@require_http_methods(["GET"])
+def removal_confirm_view(request, confirm_token: str):
+    from .models import AuditLog, RemovalRequest
+
+    try:
+        rreq = RemovalRequest.objects.select_related("entry").get(confirm_token=confirm_token)
+    except RemovalRequest.DoesNotExist:
+        return render(request, "members/removal_expired_or_invalid.html", status=200)
+
+    now = timezone.now()
+
+    if rreq.status == "expired":
+        return render(request, "members/removal_expired_or_invalid.html", status=200)
+
+    if rreq.status == "confirmed":
+        # Idempotent: clicking again shows success without re-running side effects
+        return render(
+            request,
+            "members/removal_confirmed.html",
+            {"entry": rreq.entry, "request": rreq},
+        )
+
+    # status == "pending_confirmation"
+    if rreq.expires_at <= now:
+        rreq.status = "expired"
+        rreq.save(update_fields=["status"])
+        return render(request, "members/removal_expired_or_invalid.html", status=200)
+
+    # Execute the removal — set entry.removed_at, write 2 AuditLog entries,
+    # send 2 emails, mark request as confirmed.
+    entry = rreq.entry
+    entry.removed_at = now
+    entry.removed_reason = (rreq.reason or "Retrait demandé par la personne concernée")[:200]
+    entry.save(update_fields=["removed_at", "removed_reason"])
+
+    rreq.status = "confirmed"
+    rreq.confirmed_at = now
+    rreq.save(update_fields=["status", "confirmed_at"])
+
+    AuditLog.objects.create(
+        actor=None,
+        action="ghost.removal.confirmed",
+        target_type="members.RemovalRequest",
+        target_id=str(rreq.pk),
+        metadata={"requester_email": rreq.requester_email},
+    )
+    AuditLog.objects.create(
+        actor=None,
+        action="ghost.removal.executed",
+        target_type="members.PublicSearchEntry",
+        target_id=str(entry.pk),
+        metadata={
+            "removal_request_id": rreq.pk,
+            "reason_at_request": rreq.reason,
+        },
+    )
+
+    members_emails.send_removal_completed(rreq)
+    members_emails.send_admin_removal_notification(rreq)
+
+    return render(
+        request,
+        "members/removal_confirmed.html",
+        {"entry": entry, "request": rreq},
+    )
+
+
+@require_http_methods(["GET"])
+def removal_expired_view(request):
+    return render(request, "members/removal_expired_or_invalid.html")

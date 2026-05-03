@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}
+    {% trans "Retrait confirmé" %}
+{% endblock %}
+{% block content %}
+    <section class="mx-auto max-w-2xl px-4 py-16 text-center">
+        <span class="inline-flex h-14 w-14 items-center justify-center rounded-full bg-whatsapp-green/15 text-whatsapp-green text-3xl">✓</span>
+        <h1 class="mt-6 font-display text-3xl font-semibold tracking-tight md:text-4xl">{% trans "Retrait confirmé" %}</h1>
+        <p class="mx-auto mt-4 max-w-md text-lg text-secondary">
+            {% blocktrans with name=entry.first_name initial=entry.last_name_initial %}Le nom <strong>{{ name }} {{ initial }}</strong> a été retiré de la liste publique.{% endblocktrans %}
+        </p>
+        <p class="mx-auto mt-3 max-w-md text-sm text-secondary">
+            {% trans "Si c'était une erreur, contactez l'équipe en répondant à l'email de confirmation." %}
+        </p>
+        <a href="/"
+           class="mt-8 inline-flex items-center gap-2 rounded-lg border border-secondary/25 bg-surface px-5 py-3 text-base font-medium hover:border-tertiary/40 hover:text-tertiary transition">
+            {% trans "Retour à l'accueil" %}
+            <span aria-hidden="true">→</span>
+        </a>
+    </section>
+{% endblock %}
