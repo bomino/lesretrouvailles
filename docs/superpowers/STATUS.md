@@ -14,7 +14,7 @@ Single dashboard for tracking phase and task completion across all plans. Update
 | P3 | Cooptation | Complete (tag `v0.3.0-cooptation`, 2026-05-02) | [plan](plans/2026-05-02-cooptation.md) |
 | P4a | Public surface — landing + ghost-list scaffold + SEO | Complete (tag `v0.4.0a-public-surface`, 2026-05-03) | [plan](plans/2026-05-03-public-surface.md) |
 | P4b | Public surface — token-based removal flow + AuditLog (governance UI deferred to P4c) | Complete (tag `v0.4.0b-public-surface-governance`, 2026-05-03) | [plan](plans/2026-05-03-public-surface-governance.md) |
-| P4c | Public surface — custom admin governance UI + quarterly review automation | Not started | — |
+| P4c | Public surface — quarterly review automation + admin status filter | Complete (tag `v0.4.0c-public-surface-admin`, 2026-05-03) | [plan](plans/2026-05-03-public-surface-admin.md) |
 | P5 | Mémoire seed | Not started | — |
 | P6 | Ops & RGPD | Not started | — |
 | P7 | Soft launch | Not started | — |
@@ -175,11 +175,28 @@ Single dashboard for tracking phase and task completion across all plans. Update
 
 ---
 
-## P4c — Public surface (custom admin governance UI + quarterly review automation)
+## P4c — Public surface (quarterly review automation + admin status filter)
 
-**Status:** Not started.
-**Scope:** Custom Django-admin extension for ghost-list governance (approval queue, signoff status indicators, removal-request queue), and a quarterly-review cron that flags ghost entries listed > 12 months without inbound contact.
-**Plan:** not yet written.
+**Shipped:** 2026-05-03 (branch `feat/public-surface-admin`, tag `v0.4.0c-public-surface-admin`)
+**Plan:** [plans/2026-05-03-public-surface-admin.md](plans/2026-05-03-public-surface-admin.md)
+**Spec:** [specs/2026-05-03-public-surface-admin-design.md](specs/2026-05-03-public-surface-admin-design.md)
+**Test suite:** 336 passing (324 from prior phases + 12 new across cron handler, quarterly digest, and admin filter tests).
+
+| # | Task | Done | Commit |
+|---|------|------|--------|
+| 1 | Stale-ghost auto-removal handler in daily cron | [x] | `21d3f26` |
+| 2 | Quarterly admin digest — handler + email + 3 templates | [x] | `ce68eda` |
+| 3 | GhostStatusFilter on PublicSearchEntryAdmin (5 buckets) | [x] | `5a97670` |
+| 4 | Full suite + STATUS update | [x] | _this commit_ |
+| 5 | Merge, tag, push, deploy | _next commit_ | _pending_ |
+
+**Notable design decisions:**
+- Master spec's "Revue trimestrielle" honored as a **quarterly digest** (Jan/Apr/Jul/Oct day 1) — auto-removal itself fires daily so entries never stay public >12 months + 1 day, but the human-facing review cadence is quarterly.
+- 12-month boundary uses `added_at` rather than a "first published" date — slightly conservative for entries that took weeks to cosign, but no schema change. P4d adds `published_at` if admins find it annoying.
+- New cron handler lives in the existing `process_cooptation_deadlines` command despite the naming mismatch — the cross-app housekeeping is documented in the module docstring.
+- `GhostStatusFilter` uses `Count("added_by_admins")` annotation only when a filter value is selected; default changelist load is unaffected. The "published" bucket excludes entries ≥365 days old (filtered into "stale") — strict partition, no overlap.
+- `PublicSearchEntryAdmin.list_display` now uses a custom `retrait_at` method (label: "Retiré le") instead of the raw `removed_at` field — more on-brand French + sidesteps a brittle test-vs-column-header collision.
+- "Custom admin dashboard view" deferred indefinitely — list filter + quarterly digest cover the operational need at our scale.
 
 ---
 
