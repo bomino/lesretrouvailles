@@ -54,3 +54,40 @@ def test_sitemap_no_percent_20_in_output(client, settings):
     response = client.get("/sitemap.xml")
     body = response.content.decode("utf-8")
     assert "%20" not in body
+
+
+@pytest.mark.django_db
+def test_robots_txt_returns_200_text_plain(client):
+    response = client.get("/robots.txt")
+    assert response.status_code == 200
+    assert response["Content-Type"].startswith("text/plain")
+
+
+@pytest.mark.django_db
+def test_robots_allows_public_paths(client):
+    body = client.get("/robots.txt").content.decode("utf-8")
+    assert "Allow: /\n" in body or body.strip().split("\n")[1].startswith("Allow: /")
+    assert "Allow: /inscription/" in body
+    assert "Allow: /sitemap.xml" in body
+
+
+@pytest.mark.django_db
+def test_robots_disallows_member_and_admin_paths(client):
+    body = client.get("/robots.txt").content.decode("utf-8")
+    for path in (
+        "/admin/",
+        "/accounts/",
+        "/profil/",
+        "/annuaire/",
+        "/cooptation/",
+        "/questionnaire/",
+        "/charte/",
+    ):
+        assert f"Disallow: {path}" in body, f"robots.txt missing Disallow for {path}"
+
+
+@pytest.mark.django_db
+def test_robots_references_sitemap_url_from_settings(client, settings):
+    settings.SITE_URL = "https://prod.example.test"
+    body = client.get("/robots.txt").content.decode("utf-8")
+    assert "Sitemap: https://prod.example.test/sitemap.xml" in body

@@ -18,3 +18,14 @@ def health(_request):
 
 def landing_placeholder(request):
     return render(request, "core/landing_placeholder.html")
+
+
+def robots_txt(request):
+    from django.conf import settings as django_settings
+
+    return render(
+        request,
+        "robots.txt",
+        {"site_url": django_settings.SITE_URL},
+        content_type="text/plain",
+    )

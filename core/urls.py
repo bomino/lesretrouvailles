@@ -15,4 +15,5 @@ urlpatterns = [
         {"sitemaps": sitemaps_dict},
         name="django.contrib.sitemaps.views.sitemap",
     ),
+    path("robots.txt", views.robots_txt, name="robots_txt"),
 ]
