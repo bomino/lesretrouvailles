@@ -36,6 +36,15 @@ def fake_backend(settings):
     return FakeResendBackend
 
 
+@pytest.fixture(autouse=True)
+def _no_sleep(monkeypatch):
+    """Pacing sleeps exist for production rate-limit reasons; in tests they
+    just slow the suite. Patch them out at the module the command imports."""
+    import cooptation.management.commands.smoke_test_cooptation as cmd
+
+    monkeypatch.setattr(cmd.time, "sleep", lambda *_: None)
+
+
 @pytest.mark.django_db
 def test_command_runs_full_pipeline_and_cleans_up(staff_user, fake_backend):
     from cooptation.models import AdminApplication

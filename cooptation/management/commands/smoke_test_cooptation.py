@@ -19,6 +19,7 @@ member directory.
 
 from __future__ import annotations
 
+import time
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
@@ -33,6 +34,10 @@ from members.models import Member
 SMOKE_PARRAIN_1_EMAIL = "smoke-test-parrain1@example.test"
 SMOKE_PARRAIN_2_EMAIL = "smoke-test-parrain2@example.test"
 SMOKE_TAG = "[smoke-test]"
+# Resend's free tier rate-limits at 2 requests/second. The cooptation cron
+# uses the same pacing for the same reason; the smoke test fires 7+ emails
+# in one run and would 429 without it.
+RESEND_PACING_SECONDS = 0.6
 
 
 class Command(BaseCommand):
@@ -87,6 +92,7 @@ class Command(BaseCommand):
         self.stdout.write("   sent: cooptation_accepted x2 (to candidate)")
 
         self._step("5/6", "Approving application as staff (creates User + Member)")
+        time.sleep(RESEND_PACING_SECONDS)  # cushion against Resend rate limit
         user, member = services.approve_application(app, reviewed_by=staff_user)
         self.stdout.write(f"   created User pk={user.pk} email={user.email}")
         self.stdout.write(f"   created Member pk={member.pk} status={member.status}")
@@ -189,11 +195,15 @@ class Command(BaseCommand):
             req1 = CooptationRequest.objects.create(application=app, parrain=p1, expires_at=expires)
             req2 = CooptationRequest.objects.create(application=app, parrain=p2, expires_at=expires)
 
-        emails.send_application_received(app)
-        emails.send_cooptation_requests_sent(app, parrain_emails=[p1.user.email, p2.user.email])
-        emails.send_parrain_invitation(req1)
-        emails.send_parrain_invitation(req2)
-        emails.send_admin_new_application(app)
+        self._paced(emails.send_application_received, app)
+        self._paced(
+            emails.send_cooptation_requests_sent,
+            app,
+            parrain_emails=[p1.user.email, p2.user.email],
+        )
+        self._paced(emails.send_parrain_invitation, req1)
+        self._paced(emails.send_parrain_invitation, req2)
+        self._paced(emails.send_admin_new_application, app)
         return app, req1, req2
 
     def _accept_vouches(self, req1: CooptationRequest, req2: CooptationRequest) -> None:
@@ -213,7 +223,12 @@ class Command(BaseCommand):
             app.save()
 
         for req in (req1, req2):
-            emails.send_cooptation_accepted(req)
+            self._paced(emails.send_cooptation_accepted, req)
+
+    def _paced(self, fn, *args, **kwargs):
+        """Send an email then sleep, so we don't 429 against Resend's free tier."""
+        fn(*args, **kwargs)
+        time.sleep(RESEND_PACING_SECONDS)
 
     def _cleanup(self, candidate_email: str) -> None:
         User = get_user_model()  # noqa: N806
