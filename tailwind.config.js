@@ -7,6 +7,7 @@ module.exports = {
     "./templates/**/*.html",
     "./core/**/*.{html,py}",
     "./members/**/*.{html,py}",
+    "./cooptation/**/*.{html,py}",
   ],
   theme: {
     extend: {

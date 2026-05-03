@@ -14,6 +14,7 @@ COPY static/ ./static/
 COPY templates/ ./templates/
 COPY core/ ./core/
 COPY members/ ./members/
+COPY cooptation/ ./cooptation/
 
 RUN npx tailwindcss -i ./static/css/input.css -o ./static/css/output.css --minify
 
@@ -49,13 +50,15 @@ RUN pip install --upgrade pip && pip install \
     "cloudinary>=1.40" \
     "django-ratelimit>=4.1" \
     "markdown>=3.6" \
-    "redis>=5.0"
+    "redis>=5.0" \
+    "resend>=2.0"
 
 # Copy source code
 COPY pyproject.toml ./
 COPY alumni/ ./alumni/
 COPY core/ ./core/
 COPY members/ ./members/
+COPY cooptation/ ./cooptation/
 COPY templates/ ./templates/
 COPY locale/ ./locale/
 COPY manage.py ./

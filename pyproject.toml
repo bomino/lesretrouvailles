@@ -34,7 +34,7 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["alumni", "core", "members"]
+packages = ["alumni", "core", "members", "cooptation"]
 
 [tool.ruff]
 line-length = 100
