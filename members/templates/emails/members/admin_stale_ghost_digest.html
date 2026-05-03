@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="fr">
+    <body style="font-family: Inter, system-ui, sans-serif; color: #1a1c1e">
+        <p>Bonjour,</p>
+        <p>Revue trimestrielle de la liste publique « Nous recherchons aussi… »</p>
+        <h2 style="font-size: 16px; margin-top: 24px;">Retraits automatiques (90 derniers jours)</h2>
+        <p>
+            <strong>{{ purged_count }} fiche{{ purged_count|pluralize }}</strong>
+            ont été automatiquement retirées depuis le
+            {{ since|date:"j F Y" }} (publiées depuis plus de 12 mois sans
+            renouvellement par les admins) :
+        </p>
+        <ul>
+            {% for log in logs %}
+                <li>
+                    <strong>{{ log.metadata.first_name }} {{ log.metadata.last_name_initial }}</strong>
+                    — publiée le {{ log.metadata.added_at }},
+                    retirée le {{ log.metadata.auto_removed_at }}
+                </li>
+            {% endfor %}
+        </ul>
+        <h2 style="font-size: 16px; margin-top: 24px;">
+            Liste actuelle ({{ listed_count }} fiche{{ listed_count|pluralize }} publiée{{ listed_count|pluralize }})
+        </h2>
+        <ul>
+            {% for entry in currently_listed %}
+                <li>
+                    <strong>{{ entry.first_name }} {{ entry.last_name_initial }}</strong>
+                    — publiée il y a {{ entry.age_months }} mois
+                </li>
+            {% endfor %}
+        </ul>
+        <p>
+            Si l'une des fiches retirées doit être réinscrite, recréez-la
+            dans l'admin Django avec 2 cosignatures, comme à l'origine.
+        </p>
+        <p>L'équipe Les Retrouvailles</p>
+    </body>
+</html>
