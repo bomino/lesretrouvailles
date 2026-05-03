@@ -38,7 +38,7 @@ class AdminApplicationAdmin(admin.ModelAdmin):
         "submitted_at",
         "ip_badge",
     )
-    list_filter = ("status", "cooptation_outcome", "country")
+    list_filter = ("status", "cooptation_outcome", "country", "utm_source", "utm_campaign")
     search_fields = ("full_name", "email", "nickname")
     readonly_fields = (
         "submitted_at",

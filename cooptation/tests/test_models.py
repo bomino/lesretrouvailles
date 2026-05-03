@@ -21,6 +21,9 @@ def test_application_purge_clears_all_pii(make_application):
         review_note="Long internal note",
     )
     app.source_ip = "192.168.1.10"
+    app.referrer = "https://wa.me/group/SOME-IDENTIFIABLE-INVITE-LINK"
+    app.utm_source = "whatsapp"
+    app.utm_campaign = "invitation"
     app.save()
     app.purge()
     app.refresh_from_db()
@@ -33,6 +36,11 @@ def test_application_purge_clears_all_pii(make_application):
     assert app.profession == ""
     assert app.review_note == ""
     assert app.source_ip is None
+    # referrer is PII (group invite URLs leak membership) → cleared
+    assert app.referrer == ""
+    # utm_source / utm_campaign are aggregate labels with analytical value → kept
+    assert app.utm_source == "whatsapp"
+    assert app.utm_campaign == "invitation"
     assert app.status == "purged"
     assert app.purged_at is not None
 

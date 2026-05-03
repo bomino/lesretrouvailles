@@ -12,7 +12,8 @@ Single dashboard for tracking phase and task completion across all plans. Update
 | P1 | Foundation | Complete (tag `v0.1.0-foundation`, 2026-05-02) | [plan](plans/2026-05-01-foundation.md) |
 | P2 | Membership | Complete (tag `v0.2.0-membership`, 2026-05-02) | [plan](plans/2026-05-02-membership.md) |
 | P3 | Cooptation | Complete (tag `v0.3.0-cooptation`, 2026-05-02) | [plan](plans/2026-05-02-cooptation.md) |
-| P4 | Public surface | Not started | — |
+| P4a | Public surface — landing + ghost-list scaffold + SEO | Complete (tag `v0.4.0a-public-surface`, 2026-05-03) | [plan](plans/2026-05-03-public-surface.md) |
+| P4b | Public surface — admin governance UI + token-based removal flow + AuditLog | Not started | — |
 | P5 | Mémoire seed | Not started | — |
 | P6 | Ops & RGPD | Not started | — |
 | P7 | Soft launch | Not started | — |
@@ -110,10 +111,43 @@ Single dashboard for tracking phase and task completion across all plans. Update
 
 ---
 
-## P4 — Public surface
+## P4a — Public surface (landing + ghost-list scaffold + SEO)
 
-**Status:** Not started.
-**Scope:** Public landing page (replaces the placeholder), `PublicSearchEntry` model with collegial validation, public removal flow without auth, `noindex` differentiation between public and private pages.
+**Shipped:** 2026-05-03 (branch `feat/public-surface`, tag `v0.4.0a-public-surface`)
+**Plan:** [plans/2026-05-03-public-surface.md](plans/2026-05-03-public-surface.md)
+**Spec:** [specs/2026-05-03-public-surface-design.md](specs/2026-05-03-public-surface-design.md)
+**Test suite:** 286 passing (234 from prior phases + 52 new across noindex audit, a11y, SEO, UTM, ghost-list model, basic-auth bypass, and landing view).
+
+| # | Task | Done | Commit |
+|---|------|------|--------|
+| 1 | Settings — `PUBLIC_GHOST_LIST_ENABLED`, `CLOUDFLARE_ANALYTICS_TOKEN`, sitemap/robots whitelist | [x] | `e49c6be` (+ `48e4c6f` `.env.example`) |
+| 2 | `PublicSearchEntry` model + migration + 7 model tests | [x] | `393fcca` |
+| 3 | `AdminApplication` UTM fields + admin filter + purge() guard | [x] | `353b002` |
+| 4 | `BasicAuthMiddleware` bypass for public paths (exact-match + prefix) | [x] | `4ac680b` |
+| 5 | UTM capture in `signup_view` (sanitization + session stash) | [x] | `a3b3742` |
+| 6 | `/sitemap.xml` exposing landing + inscription only | [x] | `41e3186` |
+| 7 | `/robots.txt` with explicit allow/disallow + sitemap reference | [x] | `484fbaa` |
+| 8 | `PublicSearchEntry` admin registration with 2-cosigner UX | [x] | `860f212` |
+| 9 | Landing view + template (hero, ghost section, OG/JSON-LD, namespaced URLs, year sort) | [x] | `0615459` |
+| 10 | Cloudflare Web Analytics beacon (anonymous-only, env-gated) | [x] | `7a0a3fc` |
+| 11 | Noindex audit + landing a11y assertions (5+4 tests) | [x] | `505a82f` |
+| 12 | Full suite + smoke + STATUS update | [x] | _this commit_ |
+| 13 | Merge, tag, push, deploy | _next commit_ | _pending_ |
+
+**Notable design decisions:**
+- Ghost list section is gated by env-var feature flag `PUBLIC_GHOST_LIST_ENABLED` (default off). RGPD safety net so admin signoffs can't accidentally publish names before P4b's removal flow ships.
+- Two-admin M2M publication gate enforced at queryset level (no single-toggle boolean).
+- UTM fields kept on `AdminApplication` after `purge()` (aggregate labels with no PII); `referrer` cleared (group-invite URLs leak membership).
+- `protocol = "https"` hardcoded on the sitemap class to force https://-prefixed URLs even when Django receives the request over plain HTTP behind Railway's TLS proxy.
+- Open Graph image at `static/img/og-landing.png` is a 1×1 placeholder; replace with a real 1200×630 PNG before deploy.
+- Narrative copy in the landing template is the implementer's first-draft placeholder; team to refine before deploy.
+
+---
+
+## P4b — Public surface (admin governance UI + token-based removal flow + AuditLog)
+
+**Status:** Not started. Depends on P4a; see § 4.b of the master spec.
+**Scope:** Custom admin screen for ghost-list governance, public token-based "Demander un retrait" form (no auth required, email-confirmation, 48h SLA), `AuditLog` model + decorator. Once P4b is live, operators flip `PUBLIC_GHOST_LIST_ENABLED=True`.
 **Plan:** not yet written.
 
 ---

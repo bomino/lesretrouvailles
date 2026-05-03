@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.sites",
+    "django.contrib.sitemaps",
     "allauth",
     "allauth.account",
     "core",
@@ -58,6 +59,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "django.template.context_processors.i18n",
                 "members.context.member_preferences",
+                "core.context_processors.site",
             ],
         },
     },
@@ -173,7 +175,20 @@ LOGIN_REQUIRED_WHITELIST = [
     "/media/",
     "/inscription/",
     "/questionnaire/",
+    "/sitemap.xml",
+    "/robots.txt",
 ]
+
+# P4a: feature flag gating the public ghost list (Nous recherchons aussi…).
+# Default off so admins can pre-populate via Django admin without exposing
+# names publicly until P4b ships the public removal flow. Operators flip
+# this to True via Railway env vars when the removal flow is live.
+PUBLIC_GHOST_LIST_ENABLED = env.bool("PUBLIC_GHOST_LIST_ENABLED", default=False)
+
+# P4a: Cloudflare Web Analytics token. Frontend beacon identifier (not a
+# secret — appears in HTML). Beacon snippet is omitted from base.html when
+# blank, so leaving this unset disables analytics cleanly.
+CLOUDFLARE_ANALYTICS_TOKEN = env("CLOUDFLARE_ANALYTICS_TOKEN", default="")
 
 # Resend email
 RESEND_API_KEY = env("RESEND_API_KEY", default="")

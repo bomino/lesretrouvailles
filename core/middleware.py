@@ -8,6 +8,16 @@ from django.http import HttpResponse
 # healthcheck and any future external monitor that cannot send credentials.
 BASIC_AUTH_BYPASS_PATHS = ("/health",)
 
+# P4a: SEO crawlers and anonymous visitors must reach these without
+# credentials so the public landing is actually indexable. Exact-match set
+# is used for short paths to avoid the trap where prefix-matching "/" would
+# bypass every URL in the site.
+BASIC_AUTH_PUBLIC_EXACT = {"/", "/sitemap.xml", "/robots.txt"}
+
+# Prefix-matched bypasses for paths with sub-routes. "/inscription/" covers
+# both the form and its success page; "/static/" covers all assets.
+BASIC_AUTH_PUBLIC_PREFIXES = ("/static/", "/inscription/")
+
 
 class BasicAuthMiddleware:
     """Optional HTTP basic-auth gate, used in staging only.
@@ -38,6 +48,14 @@ class BasicAuthMiddleware:
 
         # Healthchecks and similar external probes cannot send credentials.
         if request.path in BASIC_AUTH_BYPASS_PATHS:
+            return self.get_response(request)
+
+        # Public-surface bypass — exact match first, then prefix match.
+        # The order matters: prefix-matching "/" against any path would
+        # bypass everything on the site.
+        if request.path in BASIC_AUTH_PUBLIC_EXACT:
+            return self.get_response(request)
+        if any(request.path.startswith(p) for p in BASIC_AUTH_PUBLIC_PREFIXES):
             return self.get_response(request)
 
         header = request.META.get("HTTP_AUTHORIZATION", "")

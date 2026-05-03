@@ -66,6 +66,14 @@ class AdminApplication(models.Model):
     # submit the questionnaire so they don't sit in cooptation_pending forever.
     cooptation_expired_at = models.DateTimeField(null=True, blank=True)
 
+    # P4a: source-of-arrival capture from the public landing page.
+    # Stored verbatim (sanitized for control chars + HTML special chars in the
+    # signup view); no allowlist so future campaign labels work without code
+    # changes. db_index on utm_source so list_filter doesn't sequential-scan.
+    utm_source = models.CharField(max_length=80, blank=True, db_index=True)
+    utm_campaign = models.CharField(max_length=80, blank=True)
+    referrer = models.CharField(max_length=512, blank=True)
+
     class Meta:
         indexes = [
             models.Index(fields=["status"]),
@@ -78,7 +86,13 @@ class AdminApplication(models.Model):
         return f"{self.full_name or '<purged>'} ({self.status})"
 
     def purge(self) -> None:
-        """Clear all PII fields; keep aggregate state for audit/stats."""
+        """Clear all PII fields; keep aggregate state for audit/stats.
+
+        utm_source and utm_campaign are kept — they're aggregate labels
+        ("whatsapp", "invitation") with no personal data and real analytical
+        value post-purge. referrer is cleared because it can encode group
+        membership (e.g., a WhatsApp group invite URL).
+        """
         self.full_name = ""
         self.nickname = ""
         self.email = ""
@@ -88,6 +102,7 @@ class AdminApplication(models.Model):
         self.profession = ""
         self.review_note = ""
         self.source_ip = None
+        self.referrer = ""
         self.status = "purged"
         self.purged_at = timezone.now()
         self.save()

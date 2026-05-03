@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Allow: /inscription/
+Allow: /sitemap.xml
+Disallow: /admin/
+Disallow: /accounts/
+Disallow: /profil/
+Disallow: /annuaire/
+Disallow: /cooptation/
+Disallow: /questionnaire/
+Disallow: /charte/
+Sitemap: {{ site_url }}/sitemap.xml

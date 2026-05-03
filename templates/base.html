@@ -17,6 +17,11 @@
               rel="stylesheet">
         <link rel="stylesheet" href="{% static 'css/output.css' %}">
         <script defer src="{% static 'js/htmx.min.js' %}"></script>
+        {% if not request.user.is_authenticated and CLOUDFLARE_ANALYTICS_TOKEN %}
+            <script defer
+                    src="https://static.cloudflareinsights.com/beacon.min.js"
+                    data-cf-beacon='{"token": "{{ CLOUDFLARE_ANALYTICS_TOKEN }}"}'></script>
+        {% endif %}
         {% block extra_head %}{% endblock %}
     </head>
     <body data-theme="alumni"
@@ -27,7 +32,7 @@
         </a>
         <header class="sticky top-0 z-30 border-b border-secondary/15 bg-surface/85 backdrop-blur-md">
             <div class="container mx-auto flex items-center justify-between gap-4 px-4 py-3 md:px-6 md:py-4">
-                <a href="{% url 'landing_placeholder' %}"
+                <a href="{% url 'landing' %}"
                    class="flex items-center gap-3 group"
                    aria-label="{% trans 'Les Retrouvailles — accueil' %}">
                     <img src="{% static 'img/logo.png' %}"
