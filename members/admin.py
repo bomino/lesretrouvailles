@@ -124,6 +124,50 @@ class ConsentRecordAdmin(admin.ModelAdmin):
         return False
 
 
+class GhostStatusFilter(admin.SimpleListFilter):
+    """Lifecycle status of a PublicSearchEntry, computed from signoff
+    count + removed_at + added_at. Lets admins find entries pending
+    cosignature, stale ones approaching auto-removal, etc."""
+
+    title = "Statut publication"
+    parameter_name = "ghost_status"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("draft", "Brouillon (0 signatures)"),
+            ("pending", "En attente (1 signature)"),
+            ("published", "Publiée (2+)"),
+            ("stale", "Périmée (>12 mois)"),
+            ("removed", "Retirée"),
+        ]
+
+    def queryset(self, request, queryset):
+        from datetime import timedelta
+
+        from django.db.models import Count
+        from django.utils import timezone
+
+        value = self.value()
+        if value is None:
+            return queryset
+
+        if value == "removed":
+            return queryset.filter(removed_at__isnull=False)
+
+        qs = queryset.filter(removed_at__isnull=True).annotate(n=Count("added_by_admins"))
+        if value == "draft":
+            return qs.filter(n=0)
+        if value == "pending":
+            return qs.filter(n=1)
+        if value == "published":
+            cutoff = timezone.now() - timedelta(days=365)
+            return qs.filter(n__gte=2, added_at__gt=cutoff)
+        if value == "stale":
+            cutoff = timezone.now() - timedelta(days=365)
+            return qs.filter(n__gte=2, added_at__lte=cutoff)
+        return queryset
+
+
 @admin.register(PublicSearchEntry)
 class PublicSearchEntryAdmin(admin.ModelAdmin):
     """Governance UI for the public ghost list.
@@ -138,9 +182,9 @@ class PublicSearchEntryAdmin(admin.ModelAdmin):
         "last_name_initial",
         "years_at_ceg",
         "signoff_count",
-        "removed_at",
+        "retrait_at",
     )
-    list_filter = ("removed_at",)
+    list_filter = (GhostStatusFilter, "removed_at")
     search_fields = ("first_name", "last_name_initial", "note")
     filter_horizontal = ("added_by_admins",)
     readonly_fields = ("added_at", "removal_token", "removed_at", "removed_reason")
@@ -175,6 +219,10 @@ class PublicSearchEntryAdmin(admin.ModelAdmin):
     @admin.display(description="Signatures")
     def signoff_count(self, obj):
         return obj.added_by_admins.count()
+
+    @admin.display(description="Retiré le")
+    def retrait_at(self, obj):
+        return obj.removed_at
 
 
 @admin.register(RemovalRequest)
