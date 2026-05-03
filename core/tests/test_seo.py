@@ -91,3 +91,50 @@ def test_robots_references_sitemap_url_from_settings(client, settings):
     settings.SITE_URL = "https://prod.example.test"
     body = client.get("/robots.txt").content.decode("utf-8")
     assert "Sitemap: https://prod.example.test/sitemap.xml" in body
+
+
+@pytest.mark.django_db
+def test_cloudflare_beacon_present_when_token_set_and_anonymous(client, settings):
+    settings.CLOUDFLARE_ANALYTICS_TOKEN = "test-cf-token-abc"
+    body = client.get("/").content.decode("utf-8")
+    assert "static.cloudflareinsights.com/beacon.min.js" in body
+    assert "test-cf-token-abc" in body
+
+
+@pytest.mark.django_db
+def test_cloudflare_beacon_absent_when_token_blank(client, settings):
+    settings.CLOUDFLARE_ANALYTICS_TOKEN = ""
+    body = client.get("/").content.decode("utf-8")
+    assert "static.cloudflareinsights.com" not in body
+
+
+@pytest.mark.django_db
+def test_cloudflare_beacon_absent_for_authenticated_users(client, settings):
+    """Members visiting member pages must not pollute the public-surface metric."""
+    from django.contrib.auth import get_user_model
+
+    from members.models import Member
+
+    settings.CLOUDFLARE_ANALYTICS_TOKEN = "test-cf-token-abc"
+    User = get_user_model()  # noqa: N806
+    user = User.objects.create_user(
+        username="bob@example.test", email="bob@example.test", password="x"
+    )
+    Member.objects.create(
+        user=user,
+        first_name="Bob",
+        last_name="X",
+        years_attended=[1980],
+        classes=["6e"],
+        city="Niamey",
+        status="active",
+    )
+    # ConsentRequiredMiddleware gates auth users until they accept the charter
+    from members.charters import CHARTER_CURRENT_VERSION
+
+    session = client.session
+    session["consent_ok_for"] = CHARTER_CURRENT_VERSION
+    session.save()
+    client.force_login(user)
+    body = client.get("/profil/").content.decode("utf-8")
+    assert "static.cloudflareinsights.com" not in body

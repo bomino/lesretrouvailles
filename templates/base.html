@@ -17,6 +17,11 @@
               rel="stylesheet">
         <link rel="stylesheet" href="{% static 'css/output.css' %}">
         <script defer src="{% static 'js/htmx.min.js' %}"></script>
+        {% if not request.user.is_authenticated and CLOUDFLARE_ANALYTICS_TOKEN %}
+            <script defer
+                    src="https://static.cloudflareinsights.com/beacon.min.js"
+                    data-cf-beacon='{"token": "{{ CLOUDFLARE_ANALYTICS_TOKEN }}"}'></script>
+        {% endif %}
         {% block extra_head %}{% endblock %}
     </head>
     <body data-theme="alumni"
