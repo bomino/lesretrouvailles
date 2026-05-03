@@ -49,3 +49,4 @@ htmlcov/
 # Editable install metadata
 *.egg-info/
 Screenshot*.png
+.superpowers/
