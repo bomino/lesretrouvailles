@@ -177,6 +177,7 @@ LOGIN_REQUIRED_WHITELIST = [
     "/questionnaire/",
     "/sitemap.xml",
     "/robots.txt",
+    "/retrait/",
 ]
 
 # P4a: feature flag gating the public ghost list (Nous recherchons aussi…).

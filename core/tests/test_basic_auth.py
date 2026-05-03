@@ -192,3 +192,18 @@ def test_basic_auth_bypasses_inscription_prefix(client, settings):
 
     response = client.get("/inscription/")
     assert response.status_code != 401
+
+
+@pytest.mark.django_db
+def test_basic_auth_bypasses_retrait_prefix(client, settings):
+    """Public removal flow must be reachable without basic-auth credentials
+    so people who want to opt out can do so even on the staging-gated env."""
+    settings.MIDDLEWARE = PINNED_MIDDLEWARE
+    settings.BASIC_AUTH_REQUIRED = True
+    settings.BASIC_AUTH_USERNAME = "admin"
+    settings.BASIC_AUTH_PASSWORD = "secret"
+
+    # 404 from the inner view is fine — we just need to confirm we got past
+    # the 401 from BasicAuthMiddleware.
+    response = client.get("/retrait/some-token-that-doesnt-match/")
+    assert response.status_code != 401
