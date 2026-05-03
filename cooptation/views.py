@@ -28,9 +28,37 @@ def _client_ip(request) -> str:
     return request.META.get("REMOTE_ADDR")
 
 
+_UTM_FORBIDDEN = str.maketrans("", "", "<>\"'")
+
+
+def _sanitize_utm(value: str) -> str:
+    """Defence-in-depth strip of HTML special chars + control chars, truncated.
+
+    The actual XSS barrier for these values when rendered in the Django admin
+    list_filter UI is template auto-escaping — `<` and `&` get escaped to
+    entities by `conditional_escape`. This helper just keeps the stored data
+    clean so log lines, CSV exports, and future non-Django renderers don't
+    have to think about it.
+    """
+    if not value:
+        return ""
+    cleaned = value.translate(_UTM_FORBIDDEN)
+    cleaned = "".join(c for c in cleaned if c.isprintable())
+    return cleaned[:80]
+
+
 @require_http_methods(["GET", "POST"])
 @ratelimit(key="ip", rate="5/h", method="POST", block=True)
 def signup_view(request):
+    # Stash UTM on every GET so a visitor arriving at /inscription/?utm_source=…
+    # has it preserved through the form-render → form-submit hop. Sanitization
+    # happens here (not at write time) so what's in the session is already safe.
+    if request.method == "GET":
+        for key in ("utm_source", "utm_campaign"):
+            raw = request.GET.get(key)
+            if raw:
+                request.session[f"signup_{key}"] = _sanitize_utm(raw)
+
     if request.method == "POST":
         form = SignupForm(request.POST)
         if form.is_valid():
@@ -49,6 +77,9 @@ def signup_view(request):
                     email=form.cleaned_data["email"],
                     whatsapp=form.cleaned_data["whatsapp"],
                     source_ip=_client_ip(request),
+                    utm_source=request.session.pop("signup_utm_source", ""),
+                    utm_campaign=request.session.pop("signup_utm_campaign", ""),
+                    referrer=request.META.get("HTTP_REFERER", "")[:512],
                 )
                 p1 = Member.objects.get(
                     user__email=form.cleaned_data["parrain1_email"], status="active"
