@@ -136,6 +136,38 @@ def test_signup_rejects_inactive_parrain(client, active_member, second_active_me
 
 
 @pytest.mark.django_db
+def test_signup_rejects_email_matching_existing_member(client, active_member, second_active_member):
+    """Regression: a candidate cannot apply with an email already attached to
+    an existing Member. Otherwise approval would silently overwrite that
+    Member's profile via approve_application's update_or_create path."""
+    from django.contrib.auth import get_user_model
+
+    from cooptation.models import AdminApplication
+    from members.models import Member
+
+    User = get_user_model()  # noqa: N806
+    existing_user = User.objects.create_user(
+        username="duplicate@example.test",
+        email="duplicate@example.test",
+        password="x",
+    )
+    Member.objects.create(
+        user=existing_user,
+        first_name="Duplicate",
+        last_name="Owner",
+        years_attended=[1980],
+        classes=["6e"],
+        city="Niamey",
+    )
+
+    payload = _form_payload(active_member, second_active_member, email="duplicate@example.test")
+    response = client.post("/inscription/", payload)
+    assert response.status_code == 200
+    assert b"correspond" in response.content or b"compte" in response.content
+    assert AdminApplication.objects.count() == 0
+
+
+@pytest.mark.django_db
 def test_signup_honeypot_silently_rejects(client, active_member, second_active_member):
     """Honeypot field non-empty → render success page but do not create application."""
     from cooptation.models import AdminApplication

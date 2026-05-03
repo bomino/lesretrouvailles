@@ -16,6 +16,11 @@ from cooptation import emails, services
 from cooptation.models import AdminApplication, CooptationRequest
 
 PACING_SECONDS = 0.5
+# After both parrains time out and we email the questionnaire link, give the
+# candidate this many days to submit it. After that, push the application to
+# awaiting_admin so the admin can decide manually instead of letting it rot
+# in cooptation_pending forever.
+QUESTIONNAIRE_GRACE_DAYS = 7
 
 
 class Command(BaseCommand):
@@ -25,10 +30,12 @@ class Command(BaseCommand):
         now = timezone.now()
         sent_reminders = self._send_j7_reminders(now)
         expired_apps = self._expire_j14(now)
+        stale_apps = self._sweep_stale_questionnaires(now)
         purged_apps = self._purge_old_rejections(now)
         self.stdout.write(
             self.style.SUCCESS(
-                f"Done. reminders={sent_reminders} expired={expired_apps} purged={purged_apps}"
+                f"Done. reminders={sent_reminders} expired={expired_apps} "
+                f"stale={stale_apps} purged={purged_apps}"
             )
         )
 
@@ -65,10 +72,16 @@ class Command(BaseCommand):
                 continue
             timed_out = [r for r in requests if r.response == "pending" and r.expires_at <= now]
             if timed_out:
-                # At least one expired without a response — fallback to questionnaire.
+                # At least one expired without a response — fallback to
+                # questionnaire. Skip if we've already sent the email on a
+                # previous run, otherwise the candidate gets a duplicate
+                # every day until they submit.
+                if app.cooptation_expired_at is not None:
+                    continue
                 app.cooptation_outcome = "expired"
                 if not app.questionnaire_token:
                     app.questionnaire_token = secrets.token_urlsafe(32)
+                app.cooptation_expired_at = now
                 app.save()
                 site_url = getattr(settings, "SITE_URL", "https://staging.villageretrouvailles.com")
                 qurl = f"{site_url}/questionnaire/{app.questionnaire_token}/"
@@ -81,6 +94,25 @@ class Command(BaseCommand):
                 app.status = "awaiting_admin"
                 app.save()
                 count += 1
+        return count
+
+    def _sweep_stale_questionnaires(self, now) -> int:
+        """Push to awaiting_admin any application whose cooptation expired,
+        the candidate was emailed the questionnaire, and they never submitted
+        within the grace window. Without this sweep the application sits
+        in cooptation_pending indefinitely (admin sees nothing actionable)."""
+        cutoff = now - timedelta(days=QUESTIONNAIRE_GRACE_DAYS)
+        qs = AdminApplication.objects.filter(
+            status="cooptation_pending",
+            cooptation_outcome="expired",
+            cooptation_expired_at__lte=cutoff,
+            questionnaire_responses__isnull=True,
+        ).distinct()
+        count = 0
+        for app in qs:
+            app.status = "awaiting_admin"
+            app.save()
+            count += 1
         return count
 
     @staticmethod

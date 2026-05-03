@@ -8,8 +8,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.db import transaction
 from django.utils import timezone
-from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_encode
+from django.utils.http import int_to_base36
 
 from members.models import Member
 
@@ -66,16 +65,18 @@ def approve_application(application: AdminApplication, *, reviewed_by) -> tuple:
 def _build_password_set_url(user) -> str:
     """Generate an Allauth-compatible password-reset URL for `user`.
 
-    Allauth uses the same token machinery as Django's contrib.auth, so a
-    Django default_token_generator token + uidb64 works. The URL pattern
-    is `accounts/password/reset/key/<uidb64>-<token>/` per allauth.urls.
+    Allauth's URL pattern is `accounts/password/reset/key/<uidb36>-<token>/`
+    and it decodes the leading segment with `int_to_base36`/`base36_to_int`,
+    NOT base64. Encoding the PK with `urlsafe_base64_encode` produces a
+    string allauth interprets as a different integer, so the user lookup
+    fails and the link 404s.
     """
     from django.conf import settings as django_settings
 
-    uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+    uidb36 = int_to_base36(user.pk)
     token = default_token_generator.make_token(user)
     site_url = getattr(django_settings, "SITE_URL", "https://staging.villageretrouvailles.com")
-    return f"{site_url}/accounts/password/reset/key/{uidb64}-{token}/"
+    return f"{site_url}/accounts/password/reset/key/{uidb36}-{token}/"
 
 
 @transaction.atomic

@@ -69,6 +69,14 @@ class SignupForm(forms.Form):
             raise ValidationError("Vous ne pouvez pas vous parrainer (parrain n°1).")
         if email and p2 and email == p2:
             raise ValidationError("Vous ne pouvez pas vous parrainer (parrain n°2).")
+        if email and Member.objects.filter(user__email=email).exists():
+            # Any Member (incl. suspended/deleted) blocks reuse — without this,
+            # approve_application's `update_or_create` would silently overwrite
+            # the existing Member's profile. Generic message avoids leaking
+            # whether the email is on file.
+            raise ValidationError(
+                "Cet email correspond déjà à un compte. Connectez-vous ou utilisez un autre email."
+            )
         if p1 and p2 and p1 == p2:
             raise ValidationError("Veuillez nommer deux parrains différents.")
         if p1 and not Member.objects.filter(user__email=p1, status="active").exists():

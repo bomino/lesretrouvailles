@@ -47,13 +47,13 @@ security hole).
 | `CLOUDINARY_API_KEY` | from Cloudinary dashboard | Signed-upload auth |
 | `CLOUDINARY_API_SECRET` | from Cloudinary dashboard | Signed-upload auth (server-side only) |
 | `CLOUDINARY_URL` | from Cloudinary dashboard (`cloudinary://<key>:<secret>@<cloud>`) | Cloudinary SDK convenience var |
+| `SITE_URL` | `https://staging.villageretrouvailles.com` | Used for absolute links in cooptation/password-set emails. **Defaults to `http://localhost:8000` if unset**, which sends real users to a dead URL. |
 
 #### Recommended
 
 | Variable | Value | Why |
 |----------|-------|-----|
 | `CACHE_BACKEND` | `db` | Postgres-backed cache so all gunicorn workers share the rate-limit counters. Without this, `WEB_CONCURRENCY=2` means each worker has its own counter and the per-user rate limit doubles. |
-| `SITE_URL` | `https://staging.villageretrouvailles.com` | Used for absolute links in emails (P3 onwards) |
 | `SECURE_SSL_REDIRECT` | `true` | Force HTTPS (default in staging settings) |
 | `WEB_CONCURRENCY` | `2` | Gunicorn worker count. Hobby tier handles ~2 fine. |
 | `GUNICORN_TIMEOUT` | `60` | Request timeout (default in entrypoint). Bump for slow third-party calls. |
@@ -139,7 +139,7 @@ Create a second Railway service in the same project named `cooptation-cron`:
 - Build mode: same Dockerfile (shares image)
 - Start command override: `python manage.py process_cooptation_deadlines`
 - Schedule: `0 6 * * *` (daily 06:00 UTC)
-- Env: shares DATABASE_URL, RESEND_API_KEY, SECRET_KEY, DJANGO_SETTINGS_MODULE from app service. Set `BASIC_AUTH_REQUIRED=false` for the cron service (no web traffic).
+- Env: shares `DATABASE_URL`, `RESEND_API_KEY`, `SECRET_KEY`, `DJANGO_SETTINGS_MODULE`, `SITE_URL`, `DEFAULT_FROM_EMAIL`, `ALLOWED_HOSTS` from the app service. `SITE_URL` is **mandatory** — without it, the J+14 expiry email links to `http://localhost:8000` and parrains/candidates land on a dead URL. Set `BASIC_AUTH_REQUIRED=false` for the cron service (no web traffic).
 
 Cap warning: Resend free tier 100 emails/day. With ~5 emails per cooptation, do not batch more than 50 candidates in a single onboarding session.
 

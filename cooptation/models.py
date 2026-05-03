@@ -60,6 +60,11 @@ class AdminApplication(models.Model):
     purged_at = models.DateTimeField(null=True, blank=True)
     source_ip = models.GenericIPAddressField(null=True, blank=True)
     questionnaire_token = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    # Stamped when the cron flips cooptation_outcome to "expired" and emails
+    # the candidate the questionnaire link. Used to (a) avoid re-sending the
+    # expired email on every cron run and (b) detect candidates who never
+    # submit the questionnaire so they don't sit in cooptation_pending forever.
+    cooptation_expired_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         indexes = [

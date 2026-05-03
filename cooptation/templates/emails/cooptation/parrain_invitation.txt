@@ -4,7 +4,7 @@ Bonjour {{ request.parrain.first_name }},
 
 Voulez-vous coopter cette personne ? Cliquez ci-dessous pour voir le dossier et répondre :
 
-https://staging.villageretrouvailles.com/cooptation/{{ request.token }}/
+{{ site_url }}/cooptation/{{ request.token }}/
 
 Vous avez 14 jours pour répondre. Une relance automatique sera envoyée à J+7.
 

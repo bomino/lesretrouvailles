@@ -102,6 +102,36 @@ def test_reject_emails_candidate_with_reason(make_application, staff_user, setti
 
 
 @pytest.mark.django_db
+def test_password_set_url_uses_base36_resolvable_by_allauth(
+    make_application, staff_user, client, settings
+):
+    """Regression: the URL emitted to a candidate must be parseable by
+    allauth's password-reset-from-key view. Allauth decodes the leading
+    segment with `base36_to_int` (NOT base64); using `urlsafe_base64_encode`
+    silently produces a string that decodes to the wrong integer.
+    """
+    from urllib.parse import urlparse
+
+    from cooptation.services import _build_password_set_url, approve_application
+
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    app = make_application(full_name="Base36 Tester", email="b36@example.test")
+    user, _ = approve_application(app, reviewed_by=staff_user)
+
+    url = _build_password_set_url(user)
+    path = urlparse(url).path
+    assert path.startswith("/accounts/password/reset/key/")
+
+    # Allauth's first GET on the key URL stashes the token in the session
+    # and 302-redirects to .../set-password/. A 404 here means the URL
+    # didn't resolve to a known user.
+    resp = client.get(path)
+    assert resp.status_code in (200, 302), (
+        f"Expected allauth to resolve the password-set URL; got {resp.status_code}"
+    )
+
+
+@pytest.mark.django_db
 def test_purge_clears_pii_and_sets_status(make_application):
     from cooptation.services import purge_application
 

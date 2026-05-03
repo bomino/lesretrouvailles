@@ -90,9 +90,12 @@ def send_email(to: str | list[str], template_base: str, context: dict[str, Any])
                    {"candidate": app, "vouch_url": url})
     """
     recipients = [to] if isinstance(to, str) else list(to)
-    subject = render_to_string(f"emails/{template_base}.subject.txt", context).strip()
-    text_body = render_to_string(f"emails/{template_base}.txt", context)
-    html_body = render_to_string(f"emails/{template_base}.html", context)
+    # Inject site_url so templates can build absolute links without
+    # hardcoding the host (which differs between dev/staging/prod).
+    full_context = {"site_url": getattr(settings, "SITE_URL", ""), **context}
+    subject = render_to_string(f"emails/{template_base}.subject.txt", full_context).strip()
+    text_body = render_to_string(f"emails/{template_base}.txt", full_context)
+    html_body = render_to_string(f"emails/{template_base}.html", full_context)
     msg = EmailMultiAlternatives(
         subject=subject,
         body=text_body,

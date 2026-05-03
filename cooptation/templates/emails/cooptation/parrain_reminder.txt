@@ -2,7 +2,7 @@ Bonjour {{ request.parrain.first_name }},
 
 Nous n'avons pas encore reçu votre réponse pour la cooptation de {{ application.full_name }}. Il vous reste 7 jours pour répondre.
 
-https://staging.villageretrouvailles.com/cooptation/{{ request.token }}/
+{{ site_url }}/cooptation/{{ request.token }}/
 
 Si vous ne pouvez pas vous prononcer, vous pouvez aussi cliquer "Refuser" — cela ne bloque pas la procédure ; l'admin réexaminera le dossier.
 

@@ -133,6 +133,41 @@ def test_admin_new_application_to_all_staff(fake_backend, make_application):
 
 
 @pytest.mark.django_db
+def test_links_use_configured_site_url_not_hardcoded_staging(
+    fake_backend, make_application, make_cooptation_request, settings
+):
+    """Regression: parrain/admin emails must build URLs from SITE_URL, not the
+    hardcoded staging host. Otherwise prod parrains would be sent to the
+    basic-auth-gated staging site."""
+    settings.SITE_URL = "https://prod.example.test"
+
+    from django.contrib.auth import get_user_model
+
+    from cooptation.emails import (
+        send_admin_new_application,
+        send_parrain_invitation,
+        send_parrain_reminder,
+    )
+
+    User = get_user_model()  # noqa: N806
+    User.objects.create_user(
+        username="staff", email="staff@example.test", password="x", is_staff=True
+    )
+
+    app = make_application(email="c@example.test")
+    req = make_cooptation_request(application=app)
+
+    send_parrain_invitation(req)
+    send_parrain_reminder(req)
+    send_admin_new_application(app)
+
+    for msg in fake_backend.sent_messages:
+        for body in (msg["text"], msg.get("html", "")):
+            assert "staging.villageretrouvailles.com" not in body
+            assert "https://prod.example.test" in body
+
+
+@pytest.mark.django_db
 def test_each_template_includes_french_phrase(
     fake_backend, make_application, make_cooptation_request
 ):
