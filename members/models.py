@@ -195,3 +195,17 @@ class PublicSearchEntry(models.Model):
             qs.annotate(n=Count("added_by_admins")).filter(n__gte=2)
         """
         return self.removed_at is None and self.added_by_admins.count() >= 2
+
+    @property
+    def first_year(self) -> int | None:
+        """Smallest year in years_at_ceg, regardless of input order.
+
+        The template renders "first_year-last_year" for the public ghost
+        card. Using min/max instead of |first/|last guards against admins
+        entering [1982, 1980] which would otherwise display as "1982-1980".
+        """
+        return min(self.years_at_ceg) if self.years_at_ceg else None
+
+    @property
+    def last_year(self) -> int | None:
+        return max(self.years_at_ceg) if self.years_at_ceg else None

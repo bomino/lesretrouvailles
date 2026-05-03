@@ -6,7 +6,7 @@ from django.urls import reverse
 
 @pytest.mark.django_db
 def test_base_template_has_a11y_baseline(client):
-    response = client.get(reverse("landing_placeholder"))
+    response = client.get(reverse("landing"))
     html = response.content.decode("utf-8")
     # Normalize whitespace so formatter wrapping doesn't break substring checks.
     normalized = re.sub(r"\s+", " ", html)
@@ -22,7 +22,7 @@ def test_base_template_has_a11y_baseline(client):
 def test_base_template_renders_logo_and_whatsapp_link(client):
     """The header must render the brand logo and a WhatsApp affordance
     (DESIGN.md §Logo). The footer must render the founding-date badge."""
-    response = client.get(reverse("landing_placeholder"))
+    response = client.get(reverse("landing"))
     html = response.content.decode("utf-8")
 
     assert "img/logo.png" in html
@@ -38,8 +38,8 @@ def test_base_template_renders_logo_and_whatsapp_link(client):
 
 @pytest.mark.django_db
 def test_base_template_blocks_robots_for_member_pages(client):
-    """Default behavior: pages opt-in to indexing. Landing placeholder
-    is NOT yet the public landing — it must be noindex by default."""
-    response = client.get(reverse("landing_placeholder"))
+    """Default behavior: member-facing pages are noindex. The login page
+    inherits the base template default and must carry noindex."""
+    response = client.get(reverse("account_login"))
     html = response.content.decode("utf-8")
     assert '<meta name="robots" content="noindex"' in html

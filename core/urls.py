@@ -7,7 +7,7 @@ from .sitemaps import PublicSurfaceSitemap
 sitemaps_dict = {"public": PublicSurfaceSitemap}
 
 urlpatterns = [
-    path("", views.landing_placeholder, name="landing_placeholder"),
+    path("", views.landing_view, name="landing"),
     path("health", views.health, name="health"),
     path(
         "sitemap.xml",
