@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 import uuid
 
 from django.conf import settings
@@ -209,3 +210,55 @@ class PublicSearchEntry(models.Model):
     @property
     def last_year(self) -> int | None:
         return max(self.years_at_ceg) if self.years_at_ceg else None
+
+
+def _make_token() -> str:
+    """Opaque random token. Used for PublicSearchEntry.removal_token and
+    RemovalRequest.confirm_token. Mirrors cooptation.models._make_token."""
+    return secrets.token_urlsafe(32)
+
+
+class AuditLog(models.Model):
+    """Append-only governance event log.
+
+    Domain audit fields (e.g., AdminApplication.reviewed_by) stay on
+    their respective models — this table records cross-domain events
+    that would otherwise be invisible to a future "who did what when"
+    query. Never mutated after insert. Retention: indefinite.
+    """
+
+    ACTION_CHOICES = [
+        ("ghost.entry.created", "Fiche fantôme créée"),
+        ("ghost.entry.signed_off", "Cosignature ajoutée"),
+        ("ghost.entry.signoff_removed", "Cosignature retirée"),
+        ("ghost.removal.requested", "Demande de retrait soumise"),
+        ("ghost.removal.confirmed", "Demande de retrait confirmée"),
+        ("ghost.removal.executed", "Retrait exécuté"),
+        ("ghost.removal.cancelled", "Demande de retrait annulée par admin"),
+        ("ghost.entry.purged", "Fiche purgée"),
+    ]
+
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="audit_log_entries",
+        help_text="Null for anonymous actions (e.g., a public removal request).",
+    )
+    action = models.CharField(max_length=64, choices=ACTION_CHOICES)
+    target_type = models.CharField(max_length=64)
+    target_id = models.CharField(max_length=64)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["target_type", "target_id"]),
+            models.Index(fields=["action", "-created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        target = f"{self.target_type}:{self.target_id}"
+        return f"{self.action} on {target} @ {self.created_at:%Y-%m-%d %H:%M}"
