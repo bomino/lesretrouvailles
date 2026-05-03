@@ -11,7 +11,7 @@ environ.Env.read_env(BASE_DIR / ".env")
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env.bool("DEBUG", default=False)
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost"])
-SITE_URL = env("SITE_URL", default="http://localhost:8000")
+SITE_URL = env("SITE_URL", default="http://localhost:8000").strip().rstrip("/")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
