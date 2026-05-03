@@ -1,0 +1,9 @@
+Bonjour,
+
+Le nom suivant a été retiré de la liste publique des Retrouvailles :
+
+{{ entry.first_name }} {{ entry.last_name_initial }} — années {{ entry.first_year }}-{{ entry.last_year }}
+
+Cette action est définitive. Si c'était une erreur, contactez l'équipe en répondant à ce message.
+
+L'équipe Les Retrouvailles

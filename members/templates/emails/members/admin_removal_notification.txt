@@ -1,0 +1,13 @@
+Bonjour,
+
+Un retrait public a été exécuté.
+
+Détails :
+- Nom retiré : {{ entry.first_name }} {{ entry.last_name_initial }} (années {{ entry.first_year }}-{{ entry.last_year }})
+- Email du demandeur : {{ request.requester_email }}
+- Raison fournie : {{ request.reason|default:"(aucune)" }}
+- Date et heure : {{ request.confirmed_at }}
+
+Lien admin : {{ site_url }}/admin/members/publicsearchentry/{{ entry.pk }}/change/
+
+L'équipe Les Retrouvailles

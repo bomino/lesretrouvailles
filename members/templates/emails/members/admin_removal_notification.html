@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="fr">
+    <body style="font-family: Inter, system-ui, sans-serif; color: #1a1c1e">
+        <p>Bonjour,</p>
+        <p>Un retrait public a été exécuté.</p>
+        <table style="border-collapse: collapse">
+            <tr>
+                <td style="padding: 4px 12px 4px 0; color: #6c7278">Nom retiré</td>
+                <td>
+                    <strong>{{ entry.first_name }} {{ entry.last_name_initial }}</strong>
+                    (années {{ entry.first_year }}-{{ entry.last_year }})
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 4px 12px 4px 0; color: #6c7278">Email du demandeur</td>
+                <td>{{ request.requester_email }}</td>
+            </tr>
+            <tr>
+                <td style="padding: 4px 12px 4px 0; color: #6c7278">Raison fournie</td>
+                <td>{{ request.reason|default:"(aucune)" }}</td>
+            </tr>
+            <tr>
+                <td style="padding: 4px 12px 4px 0; color: #6c7278">Date et heure</td>
+                <td>{{ request.confirmed_at }}</td>
+            </tr>
+        </table>
+        <p>
+            <a href="{{ site_url }}/admin/members/publicsearchentry/{{ entry.pk }}/change/">Voir la fiche dans l'admin</a>
+        </p>
+        <p>L'équipe Les Retrouvailles</p>
+    </body>
+</html>
