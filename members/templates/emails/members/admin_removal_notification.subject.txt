@@ -1,0 +1,1 @@
+[admin] Retrait exécuté : {{ entry.first_name }} {{ entry.last_name_initial }}

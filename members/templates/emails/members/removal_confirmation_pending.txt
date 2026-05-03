@@ -1,0 +1,13 @@
+Bonjour,
+
+Vous avez demandé le retrait du nom suivant de la liste publique des Retrouvailles :
+
+{{ entry.first_name }} {{ entry.last_name_initial }} — années {{ entry.first_year }}-{{ entry.last_year }}
+
+Pour confirmer cette demande, cliquez sur le lien ci-dessous (valable 30 jours) :
+
+{{ site_url }}/retrait/confirme/{{ request.confirm_token }}/
+
+Si vous n'êtes pas à l'origine de cette demande, ignorez ce message — aucune action ne sera prise sans confirmation.
+
+L'équipe Les Retrouvailles

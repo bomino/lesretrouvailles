@@ -2,7 +2,14 @@ from django.conf import settings
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import ConsentRecord, Member, NotificationPreference, PublicSearchEntry
+from .models import (
+    AuditLog,
+    ConsentRecord,
+    Member,
+    NotificationPreference,
+    PublicSearchEntry,
+    RemovalRequest,
+)
 
 
 @admin.register(Member)
@@ -168,3 +175,64 @@ class PublicSearchEntryAdmin(admin.ModelAdmin):
     @admin.display(description="Signatures")
     def signoff_count(self, obj):
         return obj.added_by_admins.count()
+
+
+@admin.register(RemovalRequest)
+class RemovalRequestAdmin(admin.ModelAdmin):
+    """Public removal requests. Read-only on body fields; deletion of a
+    pending request fires the ghost.removal.cancelled audit hook."""
+
+    list_display = (
+        "entry",
+        "requester_email",
+        "status",
+        "requested_at",
+        "expires_at",
+    )
+    list_filter = ("status",)
+    search_fields = ("requester_email", "entry__first_name", "entry__last_name_initial")
+    readonly_fields = (
+        "entry",
+        "requester_email",
+        "reason",
+        "confirm_token",
+        "requester_ip",
+        "requested_at",
+        "confirmed_at",
+        "expires_at",
+    )
+
+    def has_add_permission(self, request):
+        return False  # always created by the public flow
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    """Append-only governance log. No add/change/delete from admin."""
+
+    list_display = (
+        "created_at",
+        "actor",
+        "action",
+        "target_type",
+        "target_id",
+    )
+    list_filter = ("action", "target_type")
+    search_fields = ("action", "target_type", "target_id")
+    readonly_fields = (
+        "actor",
+        "action",
+        "target_type",
+        "target_id",
+        "metadata",
+        "created_at",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

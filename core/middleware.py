@@ -16,7 +16,7 @@ BASIC_AUTH_PUBLIC_EXACT = {"/", "/sitemap.xml", "/robots.txt"}
 
 # Prefix-matched bypasses for paths with sub-routes. "/inscription/" covers
 # both the form and its success page; "/static/" covers all assets.
-BASIC_AUTH_PUBLIC_PREFIXES = ("/static/", "/inscription/")
+BASIC_AUTH_PUBLIC_PREFIXES = ("/static/", "/inscription/", "/retrait/")
 
 
 class BasicAuthMiddleware:

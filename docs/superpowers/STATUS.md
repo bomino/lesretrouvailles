@@ -13,7 +13,8 @@ Single dashboard for tracking phase and task completion across all plans. Update
 | P2 | Membership | Complete (tag `v0.2.0-membership`, 2026-05-02) | [plan](plans/2026-05-02-membership.md) |
 | P3 | Cooptation | Complete (tag `v0.3.0-cooptation`, 2026-05-02) | [plan](plans/2026-05-02-cooptation.md) |
 | P4a | Public surface — landing + ghost-list scaffold + SEO | Complete (tag `v0.4.0a-public-surface`, 2026-05-03) | [plan](plans/2026-05-03-public-surface.md) |
-| P4b | Public surface — admin governance UI + token-based removal flow + AuditLog | Not started | — |
+| P4b | Public surface — token-based removal flow + AuditLog (governance UI deferred to P4c) | Complete (tag `v0.4.0b-public-surface-governance`, 2026-05-03) | [plan](plans/2026-05-03-public-surface-governance.md) |
+| P4c | Public surface — custom admin governance UI + quarterly review automation | Not started | — |
 | P5 | Mémoire seed | Not started | — |
 | P6 | Ops & RGPD | Not started | — |
 | P7 | Soft launch | Not started | — |
@@ -144,10 +145,40 @@ Single dashboard for tracking phase and task completion across all plans. Update
 
 ---
 
-## P4b — Public surface (admin governance UI + token-based removal flow + AuditLog)
+## P4b — Public surface (token-based removal flow + AuditLog)
 
-**Status:** Not started. Depends on P4a; see § 4.b of the master spec.
-**Scope:** Custom admin screen for ghost-list governance, public token-based "Demander un retrait" form (no auth required, email-confirmation, 48h SLA), `AuditLog` model + decorator. Once P4b is live, operators flip `PUBLIC_GHOST_LIST_ENABLED=True`.
+**Shipped:** 2026-05-03 (branch `feat/public-surface-governance`, tag `v0.4.0b-public-surface-governance`)
+**Plan:** [plans/2026-05-03-public-surface-governance.md](plans/2026-05-03-public-surface-governance.md)
+**Spec:** [specs/2026-05-03-public-surface-governance-design.md](specs/2026-05-03-public-surface-governance-design.md)
+**Test suite:** 324 passing (286 from prior phases + 38 new across audit log, removal request, signals, view, email, landing template tests).
+
+| # | Task | Done | Commit |
+|---|------|------|--------|
+| 1 | Whitelist /retrait/ for login + basic-auth bypass | [x] | `8efdf41` |
+| 2 | AuditLog model + migration + tests | [x] | `3f009ff` |
+| 3 | RemovalRequest model + tighten removal_token + tests | [x] | `e390cc1` |
+| 4 | Audit signal handlers (entry create, signoff M2M, request cancel) | [x] | `4eecfc4` |
+| 5 | 3 removal-flow email templates + senders | [x] | `bbdaebb` |
+| 6 | Public removal request form view + done page | [x] | `968722d` |
+| 7 | Removal confirmation view (idempotent auto-execute) + expired page | [x] | `61fde34` |
+| 8 | RemovalRequestAdmin + AuditLogAdmin (append-only) | [x] | `d4e58e3` |
+| 9 | Landing template "Retirer mon nom" link in each ghost card | [x] | `d5f1f72` |
+| 10 | Full suite + STATUS update | [x] | _this commit_ |
+| 11 | Merge, tag, push, deploy | _next commit_ | _pending_ |
+
+**Notable design decisions:**
+- "sans débat" interpretation: auto-execute on email confirmation. No admin gatekeeping.
+- 30-day expiry on RemovalRequest aligns with GDPR Art. 12's one-month response window.
+- AuditLog populated automatically via Django signals so adding a new way to sign off / remove an entry doesn't require remembering to write to AuditLog.
+- P3 cooptation actions are NOT retrofitted into AuditLog — domain audit fields stay where they are.
+- Custom admin governance UI and quarterly review automation deferred to P4c.
+
+---
+
+## P4c — Public surface (custom admin governance UI + quarterly review automation)
+
+**Status:** Not started.
+**Scope:** Custom Django-admin extension for ghost-list governance (approval queue, signoff status indicators, removal-request queue), and a quarterly-review cron that flags ghost entries listed > 12 months without inbound contact.
 **Plan:** not yet written.
 
 ---
