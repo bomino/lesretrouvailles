@@ -168,3 +168,25 @@ def test_anonymous_feature_cards_not_clickable(client):
     assert "Annuaire" in body
     assert 'href="/annuaire/"' not in body
     assert 'href="/profil/"' not in body
+
+
+@pytest.mark.django_db
+def test_ghost_card_includes_removal_link_when_flag_on(client, settings, make_admin):
+    settings.PUBLIC_GHOST_LIST_ENABLED = True
+    from members.models import PublicSearchEntry
+
+    e = PublicSearchEntry.objects.create(
+        first_name="Idrissa", last_name_initial="S.", years_at_ceg=[1980, 1981]
+    )
+    e.added_by_admins.add(make_admin(), make_admin())
+
+    body = client.get("/").content.decode("utf-8")
+    assert "Retirer mon nom" in body
+    assert f"/retrait/{e.removal_token}/" in body
+
+
+@pytest.mark.django_db
+def test_no_removal_link_when_flag_off(client, settings):
+    settings.PUBLIC_GHOST_LIST_ENABLED = False
+    body = client.get("/").content.decode("utf-8")
+    assert "Retirer mon nom" not in body

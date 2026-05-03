@@ -112,6 +112,10 @@
                             <p class="mt-2 text-sm italic text-secondary">
                                 {% trans "Vous le reconnaissez ? Partagez cette page avec votre entourage." %}
                             </p>
+                            <p class="mt-2 text-xs text-secondary">
+                                <a href="{% url 'members:removal_request_form' entry.removal_token %}"
+                                   class="underline hover:text-tertiary">{% trans "Retirer mon nom" %}</a>
+                            </p>
                         </article>
                     {% endfor %}
                 </div>

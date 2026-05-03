@@ -51,3 +51,33 @@ def test_primary_cta_has_focus_ring_class(client):
     # The button uses bg-tertiary as a marker class; the project's standard
     # button styling implies focus ring via the bg-tertiary + transition combo.
     assert "bg-tertiary" in body
+
+
+@pytest.mark.django_db
+def test_removal_link_has_accessible_text_when_flag_on(client, settings, db):
+    """The 'Retirer mon nom' link must have visible text (not just an icon)."""
+    from django.contrib.auth import get_user_model
+
+    from members.models import PublicSearchEntry
+
+    settings.PUBLIC_GHOST_LIST_ENABLED = True
+    User = get_user_model()  # noqa: N806
+    a, b = (
+        User.objects.create_user(
+            username=f"a{i}", email=f"a{i}@x.test", password="x", is_staff=True
+        )
+        for i in range(2)
+    )
+    e = PublicSearchEntry.objects.create(
+        first_name="Idrissa", last_name_initial="S.", years_at_ceg=[1980]
+    )
+    e.added_by_admins.add(a, b)
+
+    body = client.get("/").content
+    soup = BeautifulSoup(body, "html.parser")
+    removal_links = [link for link in soup.find_all("a") if "/retrait/" in (link.get("href") or "")]
+    assert removal_links, "Expected at least one removal link in the rendered ghost card"
+    for link in removal_links:
+        text = link.get_text(strip=True)
+        assert text, f"Removal link {link} has no visible text"
+        assert text == "Retirer mon nom"
