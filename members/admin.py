@@ -2,7 +2,7 @@ from django.conf import settings
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import ConsentRecord, Member, NotificationPreference
+from .models import ConsentRecord, Member, NotificationPreference, PublicSearchEntry
 
 
 @admin.register(Member)
@@ -115,3 +115,56 @@ class ConsentRecordAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(PublicSearchEntry)
+class PublicSearchEntryAdmin(admin.ModelAdmin):
+    """Governance UI for the public ghost list.
+
+    Two co-signers required for publication — admins add themselves to
+    `added_by_admins` to vouch. Until 2 distinct admins have signed off,
+    the entry stays invisible publicly.
+    """
+
+    list_display = (
+        "first_name",
+        "last_name_initial",
+        "years_at_ceg",
+        "signoff_count",
+        "removed_at",
+    )
+    list_filter = ("removed_at",)
+    search_fields = ("first_name", "last_name_initial", "note")
+    filter_horizontal = ("added_by_admins",)
+    readonly_fields = ("added_at", "removal_token", "removed_at", "removed_reason")
+
+    fieldsets = (
+        (
+            "Données publiques (RGPD : strict minimum)",
+            {
+                "fields": ("first_name", "last_name_initial", "years_at_ceg", "note"),
+                "description": (
+                    "Seuls ces champs apparaissent sur la page publique. "
+                    "Pas d'email, pas de ville, pas de profession (master spec § 6.5)."
+                ),
+            },
+        ),
+        (
+            "Cosignature (2 admins requis pour publication)",
+            {
+                "fields": ("added_by_admins",),
+                "description": (
+                    "Ajoutez-vous à la liste pour cosigner. Au moins 2 admins "
+                    "distincts requis avant que le nom n'apparaisse publiquement."
+                ),
+            },
+        ),
+        (
+            "Audit (lecture seule)",
+            {"fields": ("added_at", "removal_token", "removed_at", "removed_reason")},
+        ),
+    )
+
+    @admin.display(description="Signatures")
+    def signoff_count(self, obj):
+        return obj.added_by_admins.count()
