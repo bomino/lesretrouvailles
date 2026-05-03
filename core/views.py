@@ -37,8 +37,12 @@ def landing_view(request):
     get the member-style CTAs from the prior placeholder template."""
     from members.models import PublicSearchEntry
 
+    # Ghost section is a public-discovery surface — only fetch (and therefore
+    # only render) for anonymous visitors when the operator-controlled flag
+    # is on. Authenticated members already have the full directory; the
+    # template just renders whatever queryset we hand it.
     ghosts = []
-    if django_settings.PUBLIC_GHOST_LIST_ENABLED:
+    if not request.user.is_authenticated and django_settings.PUBLIC_GHOST_LIST_ENABLED:
         ghosts = list(
             PublicSearchEntry.objects.filter(removed_at__isnull=True)
             .annotate(n=Count("added_by_admins"))
@@ -54,7 +58,6 @@ def landing_view(request):
         "core/landing.html",
         {
             "ghosts": ghosts,
-            "ghost_list_enabled": django_settings.PUBLIC_GHOST_LIST_ENABLED,
             "share_url": share_url,
             "whatsapp_share_url": f"https://wa.me/?text={quote(whatsapp_text)}",
             "site_url": django_settings.SITE_URL,

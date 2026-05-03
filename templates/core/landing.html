@@ -90,12 +90,10 @@
             </div>
         {% endif %}
     </section>
-    {# Public-discovery surface — anonymous visitors only, and only when there #}
-    {# are actual published entries to show. Logged-in members already have the #}
-    {# full directory; the empty-state copy ("Liste en cours de constitution") #}
-    {# read as "under construction" and was removed in favor of hiding the #}
-    {# section entirely until real entries exist. #}
-    {% if not request.user.is_authenticated and ghost_list_enabled and ghosts %}
+    {# `ghosts` is empty unless the visitor is anonymous AND the operator #}
+    {# flag PUBLIC_GHOST_LIST_ENABLED is on AND there are published entries. #}
+    {# All three conditions live in landing_view; the template just renders. #}
+    {% if ghosts %}
         <section class="mx-auto mt-20 max-w-4xl md:mt-28">
             <div class="text-center">
                 <span class="inline-block rounded-full border border-secondary/25 bg-surface px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary shadow-sm">
