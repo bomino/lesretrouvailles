@@ -137,3 +137,61 @@ class ConsentRecord(models.Model):
 
     def __str__(self) -> str:
         return f"{self.member.full_name} → charter v{self.charter_version}"
+
+
+class PublicSearchEntry(models.Model):
+    """A name on the public 'Nous recherchons aussi…' list.
+
+    Strict minimum-PII shape (master spec § 6.5): first name + last initial
+    + years only. The model has no email/city/profession fields by design.
+
+    Publication is gated by added_by_admins.count() >= 2 — there is no
+    'is_published' boolean a single admin can toggle. Removal is signaled
+    by setting removed_at; removed entries never publish even if they have
+    many admin signoffs.
+    """
+
+    first_name = models.CharField(max_length=60)
+    last_name_initial = models.CharField(max_length=10)
+    years_at_ceg = ArrayField(models.IntegerField(), size=6)
+    note = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Optionnel — courte ligne d'introduction visible publiquement.",
+    )
+
+    added_by_admins = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name="ghost_entries_signed",
+        blank=True,
+    )
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    # Reserved for P4b's public removal flow.
+    removal_token = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    removed_at = models.DateTimeField(null=True, blank=True)
+    removed_reason = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        ordering = ["last_name_initial", "first_name"]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(last_name_initial__regex=r"^[A-Za-zÀ-ÿ.]{1,2}$"),
+                name="initial_must_be_one_or_two_chars",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return (
+            f"{self.first_name} {self.last_name_initial} ({', '.join(map(str, self.years_at_ceg))})"
+        )
+
+    @property
+    def is_published(self) -> bool:
+        """True if 2+ admins have signed and the entry has not been removed.
+
+        Issues a SELECT COUNT(*) query each call. For bulk rendering (e.g.,
+        the public landing's ghost list), prefer the annotated queryset:
+            qs.annotate(n=Count("added_by_admins")).filter(n__gte=2)
+        """
+        return self.removed_at is None and self.added_by_admins.count() >= 2
