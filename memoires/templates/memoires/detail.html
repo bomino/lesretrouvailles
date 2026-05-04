@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load i18n memory_photo %}
+{% block title %}
+    {% trans "Mur des Souvenirs" %}
+{% endblock %}
+{% block content %}
+    <div class="mx-auto max-w-3xl">
+        <p class="mb-6 text-sm text-secondary">
+            <a href="{% url 'memoires:gallery' %}" class="hover:text-tertiary">← {% trans "Retour au mur" %}</a>
+        </p>
+        <figure>
+            <img src="{% memory_full memory.photo_public_id 1200 %}"
+                 alt="{{ memory.caption|truncatechars:120 }}"
+                 class="w-full rounded-xl border border-secondary/15 shadow-sm">
+            <figcaption class="mt-6 space-y-2">
+                <p class="text-lg leading-relaxed text-primary">{{ memory.caption|linebreaks }}</p>
+                {% if memory.taken_at or memory.location %}
+                    <p class="text-sm italic text-secondary">
+                        {% if memory.taken_at %}{{ memory.taken_at|date:"F Y" }}{% endif %}
+                        {% if memory.taken_at and memory.location %}·{% endif %}
+                        {% if memory.location %}{{ memory.location }}{% endif %}
+                    </p>
+                {% endif %}
+            </figcaption>
+        </figure>
+    </div>
+{% endblock %}
