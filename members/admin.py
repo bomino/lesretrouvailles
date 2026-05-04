@@ -127,17 +127,15 @@ class ConsentRecordAdmin(admin.ModelAdmin):
 
 class GhostStatusFilter(admin.SimpleListFilter):
     """Lifecycle status of a PublicSearchEntry, computed from signoff
-    count + removed_at + added_at. Lets admins find entries pending
-    cosignature, stale ones approaching auto-removal, etc."""
+    count + removed_at + added_at. P4d simplified to 3 meaningful
+    buckets (was 5 before single-admin governance)."""
 
     title = "Statut publication"
     parameter_name = "ghost_status"
 
     def lookups(self, request, model_admin):
         return [
-            ("draft", "Brouillon (0 signatures)"),
-            ("pending", "En attente (1 signature)"),
-            ("published", "Publiée (2+)"),
+            ("published", "Publiée"),
             ("stale", "Périmée (>12 mois)"),
             ("removed", "Retirée"),
         ]
@@ -156,16 +154,12 @@ class GhostStatusFilter(admin.SimpleListFilter):
             return queryset.filter(removed_at__isnull=False)
 
         qs = queryset.filter(removed_at__isnull=True).annotate(n=Count("added_by_admins"))
-        if value == "draft":
-            return qs.filter(n=0)
-        if value == "pending":
-            return qs.filter(n=1)
         if value == "published":
             cutoff = timezone.now() - timedelta(days=365)
-            return qs.filter(n__gte=2, added_at__gt=cutoff)
+            return qs.filter(n__gte=1, added_at__gt=cutoff)
         if value == "stale":
             cutoff = timezone.now() - timedelta(days=365)
-            return qs.filter(n__gte=2, added_at__lte=cutoff)
+            return qs.filter(n__gte=1, added_at__lte=cutoff)
         return queryset
 
 
