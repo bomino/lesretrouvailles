@@ -13,6 +13,8 @@ from django.conf import settings
 class CloudinaryClient(Protocol):
     def sign_upload(self, *, folder: str, timestamp: int) -> dict[str, Any]: ...
 
+    def upload_file(self, file_obj: Any, *, folder: str) -> str: ...
+
     def delete(self, public_id: str) -> None: ...
 
 
@@ -39,6 +41,16 @@ class RealCloudinary:
             "allowed_formats": ["jpg", "jpeg", "png", "webp"],
         }
 
+    def upload_file(self, file_obj: Any, *, folder: str) -> str:
+        """Server-side upload via Cloudinary's REST API. Returns the public_id."""
+        result = self._cloudinary.uploader.upload(
+            file_obj,
+            folder=folder,
+            resource_type="image",
+            use_filename=False,
+        )
+        return result["public_id"]
+
     def delete(self, public_id: str) -> None:
         if not public_id:
             return
@@ -51,6 +63,7 @@ class FakeCloudinary:
     def __init__(self) -> None:
         self.sign_calls: list[dict[str, Any]] = []
         self.delete_calls: list[str] = []
+        self.upload_calls: list[dict[str, Any]] = []
 
     def sign_upload(self, *, folder: str, timestamp: int) -> dict[str, Any]:
         self.sign_calls.append({"folder": folder, "timestamp": timestamp})
@@ -63,6 +76,14 @@ class FakeCloudinary:
             "max_file_size": 5 * 1024 * 1024,
             "allowed_formats": ["jpg", "jpeg", "png", "webp"],
         }
+
+    def upload_file(self, file_obj: Any, *, folder: str) -> str:
+        """Test stub: records the call and returns a deterministic fake public_id."""
+        name = getattr(file_obj, "name", "upload")
+        digest = hashlib.sha1(f"{folder}:{name}".encode()).hexdigest()[:12]
+        public_id = f"{folder}/fake-{digest}"
+        self.upload_calls.append({"folder": folder, "name": name, "public_id": public_id})
+        return public_id
 
     def delete(self, public_id: str) -> None:
         self.delete_calls.append(public_id)
@@ -87,4 +108,22 @@ def member_thumbnail_url(public_id: str, size: int = 240) -> str:
         return ""
     cloud_name = getattr(settings, "CLOUDINARY_CLOUD_NAME", "fake-cloud")
     transform = f"f_auto,q_auto:eco,c_fill,g_face,w_{size},h_{size}"
+    return f"https://res.cloudinary.com/{cloud_name}/image/upload/{transform}/{public_id}"
+
+
+def memory_thumbnail_url(public_id: str, size: int = 400) -> str:
+    """Square thumbnail for the gallery grid. Auto crop with subject focus."""
+    if not public_id:
+        return ""
+    cloud_name = getattr(settings, "CLOUDINARY_CLOUD_NAME", "fake-cloud")
+    transform = f"f_auto,q_auto:eco,c_fill,g_auto,w_{size},h_{size}"
+    return f"https://res.cloudinary.com/{cloud_name}/image/upload/{transform}/{public_id}"
+
+
+def memory_full_url(public_id: str, max_width: int = 1200) -> str:
+    """Limit-fit version for the detail page. No crop; preserves aspect ratio."""
+    if not public_id:
+        return ""
+    cloud_name = getattr(settings, "CLOUDINARY_CLOUD_NAME", "fake-cloud")
+    transform = f"f_auto,q_auto:eco,c_limit,w_{max_width}"
     return f"https://res.cloudinary.com/{cloud_name}/image/upload/{transform}/{public_id}"
