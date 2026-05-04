@@ -127,7 +127,6 @@ def test_save_model_bumps_version_on_text_change(
     assert entry.approved_content_version == 4
 
 
-@pytest.mark.skip(reason="emails module added in task 9; un-skip there")
 @pytest.mark.django_db
 def test_save_model_sets_published_at_on_first_publish(
     fake_cloudinary, make_admin_user, make_memoriam_entry

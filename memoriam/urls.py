@@ -1,7 +1,13 @@
-from django.urls import (
-    path,  # noqa: F401  # placeholder; used when urlpatterns are added in Task 10
-)
+from django.urls import path
+from django.views.generic import TemplateView
 
 app_name = "memoriam"
 
-urlpatterns: list = []
+urlpatterns = [
+    # Stub: real view added in Task 10.
+    path(
+        "in-memoriam/<int:pk>/",
+        TemplateView.as_view(template_name="memoriam/detail.html"),
+        name="detail",
+    ),
+]
