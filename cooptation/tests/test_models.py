@@ -73,6 +73,39 @@ def test_application_outcome_choices(make_application):
 
 
 @pytest.mark.django_db
+def test_application_clean_accepts_classes_with_section_letters(make_application):
+    """Defense-in-depth: an admin editing /admin/cooptation/adminapplication/
+    can save section-letter classes (4eA, 3eB) without rejection."""
+    app = make_application()
+    app.classes = ["6e", "6eA", "4eB", "3eC"]
+    app.full_clean()  # Must not raise.
+
+
+@pytest.mark.django_db
+def test_application_clean_rejects_invalid_classes(make_application):
+    """Defense-in-depth: dropping choices from the inner CharField removed
+    field-level validation, so AdminApplication.clean() catches bad classes
+    when an admin edits via the admin form."""
+    from django.core.exceptions import ValidationError
+
+    app = make_application()
+    app.classes = ["6e", "xyz"]  # second value doesn't match VALID_CLASS_PATTERN
+    with pytest.raises(ValidationError):
+        app.full_clean()
+
+
+@pytest.mark.django_db
+def test_application_clean_rejects_years_outside_range(make_application):
+    """Mirrors Member.clean() — years outside 1980-1985 raise on full_clean."""
+    from django.core.exceptions import ValidationError
+
+    app = make_application()
+    app.years_attended = [1979, 1980]
+    with pytest.raises(ValidationError):
+        app.full_clean()
+
+
+@pytest.mark.django_db
 def test_cooptation_request_token_is_unique_and_urlsafe(make_cooptation_request):
     a = make_cooptation_request()
     b = make_cooptation_request()
