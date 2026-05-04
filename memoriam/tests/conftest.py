@@ -7,6 +7,7 @@ from datetime import date
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client
+from django.utils import timezone
 
 
 @pytest.fixture
@@ -83,6 +84,10 @@ def make_memoriam_entry(db, make_admin_user):
             "created_by": admin,
         }
         defaults.update(kwargs)
+        # Mirror the admin save_model invariant: a published fiche always has a
+        # publish timestamp. Tests that override status="draft" leave this unset.
+        if defaults["status"] == "published" and "published_at" not in defaults:
+            defaults["published_at"] = timezone.now()
         return InMemoriamEntry.objects.create(**defaults)
 
     return _make

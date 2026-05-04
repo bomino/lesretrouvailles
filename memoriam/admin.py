@@ -96,23 +96,20 @@ class InMemoriamEntryAdmin(admin.ModelAdmin):
 
         # 7. Post-save: fire publish email to opted-in active members.
         if should_fire_publish_email:
-            try:
-                from members.models import Member
+            from members.models import Member
 
-                from .emails import send_fiche_published_to_member  # added in Task 9
-            except ImportError:
-                logger.warning("memoriam: emails module not yet available; skipping publish email")
-            else:
-                recipients = Member.objects.filter(
-                    status="active",
-                    preferences__in_memoriam_alerts=True,
-                ).select_related("user")
-                for member in recipients:
-                    try:
-                        send_fiche_published_to_member(member, obj)
-                    except Exception as e:  # noqa: BLE001
-                        logger.warning(
-                            "memoriam: failed to send publish email to %s: %s",
-                            member.user.email,
-                            e,
-                        )
+            from .emails import send_fiche_published_to_member
+
+            recipients = Member.objects.filter(
+                status="active",
+                preferences__in_memoriam_alerts=True,
+            ).select_related("user")
+            for member in recipients:
+                try:
+                    send_fiche_published_to_member(member, obj)
+                except Exception as e:  # noqa: BLE001
+                    logger.warning(
+                        "memoriam: failed to send publish email to %s: %s",
+                        member.user.email,
+                        e,
+                    )
