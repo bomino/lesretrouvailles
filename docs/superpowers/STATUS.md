@@ -17,7 +17,8 @@ Single dashboard for tracking phase and task completion across all plans. Update
 | P4c | Public surface — quarterly review automation + admin status filter | Complete (tag `v0.4.0c-public-surface-admin`, 2026-05-03) | [plan](plans/2026-05-03-public-surface-admin.md) |
 | P4d | Public surface — magazine cards + single-admin governance | Complete (2026-05-03) | [plan](plans/2026-05-03-magazine-cards-single-admin.md) |
 | P3.1 | Parrain UX Polish (pending-vouches dashboard + 90-day session) | Complete (2026-05-03) | [plan](plans/2026-05-03-parrain-ux-polish.md) |
-| P5 | Mémoire seed | Not started | — |
+| P5a | Mur des souvenirs (member-only photo gallery) | Complete (2026-05-03) | [plan](plans/2026-05-03-mur-souvenirs.md) |
+| P5 | Mémoire seed | (split into P5a + P5b) | — |
 | P6 | Ops & RGPD | Not started | — |
 | P7 | Soft launch | Not started | — |
 
@@ -234,6 +235,25 @@ Single dashboard for tracking phase and task completion across all plans. Update
 | 3 | `pending_vouches_count` context processor | [x] | `8e387f8` |
 | 4 | Nav link + badge in `base.html` (desktop + mobile) | [x] | `c5bd0e0` |
 | 5 | STATUS.md update | [x] | (this commit) |
+
+---
+
+## P5a — Mur des souvenirs
+
+**Shipped:** 2026-05-03
+**Plan:** [plans/2026-05-03-mur-souvenirs.md](plans/2026-05-03-mur-souvenirs.md)
+**Spec:** [specs/2026-05-03-mur-souvenirs-design.md](specs/2026-05-03-mur-souvenirs-design.md)
+**Test suite:** all passing (~18 new tests across alumni/test_cloudinary_extensions and memoires/tests/*)
+
+| # | Task | Done | Commit |
+|---|------|------|--------|
+| 1 | Cloudinary client extension (upload_file + URL helpers) | [x] | `231a020` |
+| 2 | Scaffold memoires app + Memory model + migration | [x] | `cf2cdd7` |
+| 3 | Gallery view + URL + template + memory_photo tags | [x] | `d188d35` |
+| 4 | Detail view + template | [x] | `c61304b` |
+| 5 | Admin (form + save_model + Cloudinary upload) | [x] | `fae5202` (+ review fix `453215c`) |
+| 6 | Nav link in base.html (desktop + mobile) | [x] | `140084d` |
+| 7 | STATUS.md update | [x] | (this commit) |
 
 ---
 
