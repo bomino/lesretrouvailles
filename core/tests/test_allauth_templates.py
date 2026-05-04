@@ -184,3 +184,24 @@ def test_email_change_template_extends_form_card():
 def test_email_confirm_template_extends_form_card():
     src = (TEMPLATES_DIR / "email_confirm.html").read_text(encoding="utf-8")
     assert '{% extends "account/_form_card.html" %}' in src
+
+
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "account_inactive.html",
+        "verified_email_required.html",
+        "reauthenticate.html",
+    ],
+)
+def test_edge_case_template_extends_base_or_form_card(filename):
+    """These pages need rare server state to GET (inactive user logged in,
+    sensitive-op redirect, etc.). Source-level check confirms they extend
+    our base + use brand chrome."""
+    src = (TEMPLATES_DIR / filename).read_text(encoding="utf-8")
+    extends_base = '{% extends "base.html" %}' in src
+    extends_form_card = '{% extends "account/_form_card.html" %}' in src
+    assert extends_base or extends_form_card, (
+        f"{filename} must extend base.html or account/_form_card.html"
+    )
+    assert "{% load i18n %}" in src or "{% load i18n " in src

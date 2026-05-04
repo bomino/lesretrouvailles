@@ -1,0 +1,20 @@
+{% extends "account/_form_card.html" %}
+{% load i18n %}
+{% block title %}
+    {% trans "Confirmation de sécurité" %}
+{% endblock %}
+{% block headline %}
+    {% trans "Confirmation de sécurité" %}
+{% endblock %}
+{% block subtitle %}
+    {% trans "Veuillez saisir votre mot de passe pour confirmer cette opération." %}
+{% endblock %}
+{% block action_url %}
+    {% url 'account_reauthenticate' %}
+{% endblock %}
+{% block submit_label %}
+    {% trans "Confirmer" %}
+{% endblock %}
+{% block fields %}
+    {% include "account/_input.html" with field=form.password type="password" label=_("Mot de passe") autocomplete="current-password" %}
+{% endblock %}

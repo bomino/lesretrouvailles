@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}
+    {% trans "Vérification requise" %}
+{% endblock %}
+{% block content %}
+    <div class="mx-auto max-w-md">
+        <div class="text-center mb-6">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-tertiary">{% trans "Espace membre" %}</p>
+            <h1 class="mt-3 font-display text-3xl font-semibold tracking-tight md:text-4xl">{% trans "Vérification requise" %}</h1>
+            <p class="mt-3 text-sm text-secondary">
+                {% trans "Veuillez confirmer votre adresse email avant de continuer. Un email de vérification vous a été envoyé." %}
+            </p>
+        </div>
+        <div class="rounded-2xl bg-surface p-8 shadow-sm border border-secondary/15 text-center">
+            <a href="{% url 'account_email' %}"
+               class="text-sm text-tertiary hover:underline">{% trans "Gérer mes adresses email" %}</a>
+        </div>
+    </div>
+{% endblock %}
