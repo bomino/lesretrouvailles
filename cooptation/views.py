@@ -112,6 +112,32 @@ def signup_success_view(request):
     return render(request, "cooptation/signup_success.html")
 
 
+@login_required
+@require_http_methods(["GET"])
+def parrain_dashboard_view(request):
+    """Member-only listing of CooptationRequests awaiting the current user's
+    response. Mirrors the per-token /cooptation/<token>/ page but as an index
+    so parrains don't have to dig through email to find pending requests.
+
+    Filters: response='pending' AND expires_at > now AND parrain == me.
+    Already-answered or expired requests are hidden — clicking them would
+    just hit the 410 page on parrain_vouch_view.
+    """
+    member = getattr(request.user, "member", None)
+    pending = []
+    if member is not None:
+        pending = list(
+            CooptationRequest.objects.filter(
+                parrain=member,
+                response="pending",
+                expires_at__gt=timezone.now(),
+            )
+            .select_related("application")
+            .order_by("expires_at")
+        )
+    return render(request, "cooptation/parrain_dashboard.html", {"pending": pending})
+
+
 def _resolve_outcome(application: AdminApplication) -> str:
     """Compute cooptation_outcome from current responses."""
     requests = list(application.cooptation_requests.all())
