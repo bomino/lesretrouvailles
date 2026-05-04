@@ -205,3 +205,25 @@ def test_edge_case_template_extends_base_or_form_card(filename):
         f"{filename} must extend base.html or account/_form_card.html"
     )
     assert "{% load i18n %}" in src or "{% load i18n " in src
+
+
+def test_signup_template_extends_form_card():
+    """Resilience override: even though signups are currently disabled, the
+    template should be on-brand if the adapter ever flips."""
+    src = (TEMPLATES_DIR / "signup.html").read_text(encoding="utf-8")
+    assert '{% extends "account/_form_card.html" %}' in src
+    assert "Inscription" in src or "Bienvenue" in src  # the pill text
+
+
+@pytest.mark.django_db
+def test_failing_post_to_password_reset_renders_styled_errors(client):
+    """Negative test: deliberately submit invalid data and verify the
+    rendered error markup uses the styled alert pattern, not Django's
+    default <ul class='errorlist'>."""
+    response = client.post(
+        "/accounts/password/reset/",
+        {"email": "not-an-email-address"},
+    )
+    assert response.status_code == 200  # form re-rendered with errors
+    body = response.content.decode("utf-8")
+    assert 'class="errorlist"' not in body

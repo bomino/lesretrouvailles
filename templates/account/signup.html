@@ -1,0 +1,31 @@
+{% extends "account/_form_card.html" %}
+{% load i18n %}
+{% block title %}
+    {% trans "Inscription" %}
+{% endblock %}
+{% block pill %}
+    {% trans "Inscription" %}
+{% endblock %}
+{% block headline %}
+    {% trans "Bienvenue parmi les anciens" %}
+{% endblock %}
+{% block subtitle %}
+    {% trans "Cette plateforme est privée. Pour vous inscrire, demandez à deux camarades de vous coopter." %}
+{% endblock %}
+{% block action_url %}
+    {% url 'account_signup' %}
+{% endblock %}
+{% block submit_label %}
+    {% trans "S'inscrire" %}
+{% endblock %}
+{% block fields %}
+    {% include "account/_input.html" with field=form.email type="email" label=_("Email") autocomplete="email" %}
+    {% include "account/_input.html" with field=form.password1 type="password" label=_("Mot de passe") autocomplete="new-password" %}
+    {% include "account/_input.html" with field=form.password2 type="password" label=_("Confirmer le mot de passe") autocomplete="new-password" %}
+{% endblock %}
+{% block below_card %}
+    <p class="mt-6 text-center text-sm text-secondary">
+        <a href="{% url 'cooptation:signup' %}"
+           class="text-tertiary hover:underline">{% trans "← Demander une cooptation à la place" %}</a>
+    </p>
+{% endblock %}
