@@ -105,3 +105,25 @@ def test_member_does_not_see_another_members_pending(
     assert response.status_code == 200
     assert candidate_name not in body
     assert "aucune cooptation en attente" in body
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("response_value", ["accepted", "refused"])
+def test_already_answered_requests_are_hidden(make_cooptation_request, response_value):
+    req = make_cooptation_request()
+    req.response = response_value
+    req.responded_at = timezone.now()
+    req.save()
+    candidate_name = req.application.full_name
+
+    parrain = req.parrain
+    parrain.user.set_password("x")
+    parrain.user.save()
+    ConsentRecord.objects.create(
+        member=parrain, charter_version=CHARTER_CURRENT_VERSION, ip_address="127.0.0.1"
+    )
+
+    c = Client()
+    c.login(username=parrain.user.username, password="x")
+    response = c.get(URL)
+    assert candidate_name not in response.content.decode("utf-8")
