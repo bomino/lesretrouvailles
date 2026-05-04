@@ -152,17 +152,19 @@ def test_ghost_section_renders_published_entries(client, settings, make_admin):
 
 
 @pytest.mark.django_db
-def test_ghost_section_hides_single_admin_entries(client, settings, make_admin):
+def test_single_signoff_entry_is_visible_on_landing(client, settings, make_admin):
+    """P4d: a single admin's add immediately publishes the entry. Replaces
+    the prior 2-signoff gate from P4a."""
     settings.PUBLIC_GHOST_LIST_ENABLED = True
     from members.models import PublicSearchEntry
 
     e = PublicSearchEntry.objects.create(
-        first_name="OnlyOneSignoff", last_name_initial="Z.", years_at_ceg=[1980]
+        first_name="SoloSignoff", last_name_initial="X.", years_at_ceg=[1980]
     )
-    e.added_by_admins.add(make_admin())  # Only one admin → not published
+    e.added_by_admins.add(make_admin())  # Only one admin
 
     body = client.get("/").content.decode("utf-8")
-    assert "OnlyOneSignoff" not in body
+    assert "SoloSignoff" in body
 
 
 @pytest.mark.django_db
