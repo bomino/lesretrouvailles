@@ -6,8 +6,11 @@ import secrets
 
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+
+from members.models import VALID_CLASS_PATTERN, VALID_YEARS
 
 
 class AdminApplication(models.Model):
@@ -80,6 +83,21 @@ class AdminApplication(models.Model):
 
     def __str__(self) -> str:
         return f"{self.full_name or '<purged>'} ({self.status})"
+
+    def clean(self) -> None:
+        """Validate years_attended + classes when an admin edits the
+        application via /admin/cooptation/adminapplication/. The public
+        signup form validates these too (cooptation/forms.py); this is the
+        defense-in-depth path for admin edits, since dropping
+        choices=GRADE_CHOICES from the inner CharField removed the only
+        field-level guard."""
+        super().clean()
+        if any(y not in VALID_YEARS for y in self.years_attended):
+            raise ValidationError({"years_attended": "Années hors plage 1980-1985."})
+        if any(not VALID_CLASS_PATTERN.match(c) for c in self.classes):
+            raise ValidationError(
+                {"classes": "Classe inconnue. Format attendu : 6e, 6eA, 4eB, 3eC, etc."}
+            )
 
     def purge(self) -> None:
         """Clear all PII fields; keep aggregate state for audit/stats.
