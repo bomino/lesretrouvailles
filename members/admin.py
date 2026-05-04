@@ -201,12 +201,13 @@ class PublicSearchEntryAdmin(admin.ModelAdmin):
             },
         ),
         (
-            "Cosignature (2 admins requis pour publication)",
+            "Cosignataires (optionnel)",
             {
                 "fields": ("added_by_admins",),
                 "description": (
-                    "Ajoutez-vous à la liste pour cosigner. Au moins 2 admins "
-                    "distincts requis avant que le nom n'apparaisse publiquement."
+                    "Vous êtes ajouté·e automatiquement à l'enregistrement. "
+                    "D'autres admins peuvent ajouter leur nom pour étoffer la "
+                    "trace d'audit, mais ce n'est plus requis pour la publication."
                 ),
             },
         ),
@@ -215,6 +216,23 @@ class PublicSearchEntryAdmin(admin.ModelAdmin):
             {"fields": ("added_at", "removal_token", "removed_at", "removed_reason")},
         ),
     )
+
+    def save_model(self, request, obj, form, change):
+        """P4d: stash whether this is a create so save_related can act on it."""
+        obj._is_new = not change
+        super().save_model(request, obj, form, change)
+
+    def save_related(self, request, form, formsets, change):
+        """P4d: after M2M is saved from the form, auto-add the creating admin
+        and fire the admin_ghost_added FYI email to other staff. Gated on
+        _is_new so it only fires on create, not on subsequent edits."""
+        super().save_related(request, form, formsets, change)
+        obj = form.instance
+        if getattr(obj, "_is_new", False):
+            obj.added_by_admins.add(request.user)
+            from .emails import send_admin_ghost_added
+
+            send_admin_ghost_added(obj, added_by=request.user)
 
     @admin.display(description="Signatures")
     def signoff_count(self, obj):
