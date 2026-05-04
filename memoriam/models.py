@@ -11,9 +11,8 @@ from django.db import models
 from django.urls import reverse
 from django.utils.text import Truncator
 
-# Same VALID_CLASS_PATTERN as cooptation/AdminApplication: "6e", "5e", "4e",
-# "3e" optionally followed by an uppercase section letter.
-VALID_CLASS_PATTERN = re.compile(r"^[3-6]e[A-Z]?$")
+from members.models import VALID_CLASS_PATTERN
+
 VALID_YEARS = range(1980, 1986)  # 1980-1985 inclusive
 
 CANAL_CHOICES = [
