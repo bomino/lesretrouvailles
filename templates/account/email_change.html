@@ -1,0 +1,20 @@
+{% extends "account/_form_card.html" %}
+{% load i18n %}
+{% block title %}
+    {% trans "Changer mon adresse email" %}
+{% endblock %}
+{% block headline %}
+    {% trans "Changer mon adresse email" %}
+{% endblock %}
+{% block subtitle %}
+    {% trans "Vous recevrez un lien de confirmation à la nouvelle adresse." %}
+{% endblock %}
+{% block action_url %}
+    {% url 'account_change_email' %}
+{% endblock %}
+{% block submit_label %}
+    {% trans "Enregistrer" %}
+{% endblock %}
+{% block fields %}
+    {% include "account/_input.html" with field=form.email type="email" label=_("Nouvelle adresse email") autocomplete="email" %}
+{% endblock %}

@@ -157,3 +157,30 @@ def test_password_change_renders_with_brand_chrome(member_client):
     assert "Les Retrouvailles" in body
     assert 'class="errorlist"' not in body
     assert 'name="oldpassword"' in body  # confirms the form rendered
+
+
+@pytest.mark.django_db
+def test_email_management_page_renders_with_brand_chrome(member_client):
+    response = member_client.get("/accounts/email/")
+    assert response.status_code == 200
+    body = response.content.decode("utf-8")
+    assert "Les Retrouvailles" in body
+    assert 'class="errorlist"' not in body
+
+
+def test_verification_sent_template_extends_base():
+    """verification_sent.html is rare to GET (depends on email-verification flow);
+    source-level check is enough."""
+    src = (TEMPLATES_DIR / "verification_sent.html").read_text(encoding="utf-8")
+    assert '{% extends "base.html" %}' in src
+    assert "vérification" in src.lower()
+
+
+def test_email_change_template_extends_form_card():
+    src = (TEMPLATES_DIR / "email_change.html").read_text(encoding="utf-8")
+    assert '{% extends "account/_form_card.html" %}' in src
+
+
+def test_email_confirm_template_extends_form_card():
+    src = (TEMPLATES_DIR / "email_confirm.html").read_text(encoding="utf-8")
+    assert '{% extends "account/_form_card.html" %}' in src
