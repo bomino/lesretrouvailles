@@ -167,9 +167,11 @@ class GhostStatusFilter(admin.SimpleListFilter):
 class PublicSearchEntryAdmin(admin.ModelAdmin):
     """Governance UI for the public ghost list.
 
-    Two co-signers required for publication — admins add themselves to
-    `added_by_admins` to vouch. Until 2 distinct admins have signed off,
-    the entry stays invisible publicly.
+    P4d: a single admin's add publishes the entry immediately. The creating
+    admin is auto-cosigned in `save_related`, and a notification email goes
+    out to all other staff so they can spot a bad-faith add quickly. Other
+    admins can still add themselves to `added_by_admins` to enrich the audit
+    trail, but it's no longer required for publication.
     """
 
     list_display = (
