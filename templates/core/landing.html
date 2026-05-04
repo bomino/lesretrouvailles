@@ -105,20 +105,27 @@
             </div>
             <div class="mt-10 space-y-4">
                 {% for entry in ghosts %}
-                    <article class="rounded-2xl border border-secondary/15 bg-surface/70 p-5 shadow-sm">
-                        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                            <strong class="font-display text-lg">{{ entry.first_name }} {{ entry.last_name_initial }}</strong>
-                            <span class="text-sm text-secondary">{% trans "au CEG" %} {{ entry.first_year }}-{{ entry.last_year }}</span>
-                        </div>
-                        {% if entry.note %}<p class="mt-1 text-sm text-secondary">{{ entry.note }}</p>{% endif %}
-                        <p class="mt-2 text-sm italic text-secondary">
-                            {% trans "Vous le reconnaissez ? Partagez cette page avec votre entourage." %}
-                        </p>
-                        <p class="mt-2 text-xs text-secondary">
-                            <a href="{% url 'members:removal_request_form' entry.removal_token %}"
-                               class="underline hover:text-tertiary">{% trans "Retirer mon nom" %}</a>
-                        </p>
-                    </article>
+                    {% with fn=entry.first_name|slice:":1" ln=entry.last_name_initial|slice:":1" %}
+                        <article class="overflow-hidden rounded-xl border border-secondary/15 border-l-4 border-l-ceremonial-gold bg-ceremonial-gold/5 p-6">
+                            <div class="flex flex-col gap-4 md:flex-row md:items-start">
+                                <div class="flex-shrink-0 mx-auto md:mx-0">
+                                    <div class="flex h-12 w-12 items-center justify-center rounded-full bg-ceremonial-gold/20 font-display text-base font-semibold text-primary">
+                                        {{ fn }}{{ ln }}
+                                    </div>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-display text-lg font-semibold text-primary">{{ entry.first_name }} {{ entry.last_name_initial }}</p>
+                                    <p class="mt-0.5 text-sm text-secondary">{% trans "au CEG" %} {{ entry.first_year }}-{{ entry.last_year }}</p>
+                                    {% if entry.note %}<p class="mt-1 text-sm italic text-secondary">{{ entry.note }}</p>{% endif %}
+                                    <p class="mt-3 text-sm italic text-secondary">{% trans "Si vous le connaissez, partagez ce lien." %}</p>
+                                    <p class="mt-3 text-xs text-secondary md:text-right">
+                                        <a href="{% url 'members:removal_request_form' entry.removal_token %}"
+                                           class="underline hover:text-tertiary">{% trans "Retirer mon nom" %}</a>
+                                    </p>
+                                </div>
+                            </div>
+                        </article>
+                    {% endwith %}
                 {% endfor %}
             </div>
         </section>
