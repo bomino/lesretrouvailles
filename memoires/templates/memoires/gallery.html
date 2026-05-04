@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load i18n memory_photo %}
+{% block title %}
+    {% trans "Mur des Souvenirs" %}
+{% endblock %}
+{% block content %}
+    <div class="mx-auto max-w-6xl">
+        <header class="mb-8 text-center">
+            <h1 class="font-display text-3xl font-semibold tracking-tight md:text-4xl">{% trans "Mur des Souvenirs" %}</h1>
+            <p class="mx-auto mt-3 max-w-2xl text-sm text-secondary">
+                {% trans "Photos d'époque curées par les administrateurs." %}
+            </p>
+        </header>
+        {% if memories %}
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {% for memory in memories %}
+                    <a href="{% url 'memoires:detail' memory.pk %}"
+                       class="group overflow-hidden rounded-xl border border-secondary/15 bg-surface/70 shadow-sm transition hover:border-tertiary/40">
+                        <img src="{% memory_thumb memory.photo_public_id 400 %}"
+                             alt="{{ memory.caption|truncatechars:80 }}"
+                             loading="lazy"
+                             class="aspect-square w-full object-cover">
+                        <div class="p-3">
+                            <p class="font-display text-sm font-semibold leading-tight">{{ memory.caption|truncatechars:80 }}</p>
+                            {% if memory.taken_at %}
+                                <p class="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-secondary">
+                                    {{ memory.taken_at|date:"F Y" }}
+                                </p>
+                            {% endif %}
+                        </div>
+                    </a>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="rounded-2xl border border-secondary/15 bg-surface/70 p-8 text-center shadow-sm">
+                <p class="text-base text-secondary">{% trans "Le mur sera enrichi au lancement. Revenez bientôt." %}</p>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
