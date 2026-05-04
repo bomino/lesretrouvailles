@@ -69,3 +69,25 @@ def send_admin_quarterly_ghost_digest(*, purged_logs, currently_listed, since) -
             "listed_count": len(currently_listed),
         },
     )
+
+
+def send_admin_ghost_added(entry, *, added_by) -> None:
+    """FYI to all other active staff when a new ghost entry is created.
+    Excludes the creator (they already know they just added it). Replaces
+    the 2-signoff pre-publication safety with a post-publication tripwire
+    (P4d spec §C). Mirrors send_admin_removal_notification's no-op when
+    no recipients exist."""
+    User = get_user_model()  # noqa: N806
+    recipients = list(
+        User.objects.filter(is_staff=True, is_active=True)
+        .exclude(pk=added_by.pk)
+        .values_list("email", flat=True)
+    )
+    recipients = [e for e in recipients if e]
+    if not recipients:
+        return
+    send_email(
+        recipients,
+        "members/admin_ghost_added",
+        {"entry": entry, "added_by": added_by},
+    )
