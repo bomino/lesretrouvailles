@@ -15,6 +15,7 @@ Single dashboard for tracking phase and task completion across all plans. Update
 | P4a | Public surface — landing + ghost-list scaffold + SEO | Complete (tag `v0.4.0a-public-surface`, 2026-05-03) | [plan](plans/2026-05-03-public-surface.md) |
 | P4b | Public surface — token-based removal flow + AuditLog (governance UI deferred to P4c) | Complete (tag `v0.4.0b-public-surface-governance`, 2026-05-03) | [plan](plans/2026-05-03-public-surface-governance.md) |
 | P4c | Public surface — quarterly review automation + admin status filter | Complete (tag `v0.4.0c-public-surface-admin`, 2026-05-03) | [plan](plans/2026-05-03-public-surface-admin.md) |
+| P3.1 | Parrain UX Polish (pending-vouches dashboard + 90-day session) | Complete (2026-05-03) | [plan](plans/2026-05-03-parrain-ux-polish.md) |
 | P5 | Mémoire seed | Not started | — |
 | P6 | Ops & RGPD | Not started | — |
 | P7 | Soft launch | Not started | — |
@@ -197,6 +198,23 @@ Single dashboard for tracking phase and task completion across all plans. Update
 - `GhostStatusFilter` uses `Count("added_by_admins")` annotation only when a filter value is selected; default changelist load is unaffected. The "published" bucket excludes entries ≥365 days old (filtered into "stale") — strict partition, no overlap.
 - `PublicSearchEntryAdmin.list_display` now uses a custom `retrait_at` method (label: "Retiré le") instead of the raw `removed_at` field — more on-brand French + sidesteps a brittle test-vs-column-header collision.
 - "Custom admin dashboard view" deferred indefinitely — list filter + quarterly digest cover the operational need at our scale.
+
+---
+
+## P3.1 — Parrain UX Polish
+
+**Shipped:** 2026-05-03
+**Plan:** [plans/2026-05-03-parrain-ux-polish.md](plans/2026-05-03-parrain-ux-polish.md)
+**Spec:** [specs/2026-05-03-parrain-ux-polish-design.md](specs/2026-05-03-parrain-ux-polish-design.md)
+**Test suite:** all passing
+
+| # | Task | Done | Commit |
+|---|------|------|--------|
+| 1 | 90-day sliding session lifetime | [x] | `104b570` |
+| 2 | Pending-vouches dashboard view + URL + template | [x] | `c057b76` |
+| 3 | `pending_vouches_count` context processor | [x] | `8e387f8` |
+| 4 | Nav link + badge in `base.html` (desktop + mobile) | [x] | `c5bd0e0` |
+| 5 | STATUS.md update | [x] | (this commit) |
 
 ---
 

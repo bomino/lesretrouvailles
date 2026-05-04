@@ -60,6 +60,7 @@ TEMPLATES = [
                 "django.template.context_processors.i18n",
                 "members.context.member_preferences",
                 "core.context_processors.site",
+                "cooptation.context_processors.pending_vouches_count",
             ],
         },
     },
@@ -116,6 +117,13 @@ ACCOUNT_EMAIL_VERIFICATION = "none"
 ACCOUNT_ADAPTER = "core.allauth_adapter.NoSignupAdapter"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
+
+# P3.1: 90-day sliding session lifetime so parrains stay logged in across
+# cooptation email clicks (~2 weeks per request × multiple requests in flight).
+# SAVE_EVERY_REQUEST trades one session-row write per request for sliding
+# expiry — negligible cost at our scale, big UX win.
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 90  # 90 days
+SESSION_SAVE_EVERY_REQUEST = True
 
 # Cloudinary — overridden per environment. Tests fall through to the fake.
 CLOUDINARY_CLIENT_PATH = env(
