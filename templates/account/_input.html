@@ -1,0 +1,22 @@
+{# Single form field render. #}
+{# Args: #}
+{#   field — bound form field (required) #}
+{#   type — input type (default "text"; pass "email", "password", "url", etc.) #}
+{#   label — visible label text (default field.label) #}
+{#   autocomplete — HTML autocomplete attribute (optional) #}
+{#   help_text — override for field.help_text (optional) #}
+{#   required — pass `False` to drop the required attribute (default True) #}
+<div class="space-y-1.5">
+    <label for="{{ field.id_for_label }}" class="block text-sm font-medium">{{ label|default:field.label }}</label>
+    <input type="{{ type|default:'text' }}"
+           name="{{ field.html_name }}"
+           id="{{ field.id_for_label }}"
+           value="{{ field.value|default:'' }}"
+           {% if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}
+           {% if required|default:True %}required{% endif %}
+           class="block w-full rounded-lg border border-secondary/20 bg-white px-3 py-2.5 text-base shadow-sm focus:border-tertiary focus:outline-none focus:ring-2 focus:ring-tertiary/30">
+    {% with help=help_text|default:field.help_text %}
+        {% if help %}<p class="text-xs text-secondary">{{ help|safe }}</p>{% endif %}
+    {% endwith %}
+    {% if field.errors %}<p class="text-sm text-red-700">{{ field.errors|join:" " }}</p>{% endif %}
+</div>
