@@ -34,7 +34,6 @@ New Django app: **`memoires`**. Matches the project's existing French app naming
 
 ```python
 # memoires/models.py
-from cloudinary.models import CloudinaryField
 from django.conf import settings
 from django.db import models
 
@@ -45,7 +44,10 @@ class Memory(models.Model):
         ("published", "Publiée"),
     ]
 
-    photo = CloudinaryField("photo", folder="memoires")
+    photo_public_id = models.CharField(
+        max_length=200,
+        help_text="Cloudinary public_id (auto-rempli par l'upload admin).",
+    )
     caption = models.TextField(help_text="Description visible aux membres.")
     taken_at = models.DateField(
         null=True,
@@ -82,12 +84,12 @@ class Memory(models.Model):
 
 **Notes on the field choices:**
 
+- `photo_public_id` is a `CharField` storing the Cloudinary public_id (matches the existing `Member.photo_public_id` pattern at `members/models.py:75`). The admin form will provide a `FileField` upload widget (not on the model — see Section D); the upload helper writes the resulting public_id into this field on save.
 - `caption` is required (TextField, no `blank=True`). Every memory needs a description; an unsourced photo isn't useful.
 - `taken_at` and `location` are both optional. Many seed photos will have approximate or unknown dates; making them required would block curation.
 - `status` two-state only. Draft = admin-only, published = member-visible. No `archived` state v1 (deferred).
 - `created_by` is `SET_NULL` so admin user deletion doesn't cascade-delete photos. The gallery should outlive any single curator.
 - `Meta.ordering` puts newest-era photos first. With `taken_at` nullable, Postgres NULL-handling defaults to NULLS LAST on DESC ordering — i.e., NULL `taken_at` fall to the bottom, then sub-sort by `-created_at`. Acceptable: untimed photos are usually the most-recently-added admin batches anyway.
-- `CloudinaryField` from the `cloudinary` package (already in P2 requirements). Auto-uploads on admin save, returns Cloudinary public_id, which the template uses to build `f_auto,q_auto:eco` URLs.
 
 ## B. URLs and views
 
@@ -141,16 +143,61 @@ No "Posté par X" line in v1 — Phase 1 is a collective archive, not individual
 
 ## D. Admin
 
-`memoires/admin.py:MemoryAdmin`:
+The admin needs to (a) accept a file upload (`<input type="file">`), (b) push it to Cloudinary server-side via the existing `alumni.cloudinary` abstraction, (c) write the resulting public_id into `Memory.photo_public_id`. The `Memory` model itself never holds raw bytes; the FileField lives only on the admin's `ModelForm`.
+
+### `memoires/forms.py` — admin form
 
 ```python
+# memoires/forms.py
+from django import forms
+
+from .models import Memory
+
+
+class MemoryAdminForm(forms.ModelForm):
+    """Admin form for Memory. Adds a file upload field that exists only
+    on the form (not the model). Save flow: upload via alumni.cloudinary
+    server-side, write the resulting public_id into Memory.photo_public_id."""
+
+    upload = forms.FileField(
+        required=False,
+        help_text="Choisir une photo. Conservera l'image existante si vide (en édition).",
+        widget=forms.ClearableFileInput(attrs={"accept": "image/jpeg,image/png,image/webp"}),
+    )
+
+    class Meta:
+        model = Memory
+        fields = ("photo_public_id", "caption", "taken_at", "location", "status")
+        widgets = {
+            "photo_public_id": forms.HiddenInput(),  # populated by save_model after upload
+        }
+
+    def clean(self):
+        cleaned = super().clean()
+        # On create, upload is required. On edit, may be blank (keep existing).
+        if not self.instance.pk and not cleaned.get("upload"):
+            raise forms.ValidationError("Une photo est obligatoire pour créer une nouvelle entrée.")
+        return cleaned
+```
+
+### `memoires/admin.py:MemoryAdmin`
+
+```python
+from django.contrib import admin
+from django.utils.html import format_html
+
+from alumni.cloudinary import get_client, memory_thumbnail_url
+from .forms import MemoryAdminForm
+from .models import Memory
+
+
 @admin.register(Memory)
 class MemoryAdmin(admin.ModelAdmin):
     """Admin curation surface for the Mur des souvenirs.
-    Mirrors the PublicSearchEntryAdmin pattern: created_by is auto-stamped
-    via save_model on first save (P4d pattern, requires save_related to
-    survive form.save_m2m()? No — Memory has no M2M, so save_model alone
-    suffices)."""
+    Auto-stamps created_by on first save and uploads the file to Cloudinary
+    server-side via alumni.cloudinary.get_client().upload_file()."""
+
+    form = MemoryAdminForm
 
     list_display = ("thumbnail", "caption_preview", "taken_at", "status", "updated_at")
     list_filter = ("status", "taken_at")
@@ -158,7 +205,8 @@ class MemoryAdmin(admin.ModelAdmin):
     readonly_fields = ("created_by", "created_at", "updated_at")
 
     fieldsets = (
-        ("Photo et légende", {"fields": ("photo", "caption")}),
+        ("Photo", {"fields": ("upload", "photo_public_id")}),
+        ("Légende", {"fields": ("caption",)}),
         ("Contexte", {"fields": ("taken_at", "location")}),
         ("Publication", {"fields": ("status",)}),
         ("Audit (lecture seule)", {"fields": ("created_by", "created_at", "updated_at")}),
@@ -166,10 +214,9 @@ class MemoryAdmin(admin.ModelAdmin):
 
     @admin.display(description="Aperçu")
     def thumbnail(self, obj):
-        if not obj.photo:
+        if not obj.photo_public_id:
             return ""
-        from django.utils.html import format_html
-        url = obj.photo.build_url(width=80, height=80, crop="fill", gravity="auto")
+        url = memory_thumbnail_url(obj.photo_public_id, size=80)
         return format_html('<img src="{}" width="80" height="80" alt="" />', url)
 
     @admin.display(description="Légende")
@@ -177,14 +224,118 @@ class MemoryAdmin(admin.ModelAdmin):
         return obj.caption[:60] + ("…" if len(obj.caption) > 60 else "")
 
     def save_model(self, request, obj, form, change):
+        # If the admin uploaded a file, push it to Cloudinary and stash the
+        # resulting public_id. If they didn't (edit without re-upload), keep
+        # the existing photo_public_id.
+        upload = form.cleaned_data.get("upload")
+        if upload:
+            old_public_id = obj.photo_public_id  # may be empty on create
+            client = get_client()
+            obj.photo_public_id = client.upload_file(upload, folder="memoires")
+            if old_public_id and old_public_id != obj.photo_public_id:
+                client.delete(old_public_id)
         if not change:
             obj.created_by = request.user
         super().save_model(request, obj, form, change)
 ```
 
-**`save_model` rationale:** `Memory` has no M2M fields, so the P4d `save_model` + `save_related` split (which works around `form.save_m2m()` clobbering) is unnecessary. Plain `save_model` setting `created_by` before `super().save_model()` works.
+**Why `save_model` (not `save_related`):** `Memory` has no M2M fields, so the P4d `save_model` + `save_related` split (which works around `form.save_m2m()` clobbering M2M data) is unnecessary. Plain `save_model` is correct here.
 
-No bulk upload in v1. Cloudinary's Django widget handles the upload UX in the photo field.
+**Why a custom `upload` field on the form (not on the model):** the model stores the canonical address (Cloudinary public_id), not raw bytes. The form holds the temporary upload. `save_model` mediates between them.
+
+### `alumni/cloudinary.py` — extension
+
+Add the following to `alumni/cloudinary.py`:
+
+1. `upload_file(file_obj, folder)` method on the `CloudinaryClient` Protocol, `RealCloudinary`, and `FakeCloudinary` classes.
+2. `memory_thumbnail_url(public_id, size=400)` helper, mirroring the existing `member_thumbnail_url` but with `g_auto` (no face crop bias).
+3. `memory_full_url(public_id, max_width=1200)` helper for the detail view (limit-fit, no crop).
+
+```python
+class CloudinaryClient(Protocol):
+    def sign_upload(self, *, folder: str, timestamp: int) -> dict[str, Any]: ...
+    def upload_file(self, file_obj: Any, *, folder: str) -> str: ...
+    def delete(self, public_id: str) -> None: ...
+
+
+class RealCloudinary:
+    # ... existing __init__, sign_upload, delete ...
+
+    def upload_file(self, file_obj: Any, *, folder: str) -> str:
+        """Server-side upload via Cloudinary's REST API. Returns the public_id."""
+        result = self._cloudinary.uploader.upload(
+            file_obj,
+            folder=folder,
+            resource_type="image",
+            use_filename=False,
+        )
+        return result["public_id"]
+
+
+class FakeCloudinary:
+    # ... existing fields, sign_upload, delete ...
+
+    def upload_file(self, file_obj: Any, *, folder: str) -> str:
+        """Test stub: records the call and returns a deterministic fake public_id."""
+        name = getattr(file_obj, "name", "upload")
+        digest = hashlib.sha1(f"{folder}:{name}".encode()).hexdigest()[:12]
+        public_id = f"{folder}/fake-{digest}"
+        self.upload_calls = getattr(self, "upload_calls", [])
+        self.upload_calls.append({"folder": folder, "name": name, "public_id": public_id})
+        return public_id
+
+
+def memory_thumbnail_url(public_id: str, size: int = 400) -> str:
+    """Square thumbnail with auto crop. Used in the gallery grid."""
+    if not public_id:
+        return ""
+    cloud_name = getattr(settings, "CLOUDINARY_CLOUD_NAME", "fake-cloud")
+    transform = f"f_auto,q_auto:eco,c_fill,g_auto,w_{size},h_{size}"
+    return f"https://res.cloudinary.com/{cloud_name}/image/upload/{transform}/{public_id}"
+
+
+def memory_full_url(public_id: str, max_width: int = 1200) -> str:
+    """Limit-fit version used in the detail view. No crop; keeps aspect ratio."""
+    if not public_id:
+        return ""
+    cloud_name = getattr(settings, "CLOUDINARY_CLOUD_NAME", "fake-cloud")
+    transform = f"f_auto,q_auto:eco,c_limit,w_{max_width}"
+    return f"https://res.cloudinary.com/{cloud_name}/image/upload/{transform}/{public_id}"
+```
+
+The `FakeCloudinary` change is forward-compatible — existing tests that didn't reference `upload_file` continue to work; tests that need it can call it and inspect `upload_calls`.
+
+### Templates
+
+Templates use `memory_thumbnail_url` and `memory_full_url` via a small custom template tag in `memoires/templatetags/memory_photo.py`:
+
+```python
+# memoires/templatetags/memory_photo.py
+from django import template
+
+from alumni.cloudinary import memory_full_url, memory_thumbnail_url
+
+register = template.Library()
+
+
+@register.simple_tag
+def memory_thumb(public_id, size=400):
+    return memory_thumbnail_url(public_id, size=size)
+
+
+@register.simple_tag
+def memory_full(public_id, max_width=1200):
+    return memory_full_url(public_id, max_width=max_width)
+```
+
+Then in `gallery.html` and `detail.html`:
+
+```html
+{% load memory_photo %}
+<img src="{% memory_thumb memory.photo_public_id 400 %}" alt="{{ memory.caption }}" loading="lazy">
+```
+
+No bulk upload in v1.
 
 ## E. Member nav integration
 
@@ -231,9 +382,11 @@ Total: **12 tests**.
 
 ## G. Cloudinary integration notes
 
-- **Storage**: photos go into Cloudinary's `memoires/` folder (set via `CloudinaryField(folder="memoires")`). This is namespaced separately from member profile photos (`members/`), making it easy to apply different transforms or backup policies later.
-- **Backups**: Backblaze B2 backup is master-spec mandate (§7.1) but it's a Phase 6 ops concern. P5a doesn't add the backup pipeline — it just stores via Cloudinary. The B2 backup will sweep all Cloudinary folders when it ships.
-- **Test environment**: tests use `FakeCloudinary` (P2 fixture) — no real Cloudinary calls during pytest runs. Existing `CLOUDINARY_CLIENT_PATH = "alumni.cloudinary.FakeCloudinary"` setting handles this.
+- **Storage**: photos land in Cloudinary's `memoires/` folder (passed to `client.upload_file(file, folder="memoires")` from `MemoryAdmin.save_model`). Namespaced separately from member profile photos (`members/`) so future backups, transforms, or retention policies can target one without touching the other.
+- **Upload mechanism**: server-side via the new `CloudinaryClient.upload_file(file_obj, folder)` method on both `RealCloudinary` and `FakeCloudinary`. Different from P2's frontend signed-upload flow because admin-side server uploads are simpler (Django admin already accepts `<input type="file">`) and there's no benefit to bypassing the Django server for trusted admin paths.
+- **Replacement on edit**: when an admin uploads a new file for an existing memory, `save_model` deletes the old public_id via `client.delete(old)` before stamping the new one. Mirrors `members/views.py:profile_edit_view` lines 93-101.
+- **Backups**: Backblaze B2 backup is a master-spec mandate (§7.1) but a Phase 6 ops concern. P5a doesn't add the backup pipeline — it just stores via Cloudinary. The B2 backup will sweep all Cloudinary folders when it ships.
+- **Test environment**: tests use `FakeCloudinary` (P2 fixture) — no real Cloudinary calls during pytest runs. Existing `CLOUDINARY_CLIENT_PATH = "alumni.cloudinary.FakeCloudinary"` setting handles this. `FakeCloudinary.upload_file()` returns a deterministic synthetic public_id based on the folder + filename hash.
 
 ## H. Migration + dependencies
 
@@ -249,9 +402,12 @@ Total: **12 tests**.
 - `memoires/__init__.py`
 - `memoires/apps.py`
 - `memoires/models.py`
+- `memoires/forms.py` — `MemoryAdminForm` with the temporary `upload` FileField
 - `memoires/admin.py`
 - `memoires/views.py`
 - `memoires/urls.py`
+- `memoires/templatetags/__init__.py`
+- `memoires/templatetags/memory_photo.py` — `{% memory_thumb %}` + `{% memory_full %}` tags
 - `memoires/migrations/__init__.py`
 - `memoires/migrations/0001_initial.py` (auto-generated)
 - `memoires/templates/memoires/gallery.html`
@@ -264,6 +420,7 @@ Total: **12 tests**.
 - `memoires/tests/test_admin_memory.py`
 
 **Modify:**
+- `alumni/cloudinary.py` — add `upload_file()` to `CloudinaryClient` Protocol + `RealCloudinary` + `FakeCloudinary`; add `memory_thumbnail_url()` and `memory_full_url()` helpers
 - `alumni/settings/base.py` — add `"memoires"` to `INSTALLED_APPS`
 - `alumni/urls.py` — include `memoires.urls`
 - `templates/base.html` — add "Souvenirs" link in desktop + mobile auth nav
@@ -274,14 +431,15 @@ Total: **12 tests**.
 
 | # | Task | Files | Tests |
 |---|------|-------|-------|
-| 1 | Scaffold app + Memory model + migration | new app | 3 model tests |
-| 2 | Gallery view + URL + template | views, urls, gallery.html | 3 view tests |
-| 3 | Detail view + template | views, detail.html | 4 view tests |
-| 4 | Admin (incl. save_model auto-stamp) | admin.py | 1 admin test |
-| 5 | Nav link in base.html (desktop + mobile) | base.html | 1 nav test |
-| 6 | STATUS.md update | STATUS.md | — |
+| 1 | Cloudinary client extension: `upload_file()` + URL helpers | `alumni/cloudinary.py` | 2 (upload_file behavior on both clients, helpers shape URLs correctly) |
+| 2 | Scaffold `memoires` app + Memory model + migration | new app | 3 model tests |
+| 3 | Gallery view + URL + template | `memoires/views.py`, `urls.py`, `gallery.html`, `templatetags/memory_photo.py` | 3 view tests |
+| 4 | Detail view + template | `memoires/views.py`, `detail.html` | 4 view tests |
+| 5 | Admin (form + save_model auto-stamp + Cloudinary upload + replacement-on-edit) | `memoires/forms.py`, `memoires/admin.py` | 2 admin tests |
+| 6 | Nav link in base.html (desktop + mobile) | `templates/base.html`, `core/tests/test_base_template.py` | 1 nav test |
+| 7 | STATUS.md update | `docs/superpowers/STATUS.md` | — |
 
-Estimated: ~half a day. ~12 new tests, no migrations beyond the new app's initial.
+Estimated: ~half a day. **~15 new tests**, no migrations beyond the new app's initial.
 
 ---
 
