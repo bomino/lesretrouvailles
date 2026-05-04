@@ -192,3 +192,15 @@ def test_save_model_autostamps_created_by_on_new(fake_cloudinary, make_admin_use
     admin.save_model(_admin_request(user), obj, form, change=False)
     obj.refresh_from_db()
     assert obj.created_by_id == user.pk
+
+
+@pytest.mark.django_db
+def test_nomination_admin_prohibits_add(make_admin_user):
+    from django.contrib.admin.sites import AdminSite
+
+    from memoriam.admin import InMemoriamNominationAdmin
+    from memoriam.models import InMemoriamNomination
+
+    admin = InMemoriamNominationAdmin(InMemoriamNomination, AdminSite())
+    req = _admin_request(make_admin_user())
+    assert admin.has_add_permission(req) is False

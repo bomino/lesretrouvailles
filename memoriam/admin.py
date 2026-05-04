@@ -10,7 +10,7 @@ from django.utils import timezone
 from alumni.cloudinary import get_client
 
 from .forms import InMemoriamEntryAdminForm
-from .models import InMemoriamEntry
+from .models import InMemoriamEntry, InMemoriamNomination
 
 logger = logging.getLogger(__name__)
 
@@ -113,3 +113,50 @@ class InMemoriamEntryAdmin(admin.ModelAdmin):
                         member.user.email,
                         e,
                     )
+
+
+@admin.register(InMemoriamNomination)
+class InMemoriamNominationAdmin(admin.ModelAdmin):
+    """Read-mostly: nominations come from the public form. Admin only edits
+    status/admin_note/linked_entry; the nominator's content is immutable."""
+
+    list_display = ("proposed_name", "nominator", "status", "submitted_at", "reviewed_at")
+    list_filter = ("status",)
+    search_fields = ("proposed_name", "nominator__first_name", "nominator__last_name")
+    readonly_fields = (
+        "nominator",
+        "submitted_at",
+        "proposed_name",
+        "proposed_nickname",
+        "proposed_years",
+        "personal_memory",
+        "family_contact_hint",
+        "reviewed_by",
+        "reviewed_at",
+    )
+    fields = (
+        "nominator",
+        "submitted_at",
+        "proposed_name",
+        "proposed_nickname",
+        "proposed_years",
+        "personal_memory",
+        "family_contact_hint",
+        "status",
+        "admin_note",
+        "linked_entry",
+        "reviewed_by",
+        "reviewed_at",
+    )
+
+    def has_add_permission(self, request):
+        # Nominations only come from the public form (/in-memoriam/nominer/).
+        return False
+
+    def save_model(self, request, obj, form, change):
+        if change and obj.status != "pending":
+            if not obj.reviewed_by:
+                obj.reviewed_by = request.user
+            if not obj.reviewed_at:
+                obj.reviewed_at = timezone.now()
+        super().save_model(request, obj, form, change)
