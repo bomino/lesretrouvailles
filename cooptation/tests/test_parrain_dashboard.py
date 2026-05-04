@@ -81,3 +81,27 @@ def test_member_with_pending_sees_candidates_ordered_by_urgency(
     assert "Boubacar Issoufou" in body
     # Order: Boubacar (expires in 2 days) appears before Aïssa (10 days)
     assert body.index("Boubacar Issoufou") < body.index("Aïssa Soumana")
+
+
+@pytest.mark.django_db
+def test_member_does_not_see_another_members_pending(
+    make_cooptation_request, make_member, make_user
+):
+    """Member B is logged in. The pending request belongs to Member A.
+    Dashboard for B must not list A's request — full identity isolation."""
+    req_for_a = make_cooptation_request()
+    candidate_name = req_for_a.application.full_name
+
+    user_b = make_user(password="x")
+    member_b = make_member(user=user_b)
+    ConsentRecord.objects.create(
+        member=member_b, charter_version=CHARTER_CURRENT_VERSION, ip_address="127.0.0.1"
+    )
+
+    c = Client()
+    c.login(username=user_b.username, password="x")
+    response = c.get(URL)
+    body = response.content.decode("utf-8")
+    assert response.status_code == 200
+    assert candidate_name not in body
+    assert "aucune cooptation en attente" in body
