@@ -41,6 +41,8 @@ def test_returns_correct_count_for_member_with_pending(make_cooptation_request):
     expired = make_cooptation_request(parrain=parrain)
     expired.expires_at = timezone.now() - timedelta(days=1)
     expired.save()
+    # Different parrain entirely: should NOT count (verifies parrain= filter)
+    make_cooptation_request()  # auto-generates its own fresh parrain
 
     request = RequestFactory().get("/")
     request.user = parrain.user
