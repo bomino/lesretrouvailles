@@ -115,3 +115,45 @@ def test_password_reset_from_key_token_fail_branch():
     src = (TEMPLATES_DIR / "password_reset_from_key.html").read_text(encoding="utf-8")
     assert "token_fail" in src
     assert "account_reset_password" in src  # the CTA URL name
+
+
+@pytest.fixture
+def member_client(db):
+    """Logged-in member with charter consent (passes ConsentRequiredMiddleware)."""
+    from django.contrib.auth import get_user_model
+    from django.test import Client
+
+    from members.charters import CHARTER_CURRENT_VERSION
+    from members.models import ConsentRecord, Member
+
+    User = get_user_model()  # noqa: N806
+    user = User.objects.create_user(
+        username="allauth-test@example.test",
+        email="allauth-test@example.test",
+        password="orig-pw-1",
+    )
+    member = Member.objects.create(
+        user=user,
+        first_name="Test",
+        last_name="Member",
+        years_attended=[1980, 1981, 1982, 1983],
+        classes=["6e"],
+        city="Niamey",
+        status="active",
+    )
+    ConsentRecord.objects.create(
+        member=member, charter_version=CHARTER_CURRENT_VERSION, ip_address="127.0.0.1"
+    )
+    c = Client()
+    c.login(username=user.username, password="orig-pw-1")
+    return c
+
+
+@pytest.mark.django_db
+def test_password_change_renders_with_brand_chrome(member_client):
+    response = member_client.get("/accounts/password/change/")
+    assert response.status_code == 200
+    body = response.content.decode("utf-8")
+    assert "Les Retrouvailles" in body
+    assert 'class="errorlist"' not in body
+    assert 'name="oldpassword"' in body  # confirms the form rendered
