@@ -189,13 +189,25 @@ def test_ghost_section_hides_removed_entries(client, settings, make_admin):
 
 
 @pytest.mark.django_db
-def test_anonymous_feature_cards_not_clickable(client):
-    """Annuaire/InMemoriam/Cooptation cards should not be <a> tags for anonymous
-    visitors — they lead to gated pages and would frustrate a first-time visitor."""
+def test_anonymous_member_only_cards_are_static(client):
+    """Annuaire/Mon profil destinations are gated to members. The cards
+    referencing them stay as <article> for anonymous visitors so a
+    first-time visitor doesn't hit a 302 wall. Cooptation is wired
+    differently — it points to the public /inscription/ form
+    (see test_anonymous_cooptation_card_links_to_signup)."""
     body = client.get("/").content.decode("utf-8")
     assert "Annuaire" in body
     assert 'href="/annuaire/"' not in body
     assert 'href="/profil/"' not in body
+
+
+@pytest.mark.django_db
+def test_anonymous_cooptation_card_links_to_signup(client):
+    """The Cooptation feature card is clickable for anonymous visitors and
+    points to the public signup form, not a gated page."""
+    body = client.get("/").content.decode("utf-8")
+    assert "Cooptation" in body
+    assert 'href="/inscription/"' in body
 
 
 @pytest.mark.django_db
