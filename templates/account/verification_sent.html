@@ -14,5 +14,11 @@
                 {% trans "Vérifiez votre boîte de réception et cliquez sur le lien pour activer votre compte." %}
             </p>
         </div>
+        <div class="rounded-2xl bg-surface p-8 shadow-sm border border-secondary/15 text-center">
+            <p class="text-sm">
+                <a href="{% url 'account_login' %}"
+                   class="text-tertiary hover:underline">{% trans "Retour à la connexion" %}</a>
+            </p>
+        </div>
     </div>
 {% endblock %}
