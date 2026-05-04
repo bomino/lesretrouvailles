@@ -13,7 +13,7 @@
            id="{{ field.id_for_label }}"
            value="{{ field.value|default:'' }}"
            {% if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}
-           {% if required|default:True %}required{% endif %}
+           {% if required is not False %}required{% endif %}
            class="block w-full rounded-lg border border-secondary/20 bg-white px-3 py-2.5 text-base shadow-sm focus:border-tertiary focus:outline-none focus:ring-2 focus:ring-tertiary/30">
     {% with help=help_text|default:field.help_text %}
         {% if help %}<p class="text-xs text-secondary">{{ help|safe }}</p>{% endif %}

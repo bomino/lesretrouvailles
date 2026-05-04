@@ -29,7 +29,7 @@ def test_form_card_partial_renders_with_brand_chrome():
     assert "rounded-2xl bg-surface" in rendered  # the card chrome
 
 
-def test_input_partial_renders_label_and_input(rf):
+def test_input_partial_renders_label_and_input():
     """Smoke test: _input.html renders an input with the canonical Tailwind class."""
     from django import forms
 
@@ -44,3 +44,29 @@ def test_input_partial_renders_label_and_input(rf):
     assert "Email" in rendered  # label
     assert 'type="email"' in rendered
     assert "rounded-lg border border-secondary/20" in rendered  # canonical input class
+
+
+def test_input_partial_supports_optional_field():
+    """Regression: passing required=False must omit the required attribute.
+    The naive `{% if required|default:True %}` was broken because Django's
+    `|default` substitutes the default when the value is False (truthy/falsy
+    semantics, not None-checking)."""
+    from django import forms
+
+    class SmokeForm(forms.Form):
+        nickname = forms.CharField(required=False)
+
+    f = SmokeForm()
+    rendered = render_to_string(
+        "account/_input.html",
+        {"field": f["nickname"], "type": "text", "label": "Nickname", "required": False},
+    )
+    # The input tag should NOT contain the bare `required` attribute.
+    # Walk through carefully to avoid false matches on the `required` substring
+    # (e.g., if it ever appears in a class or comment).
+    import re
+
+    input_match = re.search(r"<input[^>]*>", rendered)
+    assert input_match is not None, f"no <input> found in rendered output: {rendered}"
+    input_tag = input_match.group(0)
+    assert "required" not in input_tag, f"required=False must omit the attribute, got: {input_tag}"
