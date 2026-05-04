@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     "core",
     "members",
     "cooptation",
+    "memoires",
 ]
 
 MIDDLEWARE = [
