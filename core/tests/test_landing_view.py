@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from urllib.parse import quote
 
 import pytest
@@ -234,8 +235,9 @@ def test_ghost_card_includes_monogram_initials(client, settings, make_admin):
     body = client.get("/").content.decode("utf-8")
     # Monogram disc has the warm-tinted background and contains "IS" as text.
     assert "bg-ceremonial-gold/20" in body
-    # djlint may reformat whitespace inside the div; check initials appear in body.
-    assert "IS" in body
+    # djlint reformats the monogram div content onto its own indented line,
+    # so ">IS<" won't appear verbatim — use a regex that tolerates whitespace.
+    assert re.search(r">\s*IS\s*<", body) is not None, "monogram disc with 'IS' content not found"
 
 
 @pytest.mark.django_db
