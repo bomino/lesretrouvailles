@@ -202,7 +202,7 @@ class Command(BaseCommand):
         currently_listed = list(
             PublicSearchEntry.objects.filter(removed_at__isnull=True)
             .annotate(n=Count("added_by_admins"))
-            .filter(n__gte=2)
+            .filter(n__gte=1)
             .order_by("added_at")
         )
         for e in currently_listed:

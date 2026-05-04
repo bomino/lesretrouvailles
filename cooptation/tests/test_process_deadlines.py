@@ -514,7 +514,7 @@ def test_digest_includes_currently_listed_snapshot(make_admin, settings):
         e_active = PublicSearchEntry.objects.create(
             first_name="ActiveOne", last_name_initial="A.", years_at_ceg=[1980]
         )
-        e_active.added_by_admins.add(a, b)
+        e_active.added_by_admins.add(a)
 
     FakeResendBackend.sent_messages.clear()
     with freeze_time("2026-01-01"):
