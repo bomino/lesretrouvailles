@@ -25,7 +25,7 @@ class MemoryAdmin(admin.ModelAdmin):
     readonly_fields = ("created_by", "created_at", "updated_at")
 
     fieldsets = (
-        ("Photo", {"fields": ("upload", "photo_public_id")}),
+        ("Photo", {"fields": ("upload",)}),
         ("Légende", {"fields": ("caption",)}),
         ("Contexte", {"fields": ("taken_at", "location")}),
         ("Publication", {"fields": ("status",)}),
@@ -51,6 +51,11 @@ class MemoryAdmin(admin.ModelAdmin):
         if upload:
             old_public_id = obj.photo_public_id  # may be empty on create
             client = get_client()
+            # Note: this Cloudinary upload happens BEFORE super().save_model().
+            # If super().save_model() later raises (DB constraint, network blip),
+            # the Cloudinary blob is orphaned with no DB record. Acceptable at
+            # P5a scale (10-20 admin-curated photos); revisit if member uploads
+            # open up in Phase 2.
             obj.photo_public_id = client.upload_file(upload, folder="memoires")
             if old_public_id and old_public_id != obj.photo_public_id:
                 client.delete(old_public_id)

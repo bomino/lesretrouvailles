@@ -39,7 +39,6 @@ def test_admin_create_uploads_to_cloudinary_and_stamps_creator(fake_cloudinary, 
         "/admin/memoires/memory/add/",
         {
             "upload": _image_file("souvenir.jpg"),
-            "photo_public_id": "",  # blank on create — populated by save_model
             "caption": "Cours de récréation, 1983.",
             "taken_at": "1983-04-15",
             "location": "Birni",
@@ -68,7 +67,6 @@ def test_admin_edit_without_new_upload_keeps_existing_photo(fake_cloudinary, mak
         "/admin/memoires/memory/add/",
         {
             "upload": _image_file("first.jpg"),
-            "photo_public_id": "",
             "caption": "Original caption",
             "status": "draft",
         },
@@ -81,14 +79,61 @@ def test_admin_edit_without_new_upload_keeps_existing_photo(fake_cloudinary, mak
         f"/admin/memoires/memory/{m.pk}/change/",
         {
             "upload": "",  # no new file
-            "photo_public_id": original_public_id,
             "caption": "Updated caption",
             "status": "published",
         },
     )
-    assert response.status_code in (302, 200), (
-        f"got {response.status_code}, body={response.content[:500]}"
+    assert response.status_code == 302, (
+        f"expected 302 (admin redirect after save), got {response.status_code}, "
+        f"body={response.content[:500]}"
     )
     m.refresh_from_db()
     assert m.photo_public_id == original_public_id  # unchanged
     assert m.caption == "Updated caption"
+
+
+@pytest.mark.django_db
+def test_admin_edit_with_new_upload_replaces_photo_and_deletes_old(
+    fake_cloudinary, make_admin_user
+):
+    """Replacing the photo on an edit triggers a new Cloudinary upload and
+    writes a different public_id into photo_public_id.
+
+    Note: get_client() returns a fresh FakeCloudinary instance each call, so
+    delete_calls cannot be inspected across the create and edit requests. We
+    assert the visible outcome instead: photo_public_id changes to a value
+    derived from the new filename (FakeCloudinary is deterministic on name)."""
+    from memoires.models import Memory
+
+    creator = make_admin_user()
+    client = Client()
+    client.force_login(creator)
+
+    # Create with "first.jpg"
+    client.post(
+        "/admin/memoires/memory/add/",
+        {
+            "upload": _image_file("first.jpg"),
+            "caption": "Before replace",
+            "status": "draft",
+        },
+    )
+    m = Memory.objects.get(caption="Before replace")
+    original_public_id = m.photo_public_id
+
+    # Edit with "replacement.jpg" — different name → different deterministic public_id
+    response = client.post(
+        f"/admin/memoires/memory/{m.pk}/change/",
+        {
+            "upload": _image_file("replacement.jpg"),
+            "caption": "Before replace",
+            "status": "draft",
+        },
+    )
+    assert response.status_code == 302, (
+        f"expected 302, got {response.status_code}, body={response.content[:500]}"
+    )
+
+    m.refresh_from_db()
+    assert m.photo_public_id != original_public_id, "photo_public_id should change after re-upload"
+    assert m.photo_public_id.startswith("memoires/fake-")  # still a FakeCloudinary value

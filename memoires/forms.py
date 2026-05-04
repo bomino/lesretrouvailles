@@ -8,28 +8,22 @@ from .models import Memory
 
 
 class MemoryAdminForm(forms.ModelForm):
-    """Admin form for Memory. Adds an `upload` FileField that exists only on
-    the form (not on the Memory model). MemoryAdmin.save_model uploads the
-    file to Cloudinary via alumni.cloudinary and writes the resulting
-    public_id into Memory.photo_public_id."""
+    """Admin form for Memory. The `upload` FileField is form-only (not on
+    the model). MemoryAdmin.save_model uploads the file to Cloudinary via
+    alumni.cloudinary and writes the resulting public_id directly into
+    Memory.photo_public_id — bypassing the form entirely. This eliminates
+    the tamper-able POST vector that an exposed photo_public_id field
+    would create."""
 
     upload = forms.FileField(
         required=False,
         help_text="Choisir une photo. Conservera l'image existante si vide (en édition).",
-        widget=forms.ClearableFileInput(attrs={"accept": "image/jpeg,image/png,image/webp"}),
+        widget=forms.FileInput(attrs={"accept": "image/jpeg,image/png,image/webp"}),
     )
 
     class Meta:
         model = Memory
-        fields = ("photo_public_id", "caption", "taken_at", "location", "status")
-        widgets = {
-            "photo_public_id": forms.HiddenInput(),  # populated by save_model after upload
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # photo_public_id is set by save_model after upload; allow blank on the form.
-        self.fields["photo_public_id"].required = False
+        fields = ("caption", "taken_at", "location", "status")
 
     def clean(self):
         cleaned = super().clean()
