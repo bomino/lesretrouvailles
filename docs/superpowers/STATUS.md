@@ -253,7 +253,7 @@ Single dashboard for tracking phase and task completion across all plans. Update
 | 4 | Detail view + template | [x] | `c61304b` |
 | 5 | Admin (form + save_model + Cloudinary upload) | [x] | `fae5202` (+ review fix `453215c`) |
 | 6 | Nav link in base.html (desktop + mobile) | [x] | `140084d` |
-| 7 | STATUS.md update | [x] | (this commit) |
+| 7 | STATUS.md update | [x] | `b30179a` |
 
 ---
 
