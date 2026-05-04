@@ -50,6 +50,16 @@
                          aria-label="{% trans 'Navigation principale' %}">
                         <a href="/annuaire/"
                            class="rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "Annuaire" %}</a>
+                        <a href="/cooptations-a-valider/"
+                           class="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition">
+                            {% trans "Cooptations à valider" %}
+                            {% if pending_vouches_count %}
+                                <span class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-tertiary px-1.5 text-xs font-semibold text-on-tertiary"
+                                      aria-label="{% blocktrans count counter=pending_vouches_count %}{{ counter }} en attente{% plural %}{{ counter }} en attente{% endblocktrans %}">
+                                    {{ pending_vouches_count }}
+                                </span>
+                            {% endif %}
+                        </a>
                         <a href="/profil/"
                            class="rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "Mon profil" %}</a>
                     </nav>
