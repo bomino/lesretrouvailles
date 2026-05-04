@@ -12,8 +12,10 @@ Coverage strategy:
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
+import pytest
 from django.template.loader import render_to_string
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent / "templates" / "account"
@@ -64,9 +66,25 @@ def test_input_partial_supports_optional_field():
     # The input tag should NOT contain the bare `required` attribute.
     # Walk through carefully to avoid false matches on the `required` substring
     # (e.g., if it ever appears in a class or comment).
-    import re
-
     input_match = re.search(r"<input[^>]*>", rendered)
     assert input_match is not None, f"no <input> found in rendered output: {rendered}"
     input_tag = input_match.group(0)
     assert "required" not in input_tag, f"required=False must omit the attribute, got: {input_tag}"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "url",
+    [
+        "/accounts/password/reset/",
+        "/accounts/password/reset/done/",
+    ],
+)
+def test_password_reset_pages_render_with_brand_chrome(client, url):
+    """Anonymous-accessible pages in the password-reset flow render with
+    the project's base.html and contain no Django default errorlist markup."""
+    response = client.get(url)
+    assert response.status_code == 200
+    body = response.content.decode("utf-8")
+    assert "Les Retrouvailles" in body  # footer brand text from base.html
+    assert 'class="errorlist"' not in body
