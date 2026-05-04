@@ -15,6 +15,7 @@ COPY templates/ ./templates/
 COPY core/ ./core/
 COPY members/ ./members/
 COPY cooptation/ ./cooptation/
+COPY memoires/ ./memoires/
 
 RUN npx tailwindcss -i ./static/css/input.css -o ./static/css/output.css --minify
 
@@ -59,6 +60,7 @@ COPY alumni/ ./alumni/
 COPY core/ ./core/
 COPY members/ ./members/
 COPY cooptation/ ./cooptation/
+COPY memoires/ ./memoires/
 COPY templates/ ./templates/
 COPY locale/ ./locale/
 COPY manage.py ./
