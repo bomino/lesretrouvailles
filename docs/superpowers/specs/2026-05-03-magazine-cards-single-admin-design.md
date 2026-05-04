@@ -96,12 +96,17 @@ The `annotate` + `filter(n__gte=1)` is preserved (rather than dropped entirely) 
 
 ### Auto-add creator on admin save
 
-`members/admin.py:PublicSearchEntryAdmin` — add `save_model`:
+`members/admin.py:PublicSearchEntryAdmin` — override `save_model` (stash flag) and `save_related` (do the M2M add). The split is required because Django admin's `save_related` calls `form.save_m2m()` AFTER `save_model`, which would otherwise overwrite the M2M:
 
 ```python
 def save_model(self, request, obj, form, change):
+    obj._is_new = not change
     super().save_model(request, obj, form, change)
-    if not change:
+
+def save_related(self, request, form, formsets, change):
+    super().save_related(request, form, formsets, change)
+    obj = form.instance
+    if getattr(obj, "_is_new", False):
         obj.added_by_admins.add(request.user)
 ```
 
@@ -168,18 +173,20 @@ Single new email, fired once per ghost-entry creation, FYI tone with rich previe
 
 ### Trigger
 
-The email fires from `PublicSearchEntryAdmin.save_model` directly, not from a Django signal. Reasoning: `post_save` fires before the auto-add of the creator to `added_by_admins`, so a signal handler couldn't read `instance.added_by_admins.first()` reliably to identify the creator. Triggering from `save_model` lets us pass `request.user` explicitly and keeps the trigger close to the action.
+The email fires from `PublicSearchEntryAdmin.save_related` (alongside the auto-add — see "Auto-add creator on admin save" above), not from a Django signal. Reasoning: (1) `post_save` fires before the auto-add of the creator to `added_by_admins`, so a signal handler couldn't read `instance.added_by_admins.first()` reliably to identify the creator; (2) `save_related` runs after `form.save_m2m()` and is the correct hook for any logic that needs the M2M relationships in their final state. Triggering from there lets us pass `request.user` explicitly and keeps the trigger close to the action.
 
-Updated `save_model` in `members/admin.py:PublicSearchEntryAdmin`:
+Extended `save_related` in `members/admin.py:PublicSearchEntryAdmin`:
 
 ```python
-def save_model(self, request, obj, form, change):
-    super().save_model(request, obj, form, change)
-    if not change:
+def save_related(self, request, form, formsets, change):
+    super().save_related(request, form, formsets, change)
+    obj = form.instance
+    if getattr(obj, "_is_new", False):
         obj.added_by_admins.add(request.user)
-        from .emails import send_admin_ghost_added
         send_admin_ghost_added(obj, added_by=request.user)
 ```
+
+(The `send_admin_ghost_added` import lives at the top of `members/admin.py`.)
 
 Trade-off: notification is coupled to the admin code path. Acceptable because admins are the only creation surface; if a future phase adds a non-admin creation surface (e.g., a member-side ghost-add form), the call will need to move there too. No signal handler is added in this phase.
 
