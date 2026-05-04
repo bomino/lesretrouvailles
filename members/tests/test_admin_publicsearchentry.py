@@ -61,8 +61,9 @@ def test_admin_save_auto_adds_creator_to_signoffs(fake_backend, make_admin):
             "note": "",
         },
     )
-    assert response.status_code in (302, 200), (
-        f"got {response.status_code}, body={response.content[:500]}"
+    assert response.status_code == 302, (
+        f"expected 302 (redirect after save), got {response.status_code},"
+        f" body={response.content[:500]}"
     )
 
     entry = PublicSearchEntry.objects.get(first_name="Idrissa")
@@ -112,8 +113,6 @@ def test_admin_save_does_not_re_add_creator_on_edit(fake_backend, make_admin):
 def test_admin_save_fires_notification_email_on_create(fake_backend, make_admin):
     """Creating a new entry through the admin fires the admin_ghost_added
     email to other staff — but not to the creator themselves."""
-    from members.models import PublicSearchEntry  # noqa: F401
-
     creator = make_admin()
     other = make_admin()
 

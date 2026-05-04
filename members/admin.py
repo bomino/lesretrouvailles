@@ -2,6 +2,7 @@ from django.conf import settings
 from django.contrib import admin
 from django.utils.html import format_html
 
+from .emails import send_admin_ghost_added
 from .models import (
     AuditLog,
     ConsentRecord,
@@ -230,8 +231,6 @@ class PublicSearchEntryAdmin(admin.ModelAdmin):
         obj = form.instance
         if getattr(obj, "_is_new", False):
             obj.added_by_admins.add(request.user)
-            from .emails import send_admin_ghost_added
-
             send_admin_ghost_added(obj, added_by=request.user)
 
     @admin.display(description="Signatures")
