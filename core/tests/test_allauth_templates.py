@@ -88,3 +88,30 @@ def test_password_reset_pages_render_with_brand_chrome(client, url):
     body = response.content.decode("utf-8")
     assert "Les Retrouvailles" in body  # footer brand text from base.html
     assert 'class="errorlist"' not in body
+
+
+@pytest.mark.django_db
+def test_password_reset_from_key_done_page(client):
+    """The 'password set' confirmation page renders with brand chrome."""
+    response = client.get("/accounts/password/reset/key/done/")
+    assert response.status_code == 200
+    body = response.content.decode("utf-8")
+    assert "Les Retrouvailles" in body
+    assert 'class="errorlist"' not in body
+
+
+def test_password_reset_from_key_template_extends_base():
+    """The set-password page exists at the right path and extends base.html.
+    Reaching it via test client is awkward (needs a real key generation +
+    an interim GET-then-redirect dance allauth uses). Source-level check
+    is sufficient for chrome assertions."""
+    src = (TEMPLATES_DIR / "password_reset_from_key.html").read_text(encoding="utf-8")
+    assert '{% extends "base.html" %}' in src
+    # base.html will render "Les Retrouvailles" — we just need the extension.
+
+
+def test_password_reset_from_key_token_fail_branch():
+    """Source contains the token_fail branch with a CTA back to /accounts/password/reset/."""
+    src = (TEMPLATES_DIR / "password_reset_from_key.html").read_text(encoding="utf-8")
+    assert "token_fail" in src
+    assert "account_reset_password" in src  # the CTA URL name
