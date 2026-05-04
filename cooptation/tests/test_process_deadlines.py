@@ -238,24 +238,20 @@ def test_purge_stale_ghosts_skips_entries_under_365_days(make_admin, settings):
 
 
 @pytest.mark.django_db
-def test_purge_stale_ghosts_skips_drafts_with_under_2_signoffs(make_admin, settings):
-    """Master spec: 'listed' = 2+ signoffs. Drafts/pending entries are
-    not subject to the 12-month sweep."""
+def test_purge_stale_ghosts_skips_zero_signoff_drafts(settings):
+    """0-cosigner entries (defensive edge case) are hidden from the public
+    landing AND skipped from the 365-day purge sweep — purge only targets
+    'published' (1+ cosigner) entries (P4d spec §B)."""
     from freezegun import freeze_time
 
     from members.models import AuditLog, PublicSearchEntry
 
     settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
-    a = make_admin()
 
     with freeze_time("2025-01-01"):
         e_draft = PublicSearchEntry.objects.create(
             first_name="Draft", last_name_initial="D.", years_at_ceg=[1980]
         )  # 0 cosigners
-        e_pending = PublicSearchEntry.objects.create(
-            first_name="Pending", last_name_initial="P.", years_at_ceg=[1980]
-        )
-        e_pending.added_by_admins.add(a)  # 1 cosigner
 
     AuditLog.objects.filter(action="ghost.entry.purged").delete()
 
@@ -263,10 +259,37 @@ def test_purge_stale_ghosts_skips_drafts_with_under_2_signoffs(make_admin, setti
         call_command("process_cooptation_deadlines")
 
     e_draft.refresh_from_db()
-    e_pending.refresh_from_db()
     assert e_draft.removed_at is None
-    assert e_pending.removed_at is None
     assert AuditLog.objects.filter(action="ghost.entry.purged").count() == 0
+
+
+@pytest.mark.django_db
+def test_purge_stale_ghosts_includes_single_signoff_published_entries(make_admin, settings):
+    """P4d: a single-cosigner entry IS subject to the 365-day purge — under
+    the new single-admin governance, 1+ cosigner = published, and any
+    published entry that hasn't been refreshed in 12 months gets swept."""
+    from freezegun import freeze_time
+
+    from members.models import AuditLog, PublicSearchEntry
+
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    a = make_admin()
+
+    with freeze_time("2025-04-15"):
+        e = PublicSearchEntry.objects.create(
+            first_name="SoloPublished", last_name_initial="P.", years_at_ceg=[1980]
+        )
+        e.added_by_admins.add(a)  # 1 cosigner — published under P4d
+
+    AuditLog.objects.filter(action="ghost.entry.purged").delete()
+
+    with freeze_time("2026-04-16"):  # 366 days later
+        call_command("process_cooptation_deadlines")
+
+    e.refresh_from_db()
+    assert e.removed_at is not None
+    assert e.removed_reason == "Périmée — non renouvelée par les admins"
+    assert AuditLog.objects.filter(action="ghost.entry.purged", target_id=str(e.pk)).exists()
 
 
 @pytest.mark.django_db

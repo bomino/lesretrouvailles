@@ -149,18 +149,19 @@ class Command(BaseCommand):
         return "mixed"
 
     def _purge_stale_ghosts(self, now) -> int:
-        """Auto-remove published ghost entries older than 12 months.
+        """Auto-remove published ghost entries (1+ cosigner) older than 12 months.
 
-        'Published' = 2+ admin signoffs. 'Stale' = added_at <= now - 365 days
-        AND removed_at IS NULL. Removal is recorded via AuditLog
-        (ghost.entry.purged) and the entry's removed_at + removed_reason are
-        set so the existing public queryset filters it out automatically.
+        'Published' = 1+ admin signoff (P4d single-admin governance). 'Stale'
+        = added_at <= now - 365 days AND removed_at IS NULL. Removal is
+        recorded via AuditLog (ghost.entry.purged) and the entry's removed_at
+        + removed_reason are set so the existing public queryset filters it out
+        automatically.
         """
         cutoff = now - timedelta(days=GHOST_STALE_THRESHOLD_DAYS)
         candidates = (
             PublicSearchEntry.objects.filter(removed_at__isnull=True, added_at__lte=cutoff)
             .annotate(n=Count("added_by_admins"))
-            .filter(n__gte=2)
+            .filter(n__gte=1)
         )
         count = 0
         for entry in candidates:
