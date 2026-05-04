@@ -189,3 +189,43 @@ def test_signup_records_source_ip(client, active_member, second_active_member):
     )
     app = AdminApplication.objects.get()
     assert app.source_ip == "203.0.113.5"
+
+
+@pytest.mark.django_db
+def test_signup_accepts_classes_with_section_letters(client, active_member, second_active_member):
+    """Real-world classes have parallel sections (4eA, 3eB) — the form must
+    accept them, not just the level-only 6e/5e/4e/3e form."""
+    from cooptation.models import AdminApplication
+
+    response = client.post(
+        "/inscription/",
+        _form_payload(active_member, second_active_member, classes="6eA,5eB,4eA,3eC"),
+    )
+    assert response.status_code == 302
+    app = AdminApplication.objects.get()
+    assert app.classes == ["6eA", "5eB", "4eA", "3eC"]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "bad_value",
+    [
+        "2nde",  # high-school grade, out of CEG range
+        "7e",  # level out of range
+        "4eAB",  # two-letter section not allowed
+        "4a",  # missing the "e"
+        "xyz",  # not a class
+    ],
+)
+def test_signup_rejects_invalid_class_formats(
+    client, active_member, second_active_member, bad_value
+):
+    from cooptation.models import AdminApplication
+
+    response = client.post(
+        "/inscription/",
+        _form_payload(active_member, second_active_member, classes=bad_value),
+    )
+    assert response.status_code == 200  # form re-rendered with error
+    assert AdminApplication.objects.count() == 0
+    assert b"Classe inconnue" in response.content

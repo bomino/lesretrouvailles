@@ -56,6 +56,15 @@ def test_member_clean_rejects_unknown_grade(make_member):
 
 
 @pytest.mark.django_db
+def test_member_clean_accepts_classes_with_section_letters(make_member):
+    """Real-world classes have parallel sections (4eA, 3eB). full_clean must
+    accept these in addition to the level-only forms."""
+    m = make_member()
+    m.classes = ["6e", "6eA", "4eB", "3eC"]
+    m.full_clean()  # Must not raise.
+
+
+@pytest.mark.django_db
 def test_member_show_flags_default_true(make_member):
     m = make_member()
     assert m.show_email is True

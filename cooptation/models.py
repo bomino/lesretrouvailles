@@ -9,8 +9,6 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.utils import timezone
 
-from members.models import GRADE_CHOICES
-
 
 class AdminApplication(models.Model):
     STATUS_CHOICES = [
@@ -32,9 +30,7 @@ class AdminApplication(models.Model):
     full_name = models.CharField(max_length=160, blank=True)
     nickname = models.CharField(max_length=60, blank=True)
     years_attended = ArrayField(models.IntegerField(), size=6, default=list)
-    classes = ArrayField(
-        models.CharField(max_length=4, choices=GRADE_CHOICES), size=4, default=list
-    )
+    classes = ArrayField(models.CharField(max_length=4), size=4, default=list)
     city = models.CharField(max_length=80, blank=True)
     country = models.CharField(max_length=80, blank=True, default="Niger")
     profession = models.CharField(max_length=120, blank=True)

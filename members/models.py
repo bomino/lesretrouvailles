@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import secrets
 import uuid
 
@@ -10,13 +11,22 @@ from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 from django.db import models
 
+# Level-only labels — kept for code that wants to enumerate the four base
+# grades (e.g., admin filters, level-summary pages). Real-world class names
+# may include a parallel-section letter suffix (e.g., "4eA", "3eB"); use
+# VALID_CLASS_PATTERN to validate the full label.
 GRADE_CHOICES = [
     ("6e", "6e"),
     ("5e", "5e"),
     ("4e", "4e"),
     ("3e", "3e"),
 ]
-VALID_GRADES = {key for key, _ in GRADE_CHOICES}
+
+# Match a French middle-school class label: a level (6e/5e/4e/3e) optionally
+# followed by a single ASCII section letter (A-Z, a-z). Examples accepted:
+# "6e", "5eA", "4eb", "3eC". Examples rejected: "2nde" (high school),
+# "7e" (out of range), "4eAB" (no two-letter sections), "4a" (missing "e").
+VALID_CLASS_PATTERN = re.compile(r"^[3-6]e[A-Za-z]?$")
 
 STATUS_CHOICES = [
     ("active", "Actif"),
@@ -53,7 +63,7 @@ class Member(models.Model):
         default=default_years,
     )
     classes = ArrayField(
-        models.CharField(max_length=4, choices=GRADE_CHOICES),
+        models.CharField(max_length=4),
         size=4,
         default=default_classes,
     )
@@ -102,7 +112,7 @@ class Member(models.Model):
         super().clean()
         if any(y not in VALID_YEARS for y in self.years_attended):
             raise ValidationError({"years_attended": "Années hors plage 1980-1985."})
-        if any(c not in VALID_GRADES for c in self.classes):
+        if any(not VALID_CLASS_PATTERN.match(c) for c in self.classes):
             raise ValidationError({"classes": "Classe inconnue."})
 
 
