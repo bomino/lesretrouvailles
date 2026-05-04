@@ -86,3 +86,43 @@ def make_memoriam_entry(db, make_admin_user):
         return InMemoriamEntry.objects.create(**defaults)
 
     return _make
+
+
+@pytest.fixture
+def make_memoriam_nomination(db):
+    from members.models import Member
+    from memoriam.models import InMemoriamNomination
+
+    counter = {"i": 0}
+
+    def _make(**kwargs):
+        counter["i"] += 1
+        nominator = kwargs.pop("nominator", None)
+        if nominator is None:
+            User = get_user_model()  # noqa: N806
+            user = User.objects.create_user(
+                username=f"nom{counter['i']}@example.test",
+                email=f"nom{counter['i']}@example.test",
+                password="x",
+            )
+            nominator = Member.objects.create(
+                user=user,
+                first_name="Nom",
+                last_name=f"Inator{counter['i']}",
+                years_attended=[1980],
+                classes=["6e"],
+                city="Niamey",
+                status="active",
+            )
+        defaults = {
+            "nominator": nominator,
+            "proposed_name": f"Camarade Disparu {counter['i']}",
+            "proposed_nickname": "",
+            "proposed_years": [1980],
+            "personal_memory": "Souvenir partagé.",
+            "family_contact_hint": "",
+        }
+        defaults.update(kwargs)
+        return InMemoriamNomination.objects.create(**defaults)
+
+    return _make

@@ -141,3 +141,69 @@ class InMemoriamEntry(models.Model):
     def tribute_teaser(self) -> str:
         plain = _MD_TOKENS.sub("", self.tribute or "")
         return Truncator(plain).chars(120, html=False, truncate="…")
+
+
+NOMINATION_STATUS_CHOICES = [
+    ("pending", "À examiner"),
+    ("accepted", "Acceptée"),
+    ("declined", "Refusée"),
+    ("duplicate", "Doublon"),
+]
+
+
+class InMemoriamNomination(models.Model):
+    """A member-submitted nomination for an In Memoriam fiche.
+
+    Annexe D §D.1 prohibits members from creating fiches directly. This
+    model captures their proposal so an admin can run the consent process
+    offline and then create the fiche.
+    """
+
+    STATUS_CHOICES = NOMINATION_STATUS_CHOICES
+
+    nominator = models.ForeignKey(
+        "members.Member",
+        on_delete=models.PROTECT,
+        related_name="memoriam_nominations",
+    )
+    proposed_name = models.CharField(max_length=200)
+    proposed_nickname = models.CharField(max_length=80, blank=True)
+    proposed_years = ArrayField(
+        models.IntegerField(),
+        size=6,
+        default=list,
+        blank=True,
+    )
+    personal_memory = models.TextField()
+    family_contact_hint = models.TextField(blank=True)
+
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default="pending",
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="memoriam_nominations_reviewed",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    admin_note = models.TextField(blank=True)
+    linked_entry = models.ForeignKey(
+        InMemoriamEntry,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="nominations",
+    )
+
+    class Meta:
+        ordering = ["-submitted_at"]
+        verbose_name = "Nomination In Memoriam"
+        verbose_name_plural = "Nominations In Memoriam"
+
+    def __str__(self) -> str:
+        return f"{self.proposed_name} (par {self.nominator})"

@@ -100,3 +100,21 @@ def test_tribute_teaser_strips_markdown_and_truncates(make_memoriam_entry):
     assert "**" not in teaser
     assert len(teaser) <= 121  # 120 + ellipsis char
     assert teaser.endswith("…")
+
+
+@pytest.mark.django_db
+def test_nomination_default_status_is_pending(make_memoriam_nomination):
+    nom = make_memoriam_nomination()
+    assert nom.status == "pending"
+    assert nom.reviewed_at is None
+    assert nom.reviewed_by is None
+    assert nom.linked_entry is None
+
+
+@pytest.mark.django_db
+def test_nomination_status_choices(make_memoriam_nomination):
+    from memoriam.models import InMemoriamNomination
+
+    expected = {"pending", "accepted", "declined", "duplicate"}
+    actual = {choice for choice, _ in InMemoriamNomination.STATUS_CHOICES}
+    assert actual == expected
