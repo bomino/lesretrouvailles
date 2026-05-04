@@ -89,13 +89,36 @@ class FakeCloudinary:
         self.delete_calls.append(public_id)
 
 
+_fake_singleton: FakeCloudinary | None = None
+
+
 def get_client() -> CloudinaryClient:
-    """Resolve the Cloudinary client from settings."""
+    """Resolve the Cloudinary client from settings.
+
+    When FakeCloudinary is configured (tests), returns a module-level singleton
+    so multiple get_client() calls within the same test share recorded state.
+    Call reset_fake_client() from a fixture to get a fresh instance.
+    """
+    global _fake_singleton  # noqa: PLW0603
     path = getattr(settings, "CLOUDINARY_CLIENT_PATH", "alumni.cloudinary.RealCloudinary")
     module_name, _, class_name = path.rpartition(".")
     module = import_module(module_name)
     cls = getattr(module, class_name)
+    if cls is FakeCloudinary:
+        if _fake_singleton is None:
+            _fake_singleton = FakeCloudinary()
+        return _fake_singleton
     return cls()
+
+
+def reset_fake_client() -> FakeCloudinary:
+    """Replace the FakeCloudinary singleton with a fresh instance and return it.
+
+    Call from test fixtures before each test that needs a clean slate.
+    """
+    global _fake_singleton  # noqa: PLW0603
+    _fake_singleton = FakeCloudinary()
+    return _fake_singleton
 
 
 def now_timestamp() -> int:
