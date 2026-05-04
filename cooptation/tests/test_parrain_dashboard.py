@@ -127,3 +127,23 @@ def test_already_answered_requests_are_hidden(make_cooptation_request, response_
     c.login(username=parrain.user.username, password="x")
     response = c.get(URL)
     assert candidate_name not in response.content.decode("utf-8")
+
+
+@pytest.mark.django_db
+def test_expired_requests_are_hidden(make_cooptation_request):
+    req = make_cooptation_request()
+    req.expires_at = timezone.now() - timedelta(hours=1)
+    req.save()
+    candidate_name = req.application.full_name
+
+    parrain = req.parrain
+    parrain.user.set_password("x")
+    parrain.user.save()
+    ConsentRecord.objects.create(
+        member=parrain, charter_version=CHARTER_CURRENT_VERSION, ip_address="127.0.0.1"
+    )
+
+    c = Client()
+    c.login(username=parrain.user.username, password="x")
+    response = c.get(URL)
+    assert candidate_name not in response.content.decode("utf-8")
