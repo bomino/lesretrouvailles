@@ -1,8 +1,11 @@
 """Pending-vouches dashboard at /cooptations-a-valider/ — member-only listing
 of CooptationRequests still awaiting a response from the current user."""
 
+from datetime import timedelta
+
 import pytest
 from django.test import Client
+from django.utils import timezone
 
 from members.charters import CHARTER_CURRENT_VERSION
 from members.models import ConsentRecord
@@ -41,3 +44,40 @@ def test_member_with_zero_pending_sees_empty_state(make_member, make_user):
     response = c.get(URL)
     assert response.status_code == 200
     assert b"aucune cooptation en attente" in response.content
+
+
+@pytest.mark.django_db
+def test_member_with_pending_sees_candidates_ordered_by_urgency(
+    make_cooptation_request, make_application
+):
+    """Two pending requests for the same parrain — both candidates render,
+    soonest-to-expire first."""
+    req1 = make_cooptation_request(
+        application=make_application(full_name="Aïssa Soumana"),
+    )
+    parrain = req1.parrain
+    # Second request for the SAME parrain, expiring sooner
+    make_cooptation_request(
+        application=make_application(full_name="Boubacar Issoufou"),
+        parrain=parrain,
+        expires_at=timezone.now() + timedelta(days=2),
+    )
+    # Push req1 expiry further out so req2 should sort first
+    req1.expires_at = timezone.now() + timedelta(days=10)
+    req1.save()
+
+    parrain.user.set_password("x")
+    parrain.user.save()
+    ConsentRecord.objects.create(
+        member=parrain, charter_version=CHARTER_CURRENT_VERSION, ip_address="127.0.0.1"
+    )
+    c = Client()
+    c.login(username=parrain.user.username, password="x")
+
+    response = c.get(URL)
+    body = response.content.decode("utf-8")
+    assert response.status_code == 200
+    assert "Aïssa Soumana" in body
+    assert "Boubacar Issoufou" in body
+    # Order: Boubacar (expires in 2 days) appears before Aïssa (10 days)
+    assert body.index("Boubacar Issoufou") < body.index("Aïssa Soumana")
