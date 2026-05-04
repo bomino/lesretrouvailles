@@ -1,0 +1,22 @@
+{% extends "account/_form_card.html" %}
+{% load i18n %}
+{% block title %}
+    {% trans "Confirmer cette adresse email" %}
+{% endblock %}
+{% block headline %}
+    {% trans "Confirmer cette adresse email" %}
+{% endblock %}
+{% block subtitle %}
+    {% if confirmation %}
+        {% blocktrans with email=confirmation.email_address.email %}Cliquez sur Confirmer pour valider l'adresse {{ email }}.{% endblocktrans %}
+    {% else %}
+        {% trans "Lien de confirmation invalide ou expiré." %}
+    {% endif %}
+{% endblock %}
+{% block action_url %}
+    {% url 'account_confirm_email' confirmation.key %}
+{% endblock %}
+{% block submit_label %}
+    {% trans "Confirmer" %}
+{% endblock %}
+{% block fields %}{# no input fields — just the confirm button #}{% endblock %}

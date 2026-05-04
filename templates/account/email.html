@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}
+    {% trans "Mes adresses email" %}
+{% endblock %}
+{% block content %}
+    <div class="mx-auto max-w-2xl">
+        <div class="text-center mb-6">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-tertiary">{% trans "Espace membre" %}</p>
+            <h1 class="mt-3 font-display text-3xl font-semibold tracking-tight md:text-4xl">{% trans "Mes adresses email" %}</h1>
+            <p class="mt-3 text-sm text-secondary">
+                {% trans "Gérez l'adresse principale et les adresses associées à votre compte." %}
+            </p>
+        </div>
+        {% if emailaddresses %}
+            <form method="post"
+                  action="{% url 'account_email' %}"
+                  class="rounded-2xl bg-surface p-6 shadow-sm border border-secondary/15 space-y-4">
+                {% csrf_token %}
+                <p class="text-sm text-secondary">{% trans "Adresses associées à ce compte :" %}</p>
+                <ul class="space-y-2">
+                    {% for radio in emailaddress_radios %}
+                        {% with emailaddress=radio.emailaddress %}
+                            <li class="flex items-center gap-3 p-2 rounded-lg hover:bg-base-200">
+                                <input type="radio"
+                                       name="email"
+                                       value="{{ emailaddress.email }}"
+                                       id="{{ radio.id }}"
+                                       {% if radio.checked %}checked{% endif %}
+                                       class="h-4 w-4 text-tertiary focus:ring-tertiary">
+                                <label for="{{ radio.id }}" class="flex-1 text-sm">
+                                    {{ emailaddress.email }}
+                                    {% if emailaddress.verified %}
+                                        <span class="ml-2 inline-block rounded-full bg-tertiary/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-tertiary">{% trans "Vérifiée" %}</span>
+                                    {% else %}
+                                        <span class="ml-2 inline-block rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-yellow-800">{% trans "Non vérifiée" %}</span>
+                                    {% endif %}
+                                    {% if emailaddress.primary %}
+                                        <span class="ml-2 inline-block rounded-full bg-ceremonial-gold/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ceremonial-gold">{% trans "Principale" %}</span>
+                                    {% endif %}
+                                </label>
+                            </li>
+                        {% endwith %}
+                    {% endfor %}
+                </ul>
+                <div class="flex flex-wrap gap-2 pt-2">
+                    <button type="submit"
+                            name="action_primary"
+                            class="rounded-lg bg-tertiary px-4 py-2 text-sm font-medium text-on-tertiary shadow-sm hover:opacity-95 min-h-tap">
+                        {% trans "Définir comme principale" %}
+                    </button>
+                    <button type="submit"
+                            name="action_send"
+                            class="rounded-lg border border-secondary/25 bg-white px-4 py-2 text-sm font-medium hover:border-tertiary/40 hover:text-tertiary min-h-tap">
+                        {% trans "Renvoyer la vérification" %}
+                    </button>
+                    <button type="submit"
+                            name="action_remove"
+                            class="rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-800 hover:bg-red-100 min-h-tap"
+                            onclick="return confirm('{% trans "Confirmer la suppression de cette adresse ?" %}');">
+                        {% trans "Supprimer" %}
+                    </button>
+                </div>
+            </form>
+        {% endif %}
+        {% if can_add_email %}
+            <div class="mt-8 rounded-2xl bg-surface p-6 shadow-sm border border-secondary/15">
+                <h2 class="font-display text-xl font-semibold tracking-tight mb-4">{% trans "Ajouter une adresse" %}</h2>
+                <form method="post" action="{% url 'account_email' %}" class="space-y-4">
+                    {% csrf_token %}
+                    {% if form.non_field_errors %}
+                        <div role="alert"
+                             class="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+                            {{ form.non_field_errors }}
+                        </div>
+                    {% endif %}
+                    {% include "account/_input.html" with field=form.email type="email" label=_("Nouvelle adresse") autocomplete="email" %}
+                    <button type="submit"
+                            name="action_add"
+                            class="rounded-lg bg-tertiary px-4 py-2.5 text-sm font-medium text-on-tertiary shadow-sm hover:opacity-95 min-h-tap">
+                        {% trans "Ajouter" %}
+                    </button>
+                </form>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

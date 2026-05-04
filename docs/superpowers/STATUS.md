@@ -18,6 +18,7 @@ Single dashboard for tracking phase and task completion across all plans. Update
 | P4d | Public surface — magazine cards + single-admin governance | Complete (2026-05-03) | [plan](plans/2026-05-03-magazine-cards-single-admin.md) |
 | P3.1 | Parrain UX Polish (pending-vouches dashboard + 90-day session) | Complete (2026-05-03) | [plan](plans/2026-05-03-parrain-ux-polish.md) |
 | P5a | Mur des souvenirs (member-only photo gallery) | Complete (2026-05-03) | [plan](plans/2026-05-03-mur-souvenirs.md) |
+| Allauth styling | Allauth template overrides (full /accounts/* visual coverage) | Complete (2026-05-04) | [plan](plans/2026-05-04-styled-allauth-templates.md) |
 | P5 | Mémoire seed | (split into P5a + P5b) | — |
 | P6 | Ops & RGPD | Not started | — |
 | P7 | Soft launch | Not started | — |
@@ -254,6 +255,26 @@ Single dashboard for tracking phase and task completion across all plans. Update
 | 5 | Admin (form + save_model + Cloudinary upload) | [x] | `fae5202` (+ review fix `453215c`) |
 | 6 | Nav link in base.html (desktop + mobile) | [x] | `140084d` |
 | 7 | STATUS.md update | [x] | `b30179a` |
+
+---
+
+## Allauth template styling
+
+**Shipped:** 2026-05-04
+**Plan:** [plans/2026-05-04-styled-allauth-templates.md](plans/2026-05-04-styled-allauth-templates.md)
+**Spec:** [specs/2026-05-04-styled-allauth-templates-design.md](specs/2026-05-04-styled-allauth-templates-design.md)
+**Test suite:** all passing (18 new tests in core/tests/test_allauth_templates.py; full suite 405 passing)
+
+| # | Task | Done | Commit |
+|---|------|------|--------|
+| 1 | Shared partials (_input + _form_card) + smoke tests | [x] | `28a32d6` (+ fix `ea68e61`) |
+| 2 | Password-reset request flow (2 templates) | [x] | `e29f0fb` |
+| 3 | Password-reset-from-key flow (2 templates incl. token_fail) | [x] | `143145f` |
+| 4 | Logged-in password mgmt (2 templates) | [x] | `0fac2e4` |
+| 5 | Email management (4 templates) | [x] | `c67c97d` |
+| 6 | Edge-case templates (3 templates) | [x] | `ea1c362` |
+| 7 | Signup resilience override + negative POST test | [x] | `4f52539` |
+| 8 | STATUS.md update | [x] | (this commit) |
 
 ---
 
