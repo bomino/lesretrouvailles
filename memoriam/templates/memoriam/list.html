@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load memory_photo %}
+{% block robots %}noindex,nofollow{% endblock %}
+{% block title %}
+    {% trans "In Memoriam" %} — {{ block.super }}
+{% endblock %}
+{% block content %}
+    <section class="mx-auto max-w-3xl px-4 py-12">
+        <header class="text-center mb-10">
+            <span class="inline-flex h-12 w-12 items-center justify-center rounded-full bg-ceremonial-gold/15 text-ceremonial-gold text-3xl">🕊️</span>
+            <h1 class="mt-4 font-display text-3xl font-semibold tracking-tight">{% trans "In Memoriam" %}</h1>
+            <p class="mt-2 text-secondary">{% trans "Un espace de recueillement pour celles et ceux qui nous ont quittés." %}</p>
+            <a href="{% url 'memoriam:nominate' %}"
+               class="mt-6 inline-block rounded-lg border border-secondary/25 px-4 py-2 text-sm hover:border-tertiary/40 transition">
+                {% trans "Nominer un camarade" %}
+            </a>
+        </header>
+        {% if entries %}
+            <ul class="grid gap-6 sm:grid-cols-2">
+                {% for entry in entries %}
+                    <li>
+                        <a href="{% url 'memoriam:detail' entry.pk %}"
+                           class="block rounded-2xl bg-surface border border-secondary/15 p-6 hover:border-ceremonial-gold/40 transition shadow-sm">
+                            <div class="flex gap-4 items-start">
+                                {% if entry.photo_public_id %}
+                                    <img src="{% memory_thumb entry.photo_public_id 96 %}"
+                                         alt=""
+                                         class="h-16 w-16 rounded-full object-cover" />
+                                {% else %}
+                                    <span class="inline-flex h-16 w-16 items-center justify-center rounded-full bg-ceremonial-gold/15 text-ceremonial-gold font-display text-xl">{{ entry.full_name|slice:":1" }}</span>
+                                {% endif %}
+                                <div>
+                                    <h2 class="font-display text-lg font-semibold">{{ entry.full_name }}</h2>
+                                    {% if entry.years_attended %}
+                                        <p class="text-xs text-secondary mt-1">CEG {{ entry.years_attended|join:", " }}</p>
+                                    {% endif %}
+                                    <p class="text-sm mt-2 text-secondary leading-relaxed">{{ entry.tribute_teaser }}</p>
+                                </div>
+                            </div>
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="text-center text-secondary italic">{% trans "Aucune fiche publiée pour l'instant." %}</p>
+        {% endif %}
+    </section>
+{% endblock %}
