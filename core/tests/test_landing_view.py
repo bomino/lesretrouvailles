@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from urllib.parse import quote
 
 import pytest
@@ -152,17 +153,19 @@ def test_ghost_section_renders_published_entries(client, settings, make_admin):
 
 
 @pytest.mark.django_db
-def test_ghost_section_hides_single_admin_entries(client, settings, make_admin):
+def test_single_signoff_entry_is_visible_on_landing(client, settings, make_admin):
+    """P4d: a single admin's add immediately publishes the entry. Replaces
+    the prior 2-signoff gate from P4a."""
     settings.PUBLIC_GHOST_LIST_ENABLED = True
     from members.models import PublicSearchEntry
 
     e = PublicSearchEntry.objects.create(
-        first_name="OnlyOneSignoff", last_name_initial="Z.", years_at_ceg=[1980]
+        first_name="SoloSignoff", last_name_initial="X.", years_at_ceg=[1980]
     )
-    e.added_by_admins.add(make_admin())  # Only one admin → not published
+    e.added_by_admins.add(make_admin())  # Only one admin
 
     body = client.get("/").content.decode("utf-8")
-    assert "OnlyOneSignoff" not in body
+    assert "SoloSignoff" in body
 
 
 @pytest.mark.django_db
@@ -186,13 +189,25 @@ def test_ghost_section_hides_removed_entries(client, settings, make_admin):
 
 
 @pytest.mark.django_db
-def test_anonymous_feature_cards_not_clickable(client):
-    """Annuaire/InMemoriam/Cooptation cards should not be <a> tags for anonymous
-    visitors — they lead to gated pages and would frustrate a first-time visitor."""
+def test_anonymous_member_only_cards_are_static(client):
+    """Annuaire/Mon profil destinations are gated to members. The cards
+    referencing them stay as <article> for anonymous visitors so a
+    first-time visitor doesn't hit a 302 wall. Cooptation is wired
+    differently — it points to the public /inscription/ form
+    (see test_anonymous_cooptation_card_links_to_signup)."""
     body = client.get("/").content.decode("utf-8")
     assert "Annuaire" in body
     assert 'href="/annuaire/"' not in body
     assert 'href="/profil/"' not in body
+
+
+@pytest.mark.django_db
+def test_anonymous_cooptation_card_links_to_signup(client):
+    """The Cooptation feature card is clickable for anonymous visitors and
+    points to the public signup form, not a gated page."""
+    body = client.get("/").content.decode("utf-8")
+    assert "Cooptation" in body
+    assert 'href="/inscription/"' in body
 
 
 @pytest.mark.django_db
@@ -215,3 +230,41 @@ def test_no_removal_link_when_flag_off(client, settings):
     settings.PUBLIC_GHOST_LIST_ENABLED = False
     body = client.get("/").content.decode("utf-8")
     assert "Retirer mon nom" not in body
+
+
+@pytest.mark.django_db
+def test_ghost_card_includes_monogram_initials(client, settings, make_admin):
+    """P4d: each magazine card shows a monogram circle with the entry's
+    initials (first letter of first_name + first letter of last_name_initial)."""
+    settings.PUBLIC_GHOST_LIST_ENABLED = True
+    from members.models import PublicSearchEntry
+
+    e = PublicSearchEntry.objects.create(
+        first_name="Idrissa", last_name_initial="S.", years_at_ceg=[1980, 1981]
+    )
+    e.added_by_admins.add(make_admin())
+
+    body = client.get("/").content.decode("utf-8")
+    # Monogram disc has the warm-tinted background and contains "IS" as text.
+    assert "bg-ceremonial-gold/20" in body
+    # djlint reformats the monogram div content onto its own indented line,
+    # so ">IS<" won't appear verbatim — use a regex that tolerates whitespace.
+    assert re.search(r">\s*IS\s*<", body) is not None, "monogram disc with 'IS' content not found"
+
+
+@pytest.mark.django_db
+def test_ghost_card_uses_gold_accent_bar(client, settings, make_admin):
+    """P4d: each card has a 4px left gold accent bar — the magazine chrome."""
+    settings.PUBLIC_GHOST_LIST_ENABLED = True
+    from members.models import PublicSearchEntry
+
+    e = PublicSearchEntry.objects.create(
+        first_name="Hamidou", last_name_initial="A.", years_at_ceg=[1981, 1982]
+    )
+    e.added_by_admins.add(make_admin())
+
+    body = client.get("/").content.decode("utf-8")
+    # Tailwind 3+ syntax: border-l-{N} sets left-border width, border-l-{color}
+    # sets left-border color specifically (vs border-{color} for all sides).
+    assert "border-l-4" in body
+    assert "border-l-ceremonial-gold" in body

@@ -33,34 +33,22 @@ def make_admin(db):
 def test_ghost_status_filter_buckets(client, make_admin):
     """Each filter value returns the right entries and excludes the others.
 
-    Buckets:
-      draft     — 0 cosigners, not removed
-      pending   — 1 cosigner,  not removed
-      published — 2+ cosigners, not removed, < 365 days old
-      stale     — 2+ cosigners, not removed, >= 365 days old
+    P4d simplified buckets (5 → 3):
+      published — n>=1, not removed, < 365 days old
+      stale     — n>=1, not removed, >= 365 days old
       removed   — removed_at is set (regardless of cosigners)
     """
     from members.models import PublicSearchEntry
 
     admin_user = make_admin()
-    a, b, c = make_admin(), make_admin(), make_admin()
+    a, b = make_admin(), make_admin()
 
-    # Force-login the staff user so the admin changelist is reachable.
     client.force_login(admin_user)
-
-    PublicSearchEntry.objects.create(
-        first_name="Draft", last_name_initial="D.", years_at_ceg=[1980]
-    )
-
-    e_pending = PublicSearchEntry.objects.create(
-        first_name="Pending", last_name_initial="P.", years_at_ceg=[1980]
-    )
-    e_pending.added_by_admins.add(a)
 
     e_published = PublicSearchEntry.objects.create(
         first_name="Published", last_name_initial="B.", years_at_ceg=[1980]
     )
-    e_published.added_by_admins.add(a, b)
+    e_published.added_by_admins.add(a)
 
     e_stale = PublicSearchEntry.objects.create(
         first_name="Stale", last_name_initial="T.", years_at_ceg=[1980]
@@ -73,16 +61,14 @@ def test_ghost_status_filter_buckets(client, make_admin):
     e_removed = PublicSearchEntry.objects.create(
         first_name="Removed", last_name_initial="R.", years_at_ceg=[1980]
     )
-    e_removed.added_by_admins.add(a, b, c)
+    e_removed.added_by_admins.add(a, b)
     e_removed.removed_at = timezone.now()
     e_removed.save()
 
     cases = [
-        ("draft", "Draft", ["Pending", "Published", "Stale", "Removed"]),
-        ("pending", "Pending", ["Draft", "Published", "Stale", "Removed"]),
-        ("published", "Published", ["Draft", "Pending", "Stale", "Removed"]),
-        ("stale", "Stale", ["Draft", "Pending", "Published", "Removed"]),
-        ("removed", "Removed", ["Draft", "Pending", "Published", "Stale"]),
+        ("published", "Published", ["Stale", "Removed"]),
+        ("stale", "Stale", ["Published", "Removed"]),
+        ("removed", "Removed", ["Published", "Stale"]),
     ]
     for value, expected_present, expected_absent in cases:
         response = client.get(f"/admin/members/publicsearchentry/?ghost_status={value}")

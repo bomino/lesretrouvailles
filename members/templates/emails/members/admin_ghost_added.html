@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fr">
+    <body style="font-family: Inter, system-ui, sans-serif; color: #1a1c1e">
+        <p>Bonjour,</p>
+        <p>
+            <strong>{{ added_by.get_full_name|default:added_by.username }}</strong>
+            vient d'ajouter une fiche à la liste des anciens recherchés.
+        </p>
+        <table style="border-collapse: collapse; margin: 12px 0">
+            <tr>
+                <td style="padding: 4px 12px 4px 0; color: #6c7278">Nom</td>
+                <td>
+                    <strong>{{ entry.first_name }} {{ entry.last_name_initial }}</strong>
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 4px 12px 4px 0; color: #6c7278">Années au CEG</td>
+                <td>{{ entry.first_year }}-{{ entry.last_year }}</td>
+            </tr>
+            {% if entry.note %}
+                <tr>
+                    <td style="padding: 4px 12px 4px 0; color: #6c7278">Note</td>
+                    <td>{{ entry.note }}</td>
+                </tr>
+            {% endif %}
+            <tr>
+                <td style="padding: 4px 12px 4px 0; color: #6c7278">Ajoutée le</td>
+                <td>{{ entry.added_at|date:"d M Y à H:i" }}</td>
+            </tr>
+        </table>
+        <p>
+            Si cette fiche ne vous semble pas pertinente, vous pouvez la
+            <a href="{{ site_url }}/admin/members/publicsearchentry/{{ entry.pk }}/change/">retirer immédiatement via l'admin</a>.
+        </p>
+        <p style="color: #6c7278; font-size: 12px">
+            <a href="{{ site_url }}/admin/members/publicsearchentry/"
+               style="color: #6c7278">Liste complète</a>
+            ·
+            <a href="{{ site_url }}/" style="color: #6c7278">Page publique</a>
+        </p>
+        <p>L'équipe Les Retrouvailles</p>
+    </body>
+</html>

@@ -1,0 +1,16 @@
+Bonjour,
+
+{{ added_by.get_full_name|default:added_by.username }} vient d'ajouter une fiche à la liste des anciens recherchés.
+
+Nom : {{ entry.first_name }} {{ entry.last_name_initial }}
+Années au CEG : {{ entry.first_year }}-{{ entry.last_year }}{% if entry.note %}
+Note : {{ entry.note }}{% endif %}
+Ajoutée le : {{ entry.added_at|date:"d M Y à H:i" }}
+
+Si cette fiche ne vous semble pas pertinente, vous pouvez la retirer immédiatement via l'admin :
+{{ site_url }}/admin/members/publicsearchentry/{{ entry.pk }}/change/
+
+Liste complète : {{ site_url }}/admin/members/publicsearchentry/
+Page publique : {{ site_url }}/
+
+L'équipe Les Retrouvailles

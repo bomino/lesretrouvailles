@@ -2,6 +2,7 @@ from django.conf import settings
 from django.contrib import admin
 from django.utils.html import format_html
 
+from .emails import send_admin_ghost_added
 from .models import (
     AuditLog,
     ConsentRecord,
@@ -126,17 +127,15 @@ class ConsentRecordAdmin(admin.ModelAdmin):
 
 class GhostStatusFilter(admin.SimpleListFilter):
     """Lifecycle status of a PublicSearchEntry, computed from signoff
-    count + removed_at + added_at. Lets admins find entries pending
-    cosignature, stale ones approaching auto-removal, etc."""
+    count + removed_at + added_at. P4d simplified to 3 meaningful
+    buckets (was 5 before single-admin governance)."""
 
     title = "Statut publication"
     parameter_name = "ghost_status"
 
     def lookups(self, request, model_admin):
         return [
-            ("draft", "Brouillon (0 signatures)"),
-            ("pending", "En attente (1 signature)"),
-            ("published", "Publiée (2+)"),
+            ("published", "Publiée"),
             ("stale", "Périmée (>12 mois)"),
             ("removed", "Retirée"),
         ]
@@ -155,16 +154,12 @@ class GhostStatusFilter(admin.SimpleListFilter):
             return queryset.filter(removed_at__isnull=False)
 
         qs = queryset.filter(removed_at__isnull=True).annotate(n=Count("added_by_admins"))
-        if value == "draft":
-            return qs.filter(n=0)
-        if value == "pending":
-            return qs.filter(n=1)
         if value == "published":
             cutoff = timezone.now() - timedelta(days=365)
-            return qs.filter(n__gte=2, added_at__gt=cutoff)
+            return qs.filter(n__gte=1, added_at__gt=cutoff)
         if value == "stale":
             cutoff = timezone.now() - timedelta(days=365)
-            return qs.filter(n__gte=2, added_at__lte=cutoff)
+            return qs.filter(n__gte=1, added_at__lte=cutoff)
         return queryset
 
 
@@ -172,9 +167,11 @@ class GhostStatusFilter(admin.SimpleListFilter):
 class PublicSearchEntryAdmin(admin.ModelAdmin):
     """Governance UI for the public ghost list.
 
-    Two co-signers required for publication — admins add themselves to
-    `added_by_admins` to vouch. Until 2 distinct admins have signed off,
-    the entry stays invisible publicly.
+    P4d: a single admin's add publishes the entry immediately. The creating
+    admin is auto-cosigned in `save_related`, and a notification email goes
+    out to all other staff so they can spot a bad-faith add quickly. Other
+    admins can still add themselves to `added_by_admins` to enrich the audit
+    trail, but it's no longer required for publication.
     """
 
     list_display = (
@@ -201,12 +198,13 @@ class PublicSearchEntryAdmin(admin.ModelAdmin):
             },
         ),
         (
-            "Cosignature (2 admins requis pour publication)",
+            "Cosignataires (optionnel)",
             {
                 "fields": ("added_by_admins",),
                 "description": (
-                    "Ajoutez-vous à la liste pour cosigner. Au moins 2 admins "
-                    "distincts requis avant que le nom n'apparaisse publiquement."
+                    "Vous êtes ajouté·e automatiquement à l'enregistrement. "
+                    "D'autres admins peuvent ajouter leur nom pour étoffer la "
+                    "trace d'audit, mais ce n'est plus requis pour la publication."
                 ),
             },
         ),
@@ -215,6 +213,21 @@ class PublicSearchEntryAdmin(admin.ModelAdmin):
             {"fields": ("added_at", "removal_token", "removed_at", "removed_reason")},
         ),
     )
+
+    def save_model(self, request, obj, form, change):
+        """P4d: stash whether this is a create so save_related can act on it."""
+        obj._is_new = not change
+        super().save_model(request, obj, form, change)
+
+    def save_related(self, request, form, formsets, change):
+        """P4d: after M2M is saved from the form, auto-add the creating admin
+        and fire the admin_ghost_added FYI email to other staff. Gated on
+        _is_new so it only fires on create, not on subsequent edits."""
+        super().save_related(request, form, formsets, change)
+        obj = form.instance
+        if getattr(obj, "_is_new", False):
+            obj.added_by_admins.add(request.user)
+            send_admin_ghost_added(obj, added_by=request.user)
 
     @admin.display(description="Signatures")
     def signoff_count(self, obj):

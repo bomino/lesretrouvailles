@@ -46,7 +46,7 @@ def landing_view(request):
         ghosts = list(
             PublicSearchEntry.objects.filter(removed_at__isnull=True)
             .annotate(n=Count("added_by_admins"))
-            .filter(n__gte=2)
+            .filter(n__gte=1)
         )
 
     share_url = request.build_absolute_uri("/?utm_source=whatsapp&utm_campaign=invitation")

@@ -717,21 +717,32 @@ Run: `pytest members/tests/test_admin_publicsearchentry.py -v`
 
 Expected: 4 FAIL — `save_model` override doesn't exist yet, so creator isn't auto-added and email isn't fired.
 
-- [ ] **Step 3: Add `save_model` to `PublicSearchEntryAdmin`**
+- [ ] **Step 3: Add `save_model` + `save_related` to `PublicSearchEntryAdmin`**
 
-Open `members/admin.py`. Locate `PublicSearchEntryAdmin` (around line 172). Add this method INSIDE the class (after the `fieldsets` definition, before `def signoff_count` if it exists):
+**Important Django gotcha:** `ModelAdmin.save_model` runs BEFORE `save_related`, and `save_related` calls `form.save_m2m()` which OVERWRITES the M2M with whatever's in the form data. If you put `obj.added_by_admins.add(request.user)` in `save_model`, the subsequent `form.save_m2m()` will clobber it. The correct pattern is to stash a flag in `save_model` and act on it in `save_related` AFTER the super() call.
+
+Open `members/admin.py`. First, add the email-sender import to the module-level import block (alongside the existing `.models` / `.emails` imports if present):
+
+```python
+from .emails import send_admin_ghost_added
+```
+
+Then locate `PublicSearchEntryAdmin` (around line 172) and add these two methods INSIDE the class (after the `fieldsets` definition, before `def signoff_count` if it exists):
 
 ```python
     def save_model(self, request, obj, form, change):
-        """P4d: on first save, auto-cosign the creating admin (so the entry
-        publishes immediately) and fire the admin_ghost_added FYI email
-        to other staff. Skipped on subsequent edits — the creator is
-        already in added_by_admins by then, and a re-edit shouldn't
-        re-notify."""
+        """P4d: stash whether this is a create so save_related can act on it."""
+        obj._is_new = not change
         super().save_model(request, obj, form, change)
-        if not change:
+
+    def save_related(self, request, form, formsets, change):
+        """P4d: after M2M is saved from the form, auto-add the creating admin
+        and fire the admin_ghost_added FYI email to other staff. Gated on
+        _is_new so it only fires on create, not on subsequent edits."""
+        super().save_related(request, form, formsets, change)
+        obj = form.instance
+        if getattr(obj, "_is_new", False):
             obj.added_by_admins.add(request.user)
-            from .emails import send_admin_ghost_added
             send_admin_ghost_added(obj, added_by=request.user)
 ```
 
