@@ -74,7 +74,15 @@ class NominationForm(forms.ModelForm):
             "personal_memory",
             "family_contact_hint",
         )
-        widgets = {
-            "personal_memory": forms.Textarea(attrs={"rows": 5}),
-            "family_contact_hint": forms.Textarea(attrs={"rows": 3}),
-        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        input_class = (
+            "block w-full rounded-lg border border-secondary/20 bg-white px-3 py-2.5 "
+            "text-base shadow-sm focus:border-tertiary focus:outline-none focus:ring-2 "
+            "focus:ring-tertiary/30"
+        )
+        for name, field in self.fields.items():
+            if name in ("personal_memory", "family_contact_hint"):
+                field.widget = forms.Textarea(attrs={"rows": 5 if name == "personal_memory" else 3})
+            field.widget.attrs.setdefault("class", input_class)
