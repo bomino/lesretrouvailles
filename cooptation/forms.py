@@ -5,7 +5,7 @@ from __future__ import annotations
 from django import forms
 from django.core.exceptions import ValidationError
 
-from members.models import GRADE_CHOICES, VALID_YEARS, Member
+from members.models import VALID_CLASS_PATTERN, VALID_YEARS, Member
 
 
 class SignupForm(forms.Form):
@@ -19,7 +19,7 @@ class SignupForm(forms.Form):
     classes = forms.CharField(
         max_length=40,
         label="Classes (séparées par virgule)",
-        help_text="Parmi : 6e, 5e, 4e, 3e",
+        help_text="Ex. 6e, 6eA, 4eB, 3eC (lettre de section optionnelle)",
     )
     city = forms.CharField(max_length=80, label="Ville actuelle")
     country = forms.CharField(max_length=80, initial="Niger", label="Pays")
@@ -55,9 +55,8 @@ class SignupForm(forms.Form):
     def clean_classes(self):
         raw = self.cleaned_data["classes"]
         items = [p.strip() for p in raw.split(",") if p.strip()]
-        valid = {key for key, _ in GRADE_CHOICES}
-        if any(c not in valid for c in items):
-            raise ValidationError("Classe inconnue. Utilisez 6e, 5e, 4e, ou 3e.")
+        if any(not VALID_CLASS_PATTERN.match(c) for c in items):
+            raise ValidationError("Classe inconnue. Format attendu : 6e, 6eA, 4eB, 3eC, etc.")
         return items
 
     def clean(self):
