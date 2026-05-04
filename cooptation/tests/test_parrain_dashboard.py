@@ -56,13 +56,13 @@ def test_member_with_pending_sees_candidates_ordered_by_urgency(
         application=make_application(full_name="Aïssa Soumana"),
     )
     parrain = req1.parrain
-    # Second request for the SAME parrain, expiring sooner
+    # Second request for the SAME parrain, expiring sooner (2 days vs 10 days)
     make_cooptation_request(
         application=make_application(full_name="Boubacar Issoufou"),
         parrain=parrain,
         expires_at=timezone.now() + timedelta(days=2),
     )
-    # Push req1 expiry further out so req2 should sort first
+    # Push req1 expiry further out so Boubacar's request sorts first
     req1.expires_at = timezone.now() + timedelta(days=10)
     req1.save()
 
