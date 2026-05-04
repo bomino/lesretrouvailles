@@ -60,6 +60,7 @@ TEMPLATES = [
                 "django.template.context_processors.i18n",
                 "members.context.member_preferences",
                 "core.context_processors.site",
+                "cooptation.context_processors.pending_vouches_count",
             ],
         },
     },
