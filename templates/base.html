@@ -66,6 +66,22 @@
                         </a>
                         <a href="/profil/"
                            class="rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "Mon profil" %}</a>
+                        {% if request.user.is_staff %}
+                            <a href="/admin/"
+                               class="inline-flex items-center gap-1.5 rounded-lg border border-secondary/20 px-3 py-2 hover:border-tertiary/40 hover:bg-base-200 hover:text-tertiary transition"
+                               title="{% trans 'Panneau d’administration Django' %}">
+                                <svg class="h-4 w-4"
+                                     viewBox="0 0 24 24"
+                                     fill="none"
+                                     stroke="currentColor"
+                                     stroke-width="2"
+                                     aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                {% trans "Administration" %}
+                            </a>
+                        {% endif %}
                     </nav>
                 {% endif %}
                 <div class="flex items-center gap-2">
@@ -157,7 +173,24 @@
                             <a href="/profil/"
                                class="flex items-center min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "Mon profil" %}</a>
                         </li>
-                        <li class="border-t border-secondary/10 mt-1 pt-1">
+                        {% if request.user.is_staff %}
+                            <li class="border-t border-secondary/10 mt-1 pt-1">
+                                <a href="/admin/"
+                                   class="flex items-center gap-2 min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition">
+                                    <svg class="h-5 w-5"
+                                         viewBox="0 0 24 24"
+                                         fill="none"
+                                         stroke="currentColor"
+                                         stroke-width="2"
+                                         aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                    {% trans "Administration" %}
+                                </a>
+                            </li>
+                        {% endif %}
+                        <li {% if not request.user.is_staff %}class="border-t border-secondary/10 mt-1 pt-1"{% endif %}>
                             <a href="https://chat.whatsapp.com/"
                                rel="noopener noreferrer"
                                target="_blank"

@@ -201,3 +201,75 @@ def test_mobile_dropdown_contains_all_nav_links_and_logout(client):
     assert "/profil/" in mobile_html
     assert "Groupe WhatsApp" in mobile_html
     assert "Se déconnecter" in mobile_html
+
+
+@pytest.mark.django_db
+def test_admin_link_visible_to_staff_user(client):
+    """A staff user (is_staff=True) sees the 'Administration' link in the navbar."""
+    from django.contrib.auth import get_user_model
+
+    from members.charters import CHARTER_CURRENT_VERSION
+    from members.models import ConsentRecord, Member
+
+    User = get_user_model()  # noqa: N806
+    admin = User.objects.create_user(
+        username="admintest@example.test",
+        email="admintest@example.test",
+        password="x",
+        is_staff=True,
+        is_superuser=True,
+    )
+    member = Member.objects.create(
+        user=admin,
+        first_name="Admin",
+        last_name="Test",
+        years_attended=[1980],
+        classes=["6e"],
+        city="Niamey",
+        status="active",
+    )
+    ConsentRecord.objects.create(
+        member=member, charter_version=CHARTER_CURRENT_VERSION, ip_address="127.0.0.1"
+    )
+    client.force_login(admin)
+
+    html = client.get(reverse("landing")).content.decode("utf-8")
+    # 'Administration' link to /admin/ appears at least once (desktop) and
+    # also in the mobile dropdown — so >=2 occurrences in the rendered page.
+    assert html.count('href="/admin/"') >= 2
+    assert "Administration" in html
+
+
+@pytest.mark.django_db
+def test_admin_link_hidden_from_regular_member(client):
+    """A non-staff member never sees the 'Administration' link."""
+    from django.contrib.auth import get_user_model
+
+    from members.charters import CHARTER_CURRENT_VERSION
+    from members.models import ConsentRecord, Member
+
+    User = get_user_model()  # noqa: N806
+    user = User.objects.create_user(
+        username="regulartest@example.test",
+        email="regulartest@example.test",
+        password="x",
+        is_staff=False,  # regular member
+    )
+    member = Member.objects.create(
+        user=user,
+        first_name="Regular",
+        last_name="Test",
+        years_attended=[1980],
+        classes=["6e"],
+        city="Niamey",
+        status="active",
+    )
+    ConsentRecord.objects.create(
+        member=member, charter_version=CHARTER_CURRENT_VERSION, ip_address="127.0.0.1"
+    )
+    client.force_login(user)
+
+    html = client.get(reverse("landing")).content.decode("utf-8")
+    assert 'href="/admin/"' not in html
+    # Defense: ensure no other rendering of the admin label slipped through
+    assert "Administration" not in html
