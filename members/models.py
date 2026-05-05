@@ -249,6 +249,7 @@ class AuditLog(models.Model):
         ("memoriam.entry.published", "Fiche In Memoriam publiée"),
         ("memoriam.entry.archived", "Fiche In Memoriam archivée"),
         ("memoriam.nomination.created", "Nomination In Memoriam soumise"),
+        ("rgpd.member.purged", "Membre purgé (RGPD)"),
     ]
 
     actor = models.ForeignKey(

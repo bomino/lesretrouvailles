@@ -1,0 +1,88 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls %}
+{% block bodyclass %}
+    {{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} delete-confirmation
+{% endblock %}
+{% block breadcrumbs %}
+    <div class="breadcrumbs">
+        <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+        &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+        &rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+        &rsaquo; Purger RGPD
+    </div>
+{% endblock %}
+{% block content %}
+    <h1>Purger RGPD (irréversible)</h1>
+    <p style="background: #fff3cd;
+              border: 1px solid #ffc107;
+              padding: 1em;
+              margin: 1em 0">
+        <strong>⚠ Action destructive.</strong>
+        Cette opération efface <em>définitivement</em> les données personnelles du ou des membres
+        sélectionnés (compte, profil, photos Cloudinary, sauvegardes Tigris, requêtes de cooptation,
+        nominations In Memoriam, candidatures anonymisées) et écrit une entrée
+        <code>rgpd.member.purged</code> au journal d'audit.
+        Aucune annulation possible une fois validée.
+    </p>
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="rgpd_purge_action">
+        {% for plan in plans %}
+            <input type="hidden"
+                   name="{{ action_checkbox_name }}"
+                   value="{{ plan.member.pk }}">
+        {% endfor %}
+        {% for plan in plans %}
+            <fieldset style="border: 1px solid #ccc; padding: 1em; margin: 1em 0;">
+                <legend>
+                    <strong>{{ plan.member.full_name }}</strong>
+                </legend>
+                <p>
+                    <strong>Email :</strong> <code>{{ plan.member.user.email }}</code>
+                    <br>
+                    <strong>ID :</strong> {{ plan.member.id }}
+                </p>
+                {% if plan.blocker %}
+                    <p style="color: #c00;">
+                        <strong>Bloqué :</strong> {{ plan.blocker }}
+                    </p>
+                {% else %}
+                    <p>
+                        <strong>Sera supprimé :</strong>
+                    </p>
+                    <ul style="margin-left: 1.5em;">
+                        <li>{{ plan.summary.deleted_counts.memories }} souvenir(s) (Mur des souvenirs)</li>
+                        <li>{{ plan.summary.deleted_counts.cooptation_requests }} requête(s) de cooptation où ce membre est parrain</li>
+                        <li>{{ plan.summary.deleted_counts.memoriam_nominations }} nomination(s) In Memoriam</li>
+                        <li>{{ plan.summary.deleted_counts.admin_applications_anonymized }} candidature(s) à anonymiser</li>
+                        <li>{{ plan.summary.deleted_counts.cloudinary_public_ids }} photo(s) sur Cloudinary</li>
+                    </ul>
+                    <label for="confirm_email_{{ plan.member.id }}"
+                           style="display: block;
+                                  margin-top: 1em">
+                        <strong>Pour confirmer, saisissez l'email exact :</strong>
+                    </label>
+                    <input type="text"
+                           id="confirm_email_{{ plan.member.id }}"
+                           name="confirm_email_{{ plan.member.id }}"
+                           autocomplete="off"
+                           spellcheck="false"
+                           style="width: 100%;
+                                  max-width: 400px;
+                                  padding: .5em;
+                                  font-family: monospace"
+                           placeholder="{{ plan.member.user.email }}">
+                {% endif %}
+            </fieldset>
+        {% endfor %}
+        <div style="margin-top: 2em;">
+            <input type="submit"
+                   name="apply"
+                   value="Purger maintenant"
+                   class="default"
+                   style="background: #c00">
+            <a href="{% url opts|admin_urlname:'changelist' %}"
+               class="button cancel-link">Annuler</a>
+        </div>
+    </form>
+{% endblock %}

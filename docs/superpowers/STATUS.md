@@ -22,7 +22,8 @@ Single dashboard for tracking phase and task completion across all plans. Update
 | P5b | In Memoriam (member-only fiches + nomination form) | Complete (2026-05-04) | [plan](plans/2026-05-04-in-memoriam.md) |
 | P5 | Mémoire seed | Complete (P5a + P5b shipped 2026-05-04) | — |
 | P6a | Ops — media backup (Cloudinary→Railway bucket) | Complete (2026-05-05) | [plan](plans/2026-05-04-media-backup.md) |
-| P6 | Ops & RGPD (full) | In progress (P6a complete; P6b/P6c not started) | — |
+| P6b | Ops — RGPD admin purge | Complete (2026-05-05) | [plan](plans/2026-05-05-rgpd-admin-purge.md) |
+| P6 | Ops & RGPD (full) | In progress (P6a + P6b complete; P6c not started) | — |
 | P7 | Soft launch | Not started | — |
 
 ---
@@ -290,9 +291,9 @@ Single dashboard for tracking phase and task completion across all plans. Update
 
 ## P6 — Ops & RGPD
 
-**Status:** In progress (P6a complete; P6b/P6c not started).
-**Scope:** Media backup (P6a, complete — see below), `purge_user_from_backups.py`, RGPD deletion flow, DMARC monitoring, `AuditLog` model + decorator.
-**Plans:** P6a [plan](plans/2026-05-04-media-backup.md); P6b/P6c not yet written.
+**Status:** In progress (P6a + P6b complete; P6c not started).
+**Scope:** Media backup (P6a, complete — see below), RGPD admin-driven purge (P6b, complete — see below), DMARC monitoring (P6c), AdminApplication 6-month auto-purge cron, AuditLog 12-month retention cron.
+**Plans:** P6a [plan](plans/2026-05-04-media-backup.md); P6b [plan](plans/2026-05-05-rgpd-admin-purge.md); P6c not yet written.
 
 ---
 
@@ -363,6 +364,33 @@ Single dashboard for tracking phase and task completion across all plans. Update
 - **Photo-bearing model discovery is hardcoded** (`Member`, `Memory`, `InMemoriamEntry`). Future phases adding a `photo_public_id` field must update `_collect_photo_public_ids()` in `core/management/commands/backup_media.py`. Acceptable until ≥5 such models exist.
 - **Database backup is NOT in P6a** — relies on Railway's automatic daily Postgres snapshots (7-day retention). Documented in runbook §6.
 - The command lives in `core/management/commands/` (already an installed app) instead of `alumni/management/`. Avoids promoting `alumni/` (the project package) to a Django app just for command discovery.
+
+---
+
+## P6b — Ops: RGPD admin purge
+
+**Shipped:** 2026-05-05
+**Plan:** [plans/2026-05-05-rgpd-admin-purge.md](plans/2026-05-05-rgpd-admin-purge.md)
+**Spec:** [specs/2026-05-05-rgpd-admin-purge-design.md](specs/2026-05-05-rgpd-admin-purge-design.md)
+**Test suite:** 477 passing total (14 new tests in `members/tests/test_rgpd_purge.py`).
+
+| # | Task | Done | Commit |
+|---|------|------|--------|
+| 1 | AuditLog `rgpd.member.purged` action choice + migration | [x] | `14affbc` |
+| 2 | `rgpd_purge_member` service function (engine + 10 tests) | [x] | `2fd2735` |
+| 3 | `rgpd_purge_member` management command (--dry-run, --yes) | [x] | `85d4e13` |
+| 4 | Admin action 'Purger RGPD' with type-to-confirm intermediate page | [x] | `8530021` |
+| 5 | Operator runbook | [x] | `7b9f464` |
+| 6 | STATUS update | [x] | _this commit_ |
+
+**Notable design decisions:**
+- **Admin-only scope.** Master spec §9.4 also describes a member-self-service flow with granular content choices (delete vs anonymize). Deferred — at our scale and stage RGPD requests come in via email and an admin executes. Self-service can ship later as a separate phase calling into this same engine. Spec §A reasoning.
+- **Hard-delete personal artifacts; anonymize cross-domain references.** Member's profile photo, gallery uploads, nominations are hard-deleted. AuditLog entries about other things this member did are kept but the actor FK becomes NULL (SET_NULL already configured). AdminApplication rows tied to this email get `.purge()` called on them (existing P3 anonymization machinery).
+- **Refusal preconditions, not silent cascades.** If the member has created In Memoriam fiches (`PROTECT` FK to User), the engine refuses with a message telling the operator to reassign `created_by` first. If the actor is the member themselves, refused (would lock the operator out mid-cascade). No schema changes — refusal is rare and easy to fix in 30 seconds via Django admin.
+- **External-system calls happen BEFORE the DB transaction.** Cloudinary delete + Tigris bucket delete_version run first. If they fail, the DB is untouched and the operator re-runs safely. DB mutations are wrapped in `transaction.atomic()`. The AuditLog entry is the LAST step — its presence is the unambiguous signal of full success.
+- **Audit row carries no PII.** Single `rgpd.member.purged` entry per purge with metadata = `{email_hash: <12-char sha1>, deleted_counts: {...}}`. The hash lets a future investigator confirm "the member with email X was purged on date Y" without storing the email itself.
+- **Type-to-confirm UX.** CLI prompts for the literal word `yes`; admin action requires typing the member's exact email per row. Five seconds of friction; eliminates fat-finger purges. Same pattern GitHub uses for repo deletion.
+- **No new pip deps.** Reuses `alumni.cloudinary` (P2) + `alumni.storage` (P6a) + existing `AuditLog` (P4b). Zero infrastructure surface added.
 
 ---
 

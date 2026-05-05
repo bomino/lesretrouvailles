@@ -1,5 +1,7 @@
 from django.conf import settings
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.shortcuts import redirect
+from django.template.response import TemplateResponse
 from django.utils.html import format_html
 
 from .emails import send_admin_ghost_added
@@ -11,6 +13,7 @@ from .models import (
     PublicSearchEntry,
     RemovalRequest,
 )
+from .services import PurgeRefused, rgpd_purge_member
 
 
 @admin.register(Member)
@@ -19,6 +22,7 @@ class MemberAdmin(admin.ModelAdmin):
     list_filter = ("status", "country", "city")
     search_fields = ("first_name", "last_name", "nickname")
     readonly_fields = ("slug", "created_at", "updated_at", "photo_uploader")
+    actions = ("rgpd_purge_action",)
 
     fieldsets = (
         (
@@ -96,6 +100,88 @@ class MemberAdmin(admin.ModelAdmin):
             cloud=settings.CLOUDINARY_CLOUD_NAME,
             slug=obj.slug,
         )
+
+    @admin.action(description="Purger RGPD (irréversible)")
+    def rgpd_purge_action(self, request, queryset):
+        """RGPD member purge with type-to-confirm intermediate page.
+
+        Two-phase flow:
+        1. Initial action submission → render confirmation page listing
+           the selected members with a 'type the email to confirm' input
+           per member.
+        2. POST with `apply=1` and matching `confirm_email_<id>` per
+           member → run the service for each. Mismatches refuse the
+           batch (no partial purges).
+        """
+        members = list(queryset)
+        plans: list[dict] = []
+        for m in members:
+            try:
+                plans.append(
+                    {
+                        "member": m,
+                        "summary": rgpd_purge_member(m, actor=request.user, dry_run=True),
+                        "blocker": None,
+                    },
+                )
+            except PurgeRefused as e:
+                plans.append({"member": m, "summary": None, "blocker": str(e)})
+
+        if "apply" not in request.POST:
+            return TemplateResponse(
+                request,
+                "admin/members/member/rgpd_purge_confirm.html",
+                {
+                    "title": "Purger RGPD (irréversible)",
+                    "plans": plans,
+                    "queryset": queryset,
+                    "opts": self.model._meta,
+                    "action_checkbox_name": admin.helpers.ACTION_CHECKBOX_NAME,
+                },
+            )
+
+        # Validate all typed-emails before doing anything destructive.
+        mismatches: list[Member] = []
+        for plan in plans:
+            m = plan["member"]
+            typed = request.POST.get(f"confirm_email_{m.id}", "").strip()
+            if typed != m.user.email:
+                mismatches.append(m)
+
+        if mismatches or any(p["blocker"] for p in plans):
+            for m in mismatches:
+                messages.error(
+                    request,
+                    f"Confirmation email did not match for {m.full_name}. Aborted.",
+                )
+            for p in plans:
+                if p["blocker"]:
+                    messages.error(request, f"{p['member'].full_name}: {p['blocker']}")
+            # Re-render the confirmation template so the operator can fix
+            return TemplateResponse(
+                request,
+                "admin/members/member/rgpd_purge_confirm.html",
+                {
+                    "title": "Purger RGPD (irréversible)",
+                    "plans": plans,
+                    "queryset": queryset,
+                    "opts": self.model._meta,
+                    "action_checkbox_name": admin.helpers.ACTION_CHECKBOX_NAME,
+                },
+            )
+
+        # All typed-emails match and no blockers. Execute.
+        success = 0
+        for plan in plans:
+            try:
+                rgpd_purge_member(plan["member"], actor=request.user)
+                success += 1
+            except PurgeRefused as e:
+                messages.error(request, f"{plan['member'].full_name}: {e}")
+
+        if success:
+            messages.success(request, f"{success} membre(s) purgé(s) (RGPD).")
+        return redirect(request.get_full_path())
 
 
 @admin.register(NotificationPreference)
