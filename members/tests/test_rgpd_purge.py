@@ -367,3 +367,65 @@ def test_cli_executes_with_yes_flag(fake_clients, make_member):
 
     assert not Member.objects.filter(id=target_id).exists()
     assert AuditLog.objects.filter(action="rgpd.member.purged").count() == 1
+
+
+# -------- Admin action test (Task 4) --------
+
+
+@pytest.mark.django_db
+def test_admin_action_intermediate_confirmation(fake_clients, make_member, client):
+    """The admin action MUST require typing the email; submit without it
+    or with a mismatched value renders the confirmation page (no purge).
+    Only the correct email triggers the purge."""
+    from members.models import AuditLog, Member
+
+    target = make_member(photo_public_id="members/admin/action")
+    target_id = target.id
+    target_email = target.user.email
+
+    admin = _make_admin_user()
+    client.force_login(admin)
+
+    url = "/admin/members/member/"
+
+    # Phase 1: initial action submission (no confirm_email yet) → render template
+    resp = client.post(
+        url,
+        {
+            "action": "rgpd_purge_action",
+            "_selected_action": [str(target_id)],
+        },
+    )
+    assert resp.status_code == 200
+    assert b"Purger RGPD" in resp.content or b"RGPD" in resp.content
+    # Member still exists — no purge yet
+    assert Member.objects.filter(id=target_id).exists()
+
+    # Phase 2: submit confirmation with WRONG email → refuse, render again
+    resp = client.post(
+        url,
+        {
+            "action": "rgpd_purge_action",
+            "_selected_action": [str(target_id)],
+            "apply": "1",
+            f"confirm_email_{target_id}": "wrong@example.test",
+        },
+    )
+    assert Member.objects.filter(id=target_id).exists(), (
+        "Wrong email should not have triggered purge"
+    )
+
+    # Phase 3: submit with the CORRECT email → purge succeeds
+    resp = client.post(
+        url,
+        {
+            "action": "rgpd_purge_action",
+            "_selected_action": [str(target_id)],
+            "apply": "1",
+            f"confirm_email_{target_id}": target_email,
+        },
+    )
+    # Should redirect back to changelist after success
+    assert resp.status_code in (200, 302)
+    assert not Member.objects.filter(id=target_id).exists()
+    assert AuditLog.objects.filter(action="rgpd.member.purged").count() == 1
