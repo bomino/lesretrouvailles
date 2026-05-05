@@ -35,11 +35,16 @@ def main() -> int:
     args = parser.parse_args()
 
     print(f"[1/4] Fetching credentials for bucket '{args.bucket}'...")
+    # shell=True on Windows so the .cmd shim Railway installs gets resolved.
+    # On POSIX it's a no-op for the same single-string command.
+    is_windows = sys.platform == "win32"
+    cmd = (
+        f'railway bucket credentials --bucket "{args.bucket}" --json'
+        if is_windows
+        else ["railway", "bucket", "credentials", "--bucket", args.bucket, "--json"]
+    )
     try:
-        raw = subprocess.check_output(
-            ["railway", "bucket", "credentials", "--bucket", args.bucket, "--json"],
-            text=True,
-        )
+        raw = subprocess.check_output(cmd, text=True, shell=is_windows)
     except FileNotFoundError:
         print("ERROR: 'railway' CLI not found on PATH. Install from https://docs.railway.com/")
         return 1
@@ -69,32 +74,60 @@ def main() -> int:
         region_name=creds["region"],
     )
 
+    from botocore.exceptions import ClientError  # noqa: WPS433
+
     print("[2/4] Enabling versioning...")
-    s3.put_bucket_versioning(
-        Bucket=creds["bucketName"],
-        VersioningConfiguration={"Status": "Enabled"},
-    )
-    versioning = s3.get_bucket_versioning(Bucket=creds["bucketName"])
-    if versioning.get("Status") != "Enabled":
-        print(f"      WARNING: versioning state after put = {versioning.get('Status')!r}")
-    else:
-        print("      versioning: Enabled")
+    try:
+        s3.put_bucket_versioning(
+            Bucket=creds["bucketName"],
+            VersioningConfiguration={"Status": "Enabled"},
+        )
+        versioning = s3.get_bucket_versioning(Bucket=creds["bucketName"])
+        if versioning.get("Status") != "Enabled":
+            print(f"      WARNING: versioning state after put = {versioning.get('Status')!r}")
+        else:
+            print("      versioning: Enabled")
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        if code == "BucketAlreadyExists":
+            print(
+                "      SKIP: backend rejected PutBucketVersioning with 'BucketAlreadyExists'.\n"
+                "            This is the known Tigris-on-Railway response when versioning isn't\n"
+                "            supported on this bucket (see docs/runbooks/restore.md §1.2).\n"
+                "            Stopping here — without versioning, NoncurrentVersionExpiration is\n"
+                "            a no-op and there is no useful lifecycle rule to apply.",
+            )
+            return 0
+        raise
 
     print("[3/4] Applying 90-day rolling lifecycle rule...")
-    s3.put_bucket_lifecycle_configuration(
-        Bucket=creds["bucketName"],
-        LifecycleConfiguration={
-            "Rules": [
-                {
-                    "ID": "rolling-90-day",
-                    "Status": "Enabled",
-                    "Filter": {"Prefix": ""},
-                    "NoncurrentVersionExpiration": {"NoncurrentDays": 90},
-                    "Expiration": {"ExpiredObjectDeleteMarker": True},
-                },
-            ],
-        },
-    )
+    try:
+        s3.put_bucket_lifecycle_configuration(
+            Bucket=creds["bucketName"],
+            LifecycleConfiguration={
+                "Rules": [
+                    {
+                        "ID": "rolling-90-day",
+                        "Status": "Enabled",
+                        "Filter": {"Prefix": ""},
+                        "NoncurrentVersionExpiration": {"NoncurrentDays": 90},
+                        "Expiration": {"ExpiredObjectDeleteMarker": True},
+                    },
+                ],
+            },
+        )
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        if code in {"InvalidArgument", "InvalidRequest"}:
+            print(
+                f"      SKIP: backend rejected the rule shape ({code}: "
+                f"{e.response['Error'].get('Message', '')[:120]}).\n"
+                "            See docs/runbooks/restore.md §1.2 — Tigris-on-Railway only accepts\n"
+                "            Expiration with explicit Days/Date, which would auto-delete the\n"
+                "            backups themselves. No useful rule to apply on this backend.",
+            )
+            return 0
+        raise
 
     print("[4/4] Verifying — current lifecycle config:")
     cfg = s3.get_bucket_lifecycle_configuration(Bucket=creds["bucketName"])

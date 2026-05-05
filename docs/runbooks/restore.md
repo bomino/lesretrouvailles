@@ -34,17 +34,45 @@ railway bucket credentials --bucket media-backup --json
 
 Save those values in 1Password as "Retrouvailles media-backup bucket".
 
-### 1.2 Enable versioning + apply the 90-day rolling retention lifecycle
+### 1.2 Versioning + lifecycle — SKIP (not supported by Tigris-on-Railway)
 
-> **Read this first.** The `backup_media` command uses **path dedup** — once a photo lands in the bucket, subsequent runs skip it. So under normal operation the bucket only grows when admins add *new* photos. This lifecycle rule is **defense-in-depth** for the case where an admin replaces a photo at an existing `public_id` (re-uploading a profile picture, say): with versioning + the 90-day rule, the previous version stays recoverable for a window, then gets cleaned up automatically. Current (live) versions are never auto-deleted.
+> **TL;DR — do not run any commands in this section.** As of 2026-05, Railway's bucket service uses Tigris (`storageapi.dev`) under the hood. Tigris's S3 implementation does not support the S3 APIs we'd need to apply a useful retention rule:
 >
-> **At our scale (~200 photos, a few MB each ⇒ peak ~500 MB), this rule is genuinely optional.** It is fine to skip §1.2 entirely and revisit later if photo replacements ever become common. Monitor with `railway bucket info --bucket media-backup --json` quarterly.
+> - `PutBucketVersioning` returns `BucketAlreadyExists` (a misleading error meaning the operation isn't supported under these credentials/this bucket).
+> - `PutBucketLifecycleConfiguration` only accepts rules with an explicit `Expiration` of `Days` or `Date`. It rejects `NoncurrentVersionExpiration` and `ExpiredObjectDeleteMarker` with: *"Lifecycle only supports expiration rule. Expiration rule with content days or dates only."*
+>
+> The only rule shape Tigris would accept is `{"Expiration": {"Days": N}}` — which would auto-delete every backed-up object after N days, the opposite of what we want.
+>
+> **What this means in practice:** there is no useful lifecycle rule to apply today. We accepted this when picking Railway-native storage (spec §J risks).
+
+#### Why this is fine at our scale
+
+The `backup_media` command uses **path dedup** — once a photo lands in the bucket at `<public_id>`, subsequent weekly runs skip it. The bucket only grows when admins add *new* photos. At ~200 members × a few MB per photo, peak bucket size is ~500 MB. That's nothing on Railway Pro.
+
+The case the lifecycle rule would have handled — admin replaces a photo at an existing `public_id` — is rare on a closed alumni platform. When it happens with versioning off (Tigris), the new upload simply overwrites the old one in the bucket. We lose the old version, but Cloudinary's primary copy is intact and the system continues to work.
+
+#### What to do instead — quarterly size check
+
+Add a calendar reminder to run, every 90 days:
+
+```bash
+railway bucket info --bucket media-backup --json
+```
+
+Look at `storageBytes`. If it ever climbs into multi-GB territory unexpectedly, investigate why (rogue script? bug?) and consider manual cleanup via `aws s3 rm` or the Railway dashboard.
+
+#### If you'd like to retry the lifecycle rule later
+
+Two reasons it might become viable:
+
+1. **Tigris adds versioning + non-current-expiration support.** Re-run `python scripts/apply_bucket_lifecycle.py` — the script and runbook walkthrough below are kept for that day.
+2. **You move to a different S3-compatible backend** (e.g., a real B2 bucket, or AWS S3 directly). Same script works against any compliant S3 endpoint by changing the credentials.
+
+Until either happens, the sections below are **historical reference**, not an operational procedure.
 
 ---
 
-#### Easiest path: one-shot Python script (recommended)
-
-The repo ships a script that does everything in §1.2 in one command. It uses `boto3` (already a project dep), so no AWS CLI install required.
+#### Reference (skip during normal provisioning) — one-shot Python script
 
 ```bash
 python scripts/apply_bucket_lifecycle.py
@@ -52,17 +80,9 @@ python scripts/apply_bucket_lifecycle.py
 
 Prerequisites: Railway CLI installed and authenticated (`railway whoami`), linked to the `Retrouvailles` project (`railway status`), and the project venv active so `boto3` is on the path.
 
-The script is idempotent — safe to re-run. On success it prints the lifecycle config Railway echoed back so you can confirm it stuck.
+The script is idempotent — safe to re-run. On success it prints the lifecycle config the backend echoed back so you can confirm it stuck. On Tigris-on-Railway it currently fails with the errors documented above; that is expected.
 
-To target a different bucket: `python scripts/apply_bucket_lifecycle.py --bucket <name>`.
-
-If the script errors out, fall through to the manual AWS CLI walkthrough below.
-
----
-
-#### Manual path: AWS CLI walkthrough
-
-Use this if you'd rather operate via the standard AWS toolchain or the script fails.
+#### Reference — manual AWS CLI walkthrough
 
 #### Step 0: install the AWS CLI (skip if you already have v2)
 
