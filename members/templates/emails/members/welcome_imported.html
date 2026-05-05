@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="fr">
+    <body style="font-family:system-ui,-apple-system,sans-serif;
+                 color:#222;
+                 line-height:1.5;
+                 max-width:560px;
+                 margin:2em auto;
+                 padding:0 1em">
+        <p>Bonjour {{ full_name }},</p>
+        <p>
+            Votre compte a été créé sur <strong>Les Retrouvailles</strong>, la plateforme privée des anciens du CEG 1 Birni (1980-1985).
+        </p>
+        <p>Pour activer votre accès, choisissez votre mot de passe :</p>
+        <p style="margin:1.5em 0">
+            <a href="{{ password_set_url }}"
+               style="background:#7a3b2e;
+                      color:#fff;
+                      padding:.7em 1.4em;
+                      border-radius:.4em;
+                      text-decoration:none;
+                      display:inline-block">Choisir mon mot de passe</a>
+        </p>
+        <p style="font-size:.9em;color:#555">
+            Ce lien est valable pendant 7 jours. Passé ce délai, contactez l'administrateur via WhatsApp pour en recevoir un nouveau.
+        </p>
+        <p>Une fois connecté·e, complétez votre profil et retrouvez les camarades qui se sont déjà inscrits.</p>
+        <p>
+            À très bientôt,
+            <br>
+            L'équipe Les Retrouvailles
+        </p>
+    </body>
+</html>
