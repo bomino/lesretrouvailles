@@ -96,7 +96,7 @@ class AdminApplication(models.Model):
             raise ValidationError({"years_attended": "Années hors plage 1980-1985."})
         if any(not VALID_CLASS_PATTERN.match(c) for c in self.classes):
             raise ValidationError(
-                {"classes": "Classe inconnue. Format attendu : 6e, 6eA, 4eB, 3eC, etc."}
+                {"classes": "Classe inconnue. Format attendu : 6e, 6eA, 6a, 4b, etc."}
             )
 
     def purge(self) -> None:

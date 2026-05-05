@@ -213,7 +213,7 @@ def test_signup_accepts_classes_with_section_letters(client, active_member, seco
         "2nde",  # high-school grade, out of CEG range
         "7e",  # level out of range
         "4eAB",  # two-letter section not allowed
-        "4a",  # missing the "e"
+        "4",  # bare level — ambiguous (P7.1: short form requires a section letter)
         "xyz",  # not a class
     ],
 )
