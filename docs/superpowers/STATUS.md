@@ -23,7 +23,8 @@ Single dashboard for tracking phase and task completion across all plans. Update
 | P5 | Mémoire seed | Complete (P5a + P5b shipped 2026-05-04) | — |
 | P6a | Ops — media backup (Cloudinary→Railway bucket) | Complete (2026-05-05) | [plan](plans/2026-05-04-media-backup.md) |
 | P6b | Ops — RGPD admin purge | Complete (2026-05-05) | [plan](plans/2026-05-05-rgpd-admin-purge.md) |
-| P6 | Ops & RGPD (full) | In progress (P6a + P6b complete; P6c not started) | — |
+| P6c | Ops — DMARC monitoring + AuditLog retention | Complete (2026-05-05) | [spec](specs/2026-05-05-p6c-dmarc-retention-design.md) |
+| P6 | Ops & RGPD | Complete (P6a + P6b + P6c shipped 2026-05-05) | — |
 | P7 | Soft launch | Not started | — |
 
 ---
@@ -291,9 +292,10 @@ Single dashboard for tracking phase and task completion across all plans. Update
 
 ## P6 — Ops & RGPD
 
-**Status:** In progress (P6a + P6b complete; P6c not started).
-**Scope:** Media backup (P6a, complete — see below), RGPD admin-driven purge (P6b, complete — see below), DMARC monitoring (P6c), AdminApplication 6-month auto-purge cron, AuditLog 12-month retention cron.
-**Plans:** P6a [plan](plans/2026-05-04-media-backup.md); P6b [plan](plans/2026-05-05-rgpd-admin-purge.md); P6c not yet written.
+**Status:** Complete (P6a + P6b + P6c shipped 2026-05-05).
+**Scope shipped:** Media backup (P6a), RGPD admin-driven purge (P6b), AuditLog 12-month retention + DMARC monitoring runbook (P6c). AdminApplication 6-month auto-purge cron was already shipped in P3 (`process_cooptation_deadlines._purge_old_rejections`).
+**Plans:** P6a [plan](plans/2026-05-04-media-backup.md); P6b [plan](plans/2026-05-05-rgpd-admin-purge.md); P6c [spec](specs/2026-05-05-p6c-dmarc-retention-design.md).
+**Acknowledged gap:** Master spec §8.2 specifies media-backup retention via a 30-day rotation. Tigris on Railway does not support `PutBucketLifecycleConfiguration` with non-trivial rules (P6a discovery, runbook §1.2). The 30-day rotation is therefore not enforced today. Path-dedup keeps the bucket small (~500 MB peak at our scale); manual cleanup is the operational alternative. Revisit when Tigris adds support, or when scale forces a move to a different S3-compatible target.
 
 ---
 
@@ -391,6 +393,27 @@ Single dashboard for tracking phase and task completion across all plans. Update
 - **Audit row carries no PII.** Single `rgpd.member.purged` entry per purge with metadata = `{email_hash: <12-char sha1>, deleted_counts: {...}}`. The hash lets a future investigator confirm "the member with email X was purged on date Y" without storing the email itself.
 - **Type-to-confirm UX.** CLI prompts for the literal word `yes`; admin action requires typing the member's exact email per row. Five seconds of friction; eliminates fat-finger purges. Same pattern GitHub uses for repo deletion.
 - **No new pip deps.** Reuses `alumni.cloudinary` (P2) + `alumni.storage` (P6a) + existing `AuditLog` (P4b). Zero infrastructure surface added.
+
+---
+
+## P6c — Ops: DMARC monitoring + AuditLog retention
+
+**Shipped:** 2026-05-05
+**Spec (combined design + plan):** [specs/2026-05-05-p6c-dmarc-retention-design.md](specs/2026-05-05-p6c-dmarc-retention-design.md)
+**Test suite:** 479 passing total (2 new tests in `cooptation/tests/test_process_deadlines.py`).
+
+| # | Task | Done | Commit |
+|---|------|------|--------|
+| 1 | AuditLog 12-month retention purge in daily cron | [x] | `a869043` |
+| 2 | DMARC monitoring runbook | [x] | `92e9fd3` |
+| 3 | STATUS update — mark P6 complete | [x] | _this commit_ |
+
+**Notable design decisions:**
+- **AuditLog retention is wired into the existing daily cron** (`process_cooptation_deadlines`) as one more `_purge_*` step, not a separate command. Keeps the cron-service surface area at one Railway service. Retention window lives in a module-level constant `AUDIT_LOG_RETENTION_DAYS=365` so it can be tuned without re-tagging.
+- **Retention applies uniformly across action types**, including `rgpd.member.purged` itself. The spec discusses keeping a subset longer for compliance; that's a follow-up phase that filters by action, not part of P6c. Today's stance: the audit trail is for operational and security review, not indefinite legal record-keeping.
+- **DMARC monitoring is operator-driven, not code.** Master spec only requires "p=quarantine minimum + quarterly surveillance" — both achievable with DNS + a free aggregate-report viewer (dmarcian recommended). Building a parser/dashboard would be 2 weeks of work for marginal value at our scale. Runbook covers the verification + ingestion + quarterly review procedure.
+- **AdminApplication 6-month auto-purge was already shipped in P3** as part of `_purge_old_rejections` in the same daily cron. Discovered during P6c planning — was tracked as remaining work in earlier STATUS entries by mistake. Now correctly attributed.
+- **Tigris-bucket-lifecycle gap acknowledged in STATUS** rather than blocked on. The master spec's "30-day rotation" was a B2-shaped design that doesn't map onto Railway's bucket backend; path-dedup keeps the bucket small enough that the gap is operationally acceptable.
 
 ---
 

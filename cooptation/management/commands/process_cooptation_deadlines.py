@@ -41,6 +41,12 @@ GHOST_DIGEST_LOOKBACK_DAYS = 90
 GHOST_DIGEST_QUARTERLY_MONTHS = (1, 4, 7, 10)
 GHOST_STALE_REMOVED_REASON = "Périmée — non renouvelée par les admins"
 
+# P6c: AuditLog retention. Master spec §9.4 — "Logs d'audit : Conservés 12 mois
+# pour sécurité/légal puis purgés." Applies uniformly across all action types
+# (including rgpd.member.purged itself). If a future compliance need requires
+# keeping a subset longer, filter by action in a follow-up phase.
+AUDIT_LOG_RETENTION_DAYS = 365
+
 
 class Command(BaseCommand):
     help = "Daily processor for cooptation deadlines (J+7, J+14, retention purge)."
@@ -55,11 +61,13 @@ class Command(BaseCommand):
         if now.day == 1 and now.month in GHOST_DIGEST_QUARTERLY_MONTHS:
             digest_sent = self._send_quarterly_ghost_digest(now)
         purged_apps = self._purge_old_rejections(now)
+        purged_audit = self._purge_old_audit_logs(now)
         self.stdout.write(
             self.style.SUCCESS(
                 f"Done. reminders={sent_reminders} expired={expired_apps} "
                 f"stale={stale_apps} ghosts_purged={ghosts_purged} "
-                f"digest_sent={digest_sent} purged={purged_apps}"
+                f"digest_sent={digest_sent} purged={purged_apps} "
+                f"audit_purged={purged_audit}"
             )
         )
 
@@ -222,3 +230,15 @@ class Command(BaseCommand):
             services.purge_application(app)
             count += 1
         return count
+
+    def _purge_old_audit_logs(self, now) -> int:
+        """Delete AuditLog entries older than AUDIT_LOG_RETENTION_DAYS.
+
+        Master spec §9.4: "Logs d'audit : Conservés 12 mois pour sécurité/légal
+        puis purgés." Empty queryset is a no-op; idempotent across runs.
+        """
+        from members.models import AuditLog
+
+        cutoff = now - timedelta(days=AUDIT_LOG_RETENTION_DAYS)
+        deleted, _ = AuditLog.objects.filter(created_at__lt=cutoff).delete()
+        return deleted

@@ -527,3 +527,55 @@ def test_digest_includes_currently_listed_snapshot(make_admin, settings):
     assert "A." in body
     # Age in months from Sep 2025 → Jan 2026 should be ~4 months (allow 3-5 for rounding)
     assert "4 mois" in body or "3 mois" in body or "5 mois" in body
+
+
+# -------- AuditLog 12-month retention (P6c) --------
+
+
+@pytest.mark.django_db
+def test_audit_log_retention_purges_entries_older_than_365_days(make_admin):
+    """Audit entries older than 365 days are deleted on the daily run.
+    Entries inside the window persist."""
+    from members.models import AuditLog
+
+    actor = make_admin()
+    now = timezone.now()
+
+    old = AuditLog.objects.create(
+        actor=actor,
+        action="ghost.entry.purged",
+        target_type="X",
+        target_id="1",
+    )
+    AuditLog.objects.filter(pk=old.pk).update(created_at=now - timedelta(days=400))
+
+    recent = AuditLog.objects.create(
+        actor=actor,
+        action="ghost.entry.purged",
+        target_type="X",
+        target_id="2",
+    )
+    AuditLog.objects.filter(pk=recent.pk).update(created_at=now - timedelta(days=10))
+
+    call_command("process_cooptation_deadlines")
+
+    assert not AuditLog.objects.filter(pk=old.pk).exists()
+    assert AuditLog.objects.filter(pk=recent.pk).exists()
+
+
+@pytest.mark.django_db
+def test_audit_log_retention_handles_empty_queryset(make_admin):
+    """Cron with no expired audit entries succeeds; existing fresh entries unchanged."""
+    from members.models import AuditLog
+
+    actor = make_admin()
+    fresh = AuditLog.objects.create(
+        actor=actor,
+        action="ghost.entry.purged",
+        target_type="X",
+        target_id="3",
+    )
+
+    call_command("process_cooptation_deadlines")
+
+    assert AuditLog.objects.filter(pk=fresh.pk).exists()
