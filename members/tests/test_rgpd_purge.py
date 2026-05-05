@@ -310,3 +310,60 @@ def test_purge_anonymizes_admin_application(fake_clients, make_member):
     assert app.full_name == ""
     assert app.email == ""
     assert app.status == "purged"
+
+
+# -------- CLI tests (Task 3) --------
+
+
+@pytest.mark.django_db
+def test_cli_dry_run_reports_plan(fake_clients, make_member):
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    from members.models import Member
+
+    target = make_member(photo_public_id="members/cli/dry")
+    target_email = target.user.email
+    _make_memory(target, "memoires/dry1")
+
+    out = StringIO()
+    call_command("rgpd_purge_member", target_email, "--dry-run", stdout=out)
+
+    output = out.getvalue()
+    assert "DRY RUN" in output
+    assert "memories" in output.lower()
+    # No mutations
+    assert Member.objects.filter(id=target.id).exists()
+
+
+@pytest.mark.django_db
+def test_cli_unknown_email_exits_zero(fake_clients):
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    out = StringIO()
+    call_command("rgpd_purge_member", "nobody@example.test", "--yes", stdout=out)
+
+    output = out.getvalue()
+    assert "no member" in output.lower() or "not found" in output.lower()
+
+
+@pytest.mark.django_db
+def test_cli_executes_with_yes_flag(fake_clients, make_member):
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    from members.models import AuditLog, Member
+
+    target = make_member(photo_public_id="members/cli/yes")
+    target_email = target.user.email
+    target_id = target.id
+
+    out = StringIO()
+    call_command("rgpd_purge_member", target_email, "--yes", stdout=out)
+
+    assert not Member.objects.filter(id=target_id).exists()
+    assert AuditLog.objects.filter(action="rgpd.member.purged").count() == 1
