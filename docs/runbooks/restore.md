@@ -38,7 +38,31 @@ Save those values in 1Password as "Retrouvailles media-backup bucket".
 
 > **Read this first.** The `backup_media` command uses **path dedup** — once a photo lands in the bucket, subsequent runs skip it. So under normal operation the bucket only grows when admins add *new* photos. This lifecycle rule is **defense-in-depth** for the case where an admin replaces a photo at an existing `public_id` (re-uploading a profile picture, say): with versioning + the 90-day rule, the previous version stays recoverable for a window, then gets cleaned up automatically. Current (live) versions are never auto-deleted.
 >
-> If Railway's bucket implementation does not yet support S3 lifecycle (you'll see `NotImplemented` or `MalformedXML` from the put call), it is safe to **skip this whole section**. The bucket stays small at our scale (~200 members ⇒ a few hundred MB) and you can apply the rule later when Railway adds support.
+> **At our scale (~200 photos, a few MB each ⇒ peak ~500 MB), this rule is genuinely optional.** It is fine to skip §1.2 entirely and revisit later if photo replacements ever become common. Monitor with `railway bucket info --bucket media-backup --json` quarterly.
+
+---
+
+#### Easiest path: one-shot Python script (recommended)
+
+The repo ships a script that does everything in §1.2 in one command. It uses `boto3` (already a project dep), so no AWS CLI install required.
+
+```bash
+python scripts/apply_bucket_lifecycle.py
+```
+
+Prerequisites: Railway CLI installed and authenticated (`railway whoami`), linked to the `Retrouvailles` project (`railway status`), and the project venv active so `boto3` is on the path.
+
+The script is idempotent — safe to re-run. On success it prints the lifecycle config Railway echoed back so you can confirm it stuck.
+
+To target a different bucket: `python scripts/apply_bucket_lifecycle.py --bucket <name>`.
+
+If the script errors out, fall through to the manual AWS CLI walkthrough below.
+
+---
+
+#### Manual path: AWS CLI walkthrough
+
+Use this if you'd rather operate via the standard AWS toolchain or the script fails.
 
 #### Step 0: install the AWS CLI (skip if you already have v2)
 
@@ -62,30 +86,40 @@ aws --version   # should print "aws-cli/2.x"
 railway bucket credentials --bucket media-backup --json
 ```
 
-The JSON looks something like (exact key names may differ between Railway versions):
+The JSON Railway currently returns:
 
 ```json
 {
-  "endpoint": "https://bukt-prod-xxxx.up.railway.app",
-  "bucket": "media-backup",
   "accessKeyId": "...",
-  "secretAccessKey": "..."
+  "bucketName": "media-backup",
+  "endpoint": "https://t3.storageapi.dev",
+  "region": "iad",
+  "secretAccessKey": "...",
+  "urlStyle": "..."
 }
 ```
 
-Map whatever Railway returns onto the AWS-standard env vars in the next step.
-
 #### Step 2: export them as standard AWS env vars
+
+**Bash / zsh** (macOS, Linux, Git Bash on Windows):
 
 ```bash
 export AWS_ACCESS_KEY_ID=<accessKeyId from JSON>
 export AWS_SECRET_ACCESS_KEY=<secretAccessKey from JSON>
-export AWS_DEFAULT_REGION=auto
+export AWS_DEFAULT_REGION=<region from JSON>
 ENDPOINT=<endpoint from JSON>
-BUCKET=<bucket from JSON>
+BUCKET=<bucketName from JSON>
 ```
 
-(`AWS_DEFAULT_REGION=auto` keeps boto from complaining; Railway buckets don't use AWS regions.)
+**PowerShell** (Windows):
+
+```powershell
+$env:AWS_ACCESS_KEY_ID = "<accessKeyId from JSON>"
+$env:AWS_SECRET_ACCESS_KEY = "<secretAccessKey from JSON>"
+$env:AWS_DEFAULT_REGION = "<region from JSON>"
+$ENDPOINT = "<endpoint from JSON>"
+$BUCKET = "<bucketName from JSON>"
+```
 
 #### Step 3: enable versioning (precondition)
 
