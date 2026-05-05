@@ -171,9 +171,21 @@ class PublicSearchEntry(models.Model):
     many admin signoffs.
     """
 
-    first_name = models.CharField(max_length=60)
-    last_name_initial = models.CharField(max_length=10)
-    years_at_ceg = ArrayField(models.IntegerField(), size=6)
+    first_name = models.CharField(max_length=60, verbose_name="Prénom")
+    last_name_initial = models.CharField(
+        max_length=2,
+        verbose_name="Initiale du nom (1 à 2 caractères)",
+        help_text=(
+            "Une seule lettre, ou 2 lettres pour les préfixes type 'Mc' ou 'Da' "
+            "(ex: 'M' pour Moussa). Pour préserver la confidentialité, on n'affiche "
+            "jamais le nom complet sur la liste publique (master spec §6.5)."
+        ),
+    )
+    years_at_ceg = ArrayField(
+        models.IntegerField(),
+        size=6,
+        verbose_name="Années au CEG",
+    )
     note = models.CharField(
         max_length=200,
         blank=True,
@@ -205,6 +217,24 @@ class PublicSearchEntry(models.Model):
         return (
             f"{self.first_name} {self.last_name_initial} ({', '.join(map(str, self.years_at_ceg))})"
         )
+
+    # Friendly Python-level validation that fires BEFORE the DB CHECK constraint
+    # so the admin form shows "Saisissez 1 à 2 caractères seulement..." instead
+    # of "La contrainte « initial_must_be_one_or_two_chars » n'est pas respectée."
+    _INITIAL_RE = re.compile(r"^[A-Za-zÀ-ÿ.]{1,2}$")
+
+    def clean(self) -> None:
+        super().clean()
+        if self.last_name_initial and not self._INITIAL_RE.match(self.last_name_initial):
+            raise ValidationError(
+                {
+                    "last_name_initial": (
+                        "Saisissez 1 à 2 caractères seulement (ex: 'M' pour Moussa). "
+                        "La liste publique n'affiche jamais le nom complet — seulement "
+                        "l'initiale, pour préserver la confidentialité."
+                    ),
+                },
+            )
 
     @property
     def is_published(self) -> bool:

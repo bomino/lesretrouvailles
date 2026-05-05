@@ -80,11 +80,15 @@ def test_removed_entry_is_unpublished_regardless_of_admin_count(make_admin):
 
 @pytest.mark.django_db
 def test_last_name_initial_check_constraint_rejects_three_chars():
-    from django.db import transaction
+    """Defense-in-depth: a 3-char value is rejected at the DB layer.
+    With max_length=2 it now hits the column-length cap (DataError)
+    before reaching the CHECK constraint (IntegrityError). Either is
+    acceptable — both are subclasses of DatabaseError."""
+    from django.db import DatabaseError, transaction
 
     from members.models import PublicSearchEntry
 
-    with pytest.raises(IntegrityError):
+    with pytest.raises(DatabaseError):
         with transaction.atomic():
             PublicSearchEntry.objects.create(
                 first_name="X", last_name_initial="ABC", years_at_ceg=[1980]
@@ -108,3 +112,36 @@ def test_removal_token_unique_when_set():
                 years_at_ceg=[1980],
                 removal_token="tok1",
             )
+
+
+@pytest.mark.django_db
+def test_full_clean_rejects_long_initial_with_friendly_message():
+    """The model.clean() check fires BEFORE the DB CHECK constraint and
+    surfaces a friendly French error to the admin form, rather than the
+    raw constraint name."""
+    from django.core.exceptions import ValidationError
+
+    from members.models import PublicSearchEntry
+
+    entry = PublicSearchEntry(
+        first_name="Oumarou",
+        last_name_initial="Moussa",  # full name, not initial — common mistake
+        years_at_ceg=[1984],
+    )
+    with pytest.raises(ValidationError) as exc_info:
+        entry.full_clean()
+
+    msg = str(exc_info.value)
+    assert "Saisissez 1 à 2 caractères" in msg
+    assert "M" in msg  # the worked example
+    # The friendly message should NOT mention the raw constraint name
+    assert "initial_must_be_one_or_two_chars" not in msg
+
+
+@pytest.mark.django_db
+def test_full_clean_accepts_one_or_two_char_initial():
+    from members.models import PublicSearchEntry
+
+    for init in ["M", "m", "M.", "Mc", "Da", "À"]:
+        entry = PublicSearchEntry(first_name="Test", last_name_initial=init, years_at_ceg=[1980])
+        entry.full_clean()  # must not raise
