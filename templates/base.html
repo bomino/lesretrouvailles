@@ -31,7 +31,7 @@
             {% trans "Aller au contenu principal" %}
         </a>
         <header class="sticky top-0 z-30 border-b border-secondary/15 bg-surface/85 backdrop-blur-md">
-            <div class="container mx-auto flex items-center justify-between gap-4 px-4 py-3 md:px-6 md:py-4">
+            <div class="container mx-auto flex items-center justify-between gap-3 px-4 py-3 md:px-6 md:py-4">
                 <a href="{% url 'landing' %}"
                    class="flex items-center gap-3 group"
                    aria-label="{% trans 'Les Retrouvailles — accueil' %}">
@@ -70,26 +70,53 @@
                 {% endif %}
                 <div class="flex items-center gap-2">
                     {% block header_actions %}
+                        {# WhatsApp button: visible on md+ desktop. On mobile it lives inside the dropdown menu (auth) or as an icon-only button (anon). #}
                         {# TODO P2: replace href with the real "Les Retrouvailles" WhatsApp invite URL. #}
                         <a href="https://chat.whatsapp.com/"
                            rel="noopener noreferrer"
                            target="_blank"
-                           class="inline-flex items-center gap-2 rounded-full bg-whatsapp-green px-4 py-2 min-h-tap text-sm font-medium text-on-whatsapp-green shadow-sm hover:opacity-95 transition">
+                           class="hidden md:inline-flex items-center gap-2 rounded-full bg-whatsapp-green px-4 py-2 min-h-tap text-sm font-medium text-on-whatsapp-green shadow-sm hover:opacity-95 transition">
                             <span aria-hidden="true">💬</span>
                             <span class="hidden lg:inline">{% trans "Rejoindre le groupe WhatsApp" %}</span>
-                            <span class="lg:hidden hidden sm:inline">{% trans "WhatsApp" %}</span>
+                            <span class="lg:inline">{% trans "WhatsApp" %}</span>
                         </a>
                         {% if request.user.is_authenticated %}
-                            <form method="post" action="{% url 'account_logout' %}" class="inline">
+                            <form method="post"
+                                  action="{% url 'account_logout' %}"
+                                  class="hidden md:inline">
                                 {% csrf_token %}
                                 <button type="submit"
-                                        class="hidden sm:inline-flex items-center rounded-lg border border-secondary/20 px-3 py-2 min-h-tap text-sm font-medium hover:border-tertiary/40 hover:text-tertiary transition">
+                                        class="inline-flex items-center rounded-lg border border-secondary/20 px-3 py-2 min-h-tap text-sm font-medium hover:border-tertiary/40 hover:text-tertiary transition">
                                     {% trans "Se déconnecter" %}
                                 </button>
                             </form>
+                            {# Mobile-only hamburger button: opens the dropdown nav below. #}
+                            <button id="nav-toggle"
+                                    type="button"
+                                    class="md:hidden inline-flex items-center justify-center rounded-lg border border-secondary/20 min-h-tap min-w-tap hover:border-tertiary/40 hover:text-tertiary transition"
+                                    aria-label="{% trans 'Ouvrir le menu' %}"
+                                    aria-expanded="false"
+                                    aria-controls="mobile-nav">
+                                <svg class="h-6 w-6"
+                                     viewBox="0 0 24 24"
+                                     fill="none"
+                                     stroke="currentColor"
+                                     stroke-width="2"
+                                     aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                                </svg>
+                            </button>
                         {% else %}
+                            {# Anonymous mobile: show WhatsApp icon-only + Connexion link inline (no hamburger needed for 2 items). #}
+                            <a href="https://chat.whatsapp.com/"
+                               rel="noopener noreferrer"
+                               target="_blank"
+                               class="md:hidden inline-flex items-center justify-center rounded-full bg-whatsapp-green min-h-tap min-w-tap text-on-whatsapp-green shadow-sm hover:opacity-95 transition"
+                               aria-label="{% trans 'Rejoindre le groupe WhatsApp' %}">
+                                <span aria-hidden="true">💬</span>
+                            </a>
                             <a href="{% url 'account_login' %}"
-                               class="hidden sm:inline-flex items-center rounded-lg border border-secondary/20 px-3 py-2 min-h-tap text-sm font-medium hover:border-tertiary/40 hover:text-tertiary transition">
+                               class="inline-flex items-center rounded-lg border border-secondary/20 px-3 py-2 min-h-tap text-sm font-medium hover:border-tertiary/40 hover:text-tertiary transition">
                                 {% trans "Connexion" %}
                             </a>
                         {% endif %}
@@ -97,29 +124,79 @@
                 </div>
             </div>
             {% if request.user.is_authenticated %}
-                <nav class="md:hidden border-t border-secondary/10 bg-surface/95"
+                {# Mobile dropdown nav. Hidden by default; toggled by the #nav-toggle button. #}
+                <nav id="mobile-nav"
+                     class="md:hidden hidden border-t border-secondary/10 bg-surface/95"
                      aria-label="{% trans 'Navigation mobile' %}">
-                    <div class="container mx-auto flex justify-around px-2 py-1.5 text-sm">
-                        <a href="/annuaire/" class="rounded-lg px-3 py-2 hover:text-tertiary">{% trans "Annuaire" %}</a>
-                        <a href="/souvenirs/" class="rounded-lg px-3 py-2 hover:text-tertiary">{% trans "Souvenirs" %}</a>
-                        <a href="{% url 'memoriam:list' %}"
-                           class="rounded-lg px-3 py-2 hover:text-tertiary">{% trans "In Memoriam" %} 🕊️</a>
-                        <a href="/cooptations-a-valider/"
-                           class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 hover:text-tertiary">
-                            {% trans "À valider" %}
-                            {% if pending_vouches_count %}
-                                <span class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-tertiary px-1.5 text-xs font-semibold text-on-tertiary">
-                                    {{ pending_vouches_count }}
-                                </span>
-                            {% endif %}
-                        </a>
-                        <a href="/profil/" class="rounded-lg px-3 py-2 hover:text-tertiary">{% trans "Mon profil" %}</a>
-                        <form method="post" action="{% url 'account_logout' %}" class="inline">
-                            {% csrf_token %}
-                            <button type="submit" class="rounded-lg px-3 py-2 hover:text-tertiary">{% trans "Quitter" %}</button>
-                        </form>
-                    </div>
+                    <ul class="container mx-auto flex flex-col gap-0.5 px-2 py-2 text-base">
+                        <li>
+                            <a href="/annuaire/"
+                               class="flex items-center min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "Annuaire" %}</a>
+                        </li>
+                        <li>
+                            <a href="/souvenirs/"
+                               class="flex items-center min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "Souvenirs" %}</a>
+                        </li>
+                        <li>
+                            <a href="{% url 'memoriam:list' %}"
+                               class="flex items-center min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "In Memoriam" %} 🕊️</a>
+                        </li>
+                        <li>
+                            <a href="/cooptations-a-valider/"
+                               class="flex items-center justify-between min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition">
+                                <span>{% trans "Cooptations à valider" %}</span>
+                                {% if pending_vouches_count %}
+                                    <span class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-tertiary px-1.5 text-xs font-semibold text-on-tertiary"
+                                          aria-label="{% blocktrans count counter=pending_vouches_count %}{{ counter }} en attente{% plural %}{{ counter }} en attente{% endblocktrans %}">
+                                        {{ pending_vouches_count }}
+                                    </span>
+                                {% endif %}
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/profil/"
+                               class="flex items-center min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "Mon profil" %}</a>
+                        </li>
+                        <li class="border-t border-secondary/10 mt-1 pt-1">
+                            <a href="https://chat.whatsapp.com/"
+                               rel="noopener noreferrer"
+                               target="_blank"
+                               class="flex items-center gap-2 min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition">
+                                <span aria-hidden="true">💬</span>
+                                {% trans "Groupe WhatsApp" %}
+                            </a>
+                        </li>
+                        <li>
+                            <form method="post" action="{% url 'account_logout' %}">
+                                {% csrf_token %}
+                                <button type="submit"
+                                        class="w-full flex items-center min-h-tap rounded-lg px-4 py-2 text-left hover:bg-base-200 hover:text-tertiary transition">
+                                    {% trans "Se déconnecter" %}
+                                </button>
+                            </form>
+                        </li>
+                    </ul>
                 </nav>
+                <script nonce="">
+                    (function () {
+                        var btn = document.getElementById('nav-toggle');
+                        var menu = document.getElementById('mobile-nav');
+                        if (!btn || !menu) return;
+                        function setOpen(open) {
+                            menu.classList.toggle('hidden', !open);
+                            btn.setAttribute('aria-expanded', String(open));
+                        }
+                        btn.addEventListener('click', function () {
+                            setOpen(menu.classList.contains('hidden'));
+                        });
+                        document.addEventListener('keydown', function (e) {
+                            if (e.key === 'Escape') setOpen(false);
+                        });
+                        document.addEventListener('click', function (e) {
+                            if (!menu.contains(e.target) && !btn.contains(e.target)) setOpen(false);
+                        });
+                    })();
+                </script>
             {% endif %}
         </header>
         <main id="main" class="container mx-auto px-4 py-8 md:px-6 md:py-12">
