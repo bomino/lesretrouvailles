@@ -158,13 +158,14 @@
             {% else %}
             </article>
         {% endif %}
-        <article class="rounded-2xl border border-secondary/15 bg-surface/70 p-6 shadow-sm">
+        <a href="{% if request.user.is_authenticated %}{% url 'memoriam:list' %}{% else %}{% url 'account_login' %}?next=/in-memoriam/{% endif %}"
+           class="rounded-2xl border border-secondary/15 bg-surface/70 p-6 shadow-sm hover:border-tertiary/40 transition block">
             <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-ceremonial-gold/15 text-ceremonial-gold text-xl">🕊️</span>
             <h2 class="mt-4 font-display text-xl font-semibold tracking-tight">{% trans "In Memoriam" %}</h2>
             <p class="mt-2 text-sm text-secondary leading-relaxed">
                 {% trans "Un espace de recueillement pour celles et ceux qui nous ont quittés." %}
             </p>
-        </article>
+        </a>
         <a href="{% if request.user.is_authenticated %}/cooptations-a-valider/{% else %}{% url 'cooptation:signup' %}{% endif %}"
            class="rounded-2xl border border-secondary/15 bg-surface/70 p-6 shadow-sm hover:border-tertiary/40 transition">
             <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-whatsapp-green/15 text-whatsapp-green text-xl">🤝</span>
