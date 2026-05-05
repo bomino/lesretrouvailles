@@ -52,6 +52,7 @@ RUN pip install --upgrade pip && pip install \
     "cloudinary>=1.40" \
     "django-ratelimit>=4.1" \
     "markdown>=3.6" \
+    "bleach>=6.0" \
     "redis>=5.0" \
     "resend>=2.0"
 
