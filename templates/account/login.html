@@ -22,14 +22,19 @@
                     </div>
                 {% endif %}
                 <div class="space-y-1.5">
-                    <label for="{{ form.login.id_for_label }}" class="block text-sm font-medium">{% trans "Email" %}</label>
-                    <input type="email"
+                    <label for="{{ form.login.id_for_label }}" class="block text-sm font-medium">
+                        {% trans "Numéro WhatsApp ou email" %}
+                    </label>
+                    <input type="text"
                            name="{{ form.login.html_name }}"
                            id="{{ form.login.id_for_label }}"
                            value="{{ form.login.value|default:'' }}"
-                           autocomplete="email"
+                           autocomplete="username"
                            required
                            class="block w-full rounded-lg border border-secondary/20 bg-white px-3 py-2.5 text-base shadow-sm focus:border-tertiary focus:outline-none focus:ring-2 focus:ring-tertiary/30">
+                    <p class="text-xs text-secondary/80">
+                        {% trans "Saisissez votre numéro WhatsApp (ex. 22790000001) ou votre email." %}
+                    </p>
                     {% if form.login.errors %}<p class="text-sm text-red-700">{{ form.login.errors|join:" " }}</p>{% endif %}
                 </div>
                 <div class="space-y-1.5">
