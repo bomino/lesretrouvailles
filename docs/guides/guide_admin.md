@@ -24,9 +24,12 @@ Tout passe par l'interface admin Django : **https://villageretrouvailles.com/adm
 
 ## 2. Accéder à l'interface admin
 
-1. Allez à **https://villageretrouvailles.com/admin/**.
-2. Connectez-vous avec votre nom d'utilisateur (par exemple `bominomla`) ou votre email + votre mot de passe.
-3. Vous arrivez sur le tableau de bord Django Admin, organisé par sections :
+Deux chemins :
+
+- **Depuis la plateforme** : connectez-vous comme d'habitude, puis cliquez sur **« ⚙ Administration »** dans la barre de navigation. Ce lien n'est visible que pour les comptes Super Admin (`is_staff=True`) — les membres réguliers ne le voient jamais.
+- **Directement** : allez à **https://villageretrouvailles.com/admin/** et connectez-vous avec votre nom d'utilisateur (par exemple `bominomla`) ou votre email + votre mot de passe.
+
+Vous arrivez sur le tableau de bord Django Admin, organisé par sections :
    - **Members** — comptes des membres, candidatures de cooptation, journal d'audit, etc.
    - **Cooptation** — candidatures (`AdminApplication`), requêtes de parrainage, questions
    - **Memoires** — Mur des souvenirs (`Memory`)
@@ -251,10 +254,13 @@ Cette liste apparaît sur la page d'accueil publique pour aider à retrouver des
 ### Ajouter un nom
 
 1. Allez à **Members → Public search entries → Add**.
-2. **Prénom** et **initiale du nom** (ex. « Mahamadou L. ») — données minimales pour ne pas exposer publiquement de PII.
-3. **Années au CEG** (1980-1985, plusieurs années possibles).
-4. **Note** (optionnelle) : une courte ligne d'introduction publique (ex. « Cherché par sa promotion 1983 »).
-5. Sauvegardez. Vous êtes automatiquement enregistré comme cosignataire (un seul admin suffit pour publier en mode P4d).
+2. **Prénom**.
+3. **Initiale du nom (1 à 2 caractères)** — saisissez **uniquement la première lettre** du nom de famille (ex. `M` pour Moussa). Le champ est limité à 2 caractères pour les préfixes type `Mc` ou `Da`. **N'écrivez pas le nom complet** — la liste publique est volontairement minimale en PII (master spec §6.5).
+4. **Années au CEG** (1980-1985, plusieurs années possibles).
+5. **Note** (optionnelle) : une courte ligne d'introduction publique (ex. « Cherché par sa promotion 1983 »).
+6. Sauvegardez. Vous êtes automatiquement enregistré comme cosignataire (un seul admin suffit pour publier en mode P4d).
+
+> 💡 Le formulaire bloquera automatiquement la saisie au-delà de 2 caractères dans le champ « Initiale du nom » et affichera un message d'aide clair en cas d'erreur.
 
 Un email FYI est envoyé aux autres admins pour transparence.
 

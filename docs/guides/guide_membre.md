@@ -97,7 +97,7 @@ Vous pouvez modifier à tout moment :
 - **Profession** — libre, en quelques mots
 - **Photo**
 
-Certaines informations sont **verrouillées** car elles font partie de votre identité d'ancien : votre nom, vos années au CEG (1980-1985), et vos classes (6e, 5e, 4e, 3e, avec ou sans lettre de section). Pour les corriger, contactez l'administrateur.
+Certaines informations sont **verrouillées** car elles font partie de votre identité d'ancien : votre nom, vos années au CEG (1980-1985), et vos classes. Les classes acceptent toutes les écritures courantes : `6e`, `6eA`, `6a`, `6A` — utilisez la forme dans laquelle vous vous reconnaissez le mieux. Pour les corriger, contactez l'administrateur.
 
 ### Paramètres de confidentialité
 

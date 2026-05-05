@@ -1,0 +1,231 @@
+# CLAUDE.md — Project conventions for AI agents
+
+This file is loaded by Claude Code when working in this repository. It captures the load-bearing conventions and gotchas that aren't obvious from reading the code.
+
+If something here contradicts what you'd reach for by default, **trust this file** — it's the result of real incidents on this codebase.
+
+---
+
+## Project context (the 30-second version)
+
+- **What:** Private alumni platform for CEG 1 Birni (Zinder, Niger), promotions 1980-1985. Production at https://villageretrouvailles.com/. Tag `v1.0.0-soft-launch`.
+- **Audience:** ~200 alumni from a WhatsApp group, ages 55-65. **~80% have no email.** Mobile-first (Android 7+ + low-end devices). The launch onboarding imports them en masse from a WhatsApp roster.
+- **Tone:** All user-facing copy is **French**. Code, comments, and commit messages are **English**.
+- **Owner:** Single bilingual operator (Bomino). One Super Admin (`bominomla`) in production.
+
+---
+
+## Auth (load-bearing decision — read this before touching anything auth-adjacent)
+
+- **Username = WhatsApp digits-only**, e.g. `22790000001`. Email is optional.
+- `ACCOUNT_LOGIN_METHODS = {"email", "username"}` — both work. `ACCOUNT_SIGNUP_FIELDS = ["username*", "email", "password1*", "password2*"]`.
+- These are the **new (non-deprecated) allauth settings keys**; do NOT regress to `ACCOUNT_AUTHENTICATION_METHOD` etc.
+- **Magic-link via WhatsApp** is the dominant onboarding flow (~80% of users have no email). Cooptation flow is for *new outside candidates* only.
+- For email-less password resets: `python manage.py reissue_login_link <username>`. Operator copy-pastes the printed URL into a WhatsApp DM.
+
+If you're proposing a feature that "just emails the user," ask: how do the email-less ~80% experience this? They probably need an admin-mediated alternative.
+
+---
+
+## Vendor architecture (don't agree to "all on Railway")
+
+The platform spans **two cloud vendors**:
+
+- **Railway** — app, Postgres, cron services, S3-compatible bucket (Tigris-backed)
+- **Cloudinary** — primary media storage + on-the-fly transforms
+
+If a user says "we have everything on Railway, why add X?" or proposes "single-vendor simplicity," **verify against the code first**. Cloudinary is load-bearing for `Member.photo_public_id`, `Memory.photo_public_id`, `InMemoriamEntry.photo_public_id`, and the upload widgets in `members/admin.py`, `memoires/admin.py`, `memoriam/admin.py`.
+
+Replacing Cloudinary would mean reimplementing `f_auto, q_auto:eco, c_fill, g_face` etc. via Pillow or pre-generated variants. Don't agree it's "easy."
+
+---
+
+## Tigris (Railway's bucket backend) quirks
+
+The bucket is on Tigris (`storageapi.dev`), discovered during P6a:
+
+- **`PutBucketVersioning` is NOT supported.** Returns the misleading `BucketAlreadyExists` error.
+- **`PutBucketLifecycleConfiguration` only accepts `Expiration` with explicit `Days`/`Date`.** Rejects `NoncurrentVersionExpiration` and `ExpiredObjectDeleteMarker`. The only rule shape Tigris accepts would auto-delete the backups themselves — useless for us.
+- **The bucket has no rotation today.** Path-dedup in `backup_media` keeps it small (~500 MB peak at our scale).
+
+If the user proposes anything around bucket retention/versioning, **don't volunteer to apply S3 lifecycle rules**. Read `docs/runbooks/restore.md` §1.2 first.
+
+The script `scripts/apply_bucket_lifecycle.py` exists and gracefully detects + reports both Tigris failures (no longer raises a stack trace).
+
+---
+
+## Cloudinary submodule trap (we hit this twice — don't be the third)
+
+`import cloudinary` does NOT transitively pull in `cloudinary.api` or `cloudinary.uploader`. Attribute access (`cloudinary.uploader.upload(...)`) raises `AttributeError: module 'cloudinary' has no attribute 'uploader'` at first real use.
+
+**Fix and contract:**
+
+- `RealCloudinary.__init__` in `alumni/cloudinary.py` imports `cloudinary`, `cloudinary.api`, AND `cloudinary.uploader` explicitly.
+- A regression test (`alumni/tests/test_cloudinary_extensions.py::test_real_cloudinary_init_loads_required_submodules`) instantiates `RealCloudinary` and asserts all three submodules are accessible.
+- **Do NOT remove** those imports thinking they're unused. They're load-bearing for production.
+- `FakeCloudinary` (used in tests) doesn't go through the real SDK; you'll never catch this in unit tests. The bug only surfaces in production at first real call.
+
+---
+
+## DB constraints: prefer Python-level `clean()` validation
+
+Hard CHECK constraints at the DB level become footguns when the format evolves. We hit this with `members_member_classes_in_set` (P7.1, dropped in migration 0013).
+
+**Pattern:**
+
+- Validate via `Model.clean()` with a regex constant (e.g. `VALID_CLASS_PATTERN`).
+- Surface a friendly user-facing message (in French) at the form layer.
+- DB-level CHECK is acceptable as defense-in-depth, but only when the format is genuinely fixed forever (e.g. `status IN ('active', 'suspended', 'deleted')`).
+
+For `last_name_initial` on `PublicSearchEntry`: we have `max_length=2` (browser maxlength cap) + `Model.clean()` (friendly message) + DB CHECK regex (defense). Three layers; the user never sees the raw constraint name.
+
+---
+
+## Workflow
+
+The project has used a tight **spec → plan → TDD → ship** loop throughout.
+
+1. **Spec** (`docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`) — what we're building, why, what's in/out of scope. Includes a §J risks section.
+2. **Plan** (`docs/superpowers/plans/YYYY-MM-DD-<topic>.md`) — task breakdown with TDD steps. For small fixes, you can fold spec + plan into one combined doc (see P6c, P7).
+3. **Branch** — `feat/<phase-or-topic>` for features, `fix/<topic>` for bugfixes, `docs/<topic>` for doc-only.
+4. **TDD** per task: write failing tests → run red → implement → run green → run full suite → commit.
+5. **Merge** — always `git merge --no-ff` with a descriptive merge commit message.
+6. **Tag** — only for milestone phases (`v1.0.0-soft-launch`). Sub-phases since P5+ haven't been individually tagged.
+
+Commit message convention:
+```
+<type>(<scope>): <imperative summary>
+
+<body — what changed and why; reference incident if applicable>
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+```
+
+`<type>` ∈ {feat, fix, docs, chore, refactor}; `<scope>` is the affected app or area.
+
+---
+
+## Pre-commit hooks
+
+Configured in `.pre-commit-config.yaml`:
+
+- **ruff** + **ruff-format** — Python linting + formatting
+- **djLint** — Django template formatting (HTML)
+- **trim trailing whitespace**, **fix end of files**
+
+The hooks **auto-fix** on commit. If they reformat a file, the commit fails and you have to re-stage + re-commit:
+
+```bash
+git add <files>
+git commit -m "..."
+# → ruff-format reformatted; commit aborted
+git add <files>           # re-stage the reformatted files
+git commit -m "..."       # this one passes
+```
+
+This is normal. Don't fight it.
+
+---
+
+## Production secrets — DO NOT pull locally
+
+Earlier in the project I (Claude) was rate-limited for piping production Cloudinary credentials into a local Python process. **Don't do that.**
+
+If you need to interact with prod:
+
+- **Read-only inspection:** `railway ssh --service lesretrouvailles -- python manage.py shell` (then pipe a Python script via stdin).
+- **Run a Django command in prod context:** `railway run --service lesretrouvailles python manage.py <command>` (note: this runs **locally** with prod env vars; only works for things that don't need internal-network DNS).
+- **Run something that needs prod DB access:** SSH into the running container — `DATABASE_URL` only resolves inside Railway's network.
+
+Never paste a production secret into a tool call's stdout/argv.
+
+---
+
+## Windows-specific gotchas
+
+The owner develops on Windows. The repo is cross-platform but:
+
+- The `railway` CLI is `railway.cmd` on Windows. From Python `subprocess`, you need `shell=True` for Windows (see `scripts/apply_bucket_lifecycle.py` for the pattern). Without it, you get `FileNotFoundError`.
+- The `Bash` tool in this Claude Code env is Git Bash, not WSL. Most things work; Postgres connections to localhost work via the Docker port mapping.
+- Line endings: `.gitattributes` is set to LF; on commit, Git warns "LF will be replaced by CRLF" — that's working-tree-only, harmless.
+- pytest with multiple sequential runs sometimes hits transient Postgres test-DB issues. If a full-suite run shows ERRORS in cooptation tests but passes in isolation, just re-run.
+
+---
+
+## Test conventions
+
+- Tests live next to the app: `<app>/tests/test_<topic>.py`.
+- Fixtures in `<app>/tests/conftest.py`. Common fixtures: `make_user`, `make_member`, `make_admin`, `make_application`, `make_cooptation_request`.
+- Use `@pytest.mark.django_db` for DB tests.
+- Use `settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"` to avoid real sends in email-related tests.
+- Use `settings.CLOUDINARY_CLIENT_PATH = "alumni.cloudinary.FakeCloudinary"` and `settings.STORAGE_CLIENT_PATH = "alumni.storage.FakeStorage"` (call `reset_fake_client()` between tests for clean call lists).
+- Target full-suite count is `~520 passing` as of v1.0.0-soft-launch. New work should add tests; the count should grow, not shrink.
+
+---
+
+## Mobile UX
+
+- Tap targets: `min-h-tap` and `min-w-tap` Tailwind utilities (= 44px). Use them on every interactive element.
+- Mobile breakpoint: `md:` (768px+) is "desktop". Below = mobile, including iPads in portrait.
+- The navbar uses a hamburger pattern on `<md` for authenticated users (P7.2 fix). Anon mobile gets a simpler inline layout (logo + WhatsApp icon + Connexion).
+- Test responsive in browser DevTools at 360px width minimum (low-end Android baseline for this audience).
+
+---
+
+## Quick references
+
+| What | Where |
+|---|---|
+| Current state, phase index | `docs/superpowers/STATUS.md` |
+| Master spec (PRD + design) | `docs/superpowers/specs/2026-05-01-alumni-platform-design.md` |
+| Operator launch procedure | `docs/runbooks/launch.md` |
+| User-facing French guide | `docs/guides/guide_membre.md` (member) + `guide_admin.md` (admin) |
+| Cooptation services (approve/reject/purge) | `cooptation/services.py` |
+| Member purge (RGPD) engine | `members/services.py::rgpd_purge_member` |
+| Bulk import command | `members/management/commands/import_whatsapp_roster.py` |
+| Daily cron handler | `cooptation/management/commands/process_cooptation_deadlines.py` |
+| Cloudinary client (real + fake) | `alumni/cloudinary.py` |
+| Object storage client (real + fake) | `alumni/storage.py` |
+
+---
+
+## Phase patterns to repeat
+
+When the user asks for a new feature:
+
+1. **Brainstorm** if scope is unclear (use `superpowers:brainstorming` skill if it appears applicable).
+2. **Spec** the design, including non-goals + risks.
+3. **Plan** the tasks with TDD steps.
+4. Show user the spec/plan, get confirmation, then execute.
+5. After each task: tests green → commit → next task. After all tasks: full suite → STATUS update → propose merge + tag if milestone.
+
+When the user reports a bug:
+
+1. **Understand** the symptom — read logs, reproduce if possible.
+2. **Diagnose** the root cause before proposing a fix. Don't paper over symptoms.
+3. **Fix** with the smallest change that addresses the cause.
+4. **Add a regression test** that would have caught the bug.
+5. **Ship** via the same workflow (branch → commit → merge → push). Watch the deploy.
+
+---
+
+## What NOT to do
+
+- **Don't** change auth settings without thinking through how the email-less ~80% are affected.
+- **Don't** propose Cloudinary removal without acknowledging the transform pipeline.
+- **Don't** apply S3 lifecycle rules to the Railway bucket — Tigris rejects the rule shapes we'd want.
+- **Don't** remove the explicit `import cloudinary.api` / `import cloudinary.uploader` in `RealCloudinary.__init__` — there's a regression test, but more importantly there's a real production failure waiting if you do.
+- **Don't** add DB CHECK constraints for fields whose format might evolve. Use Python `clean()` instead.
+- **Don't** pull production secrets into the local environment.
+- **Don't** delete records on production without explicit user confirmation. The P6b RGPD purge engine is the right tool for member deletions; for other test artifacts, surface what you'd delete and ask.
+- **Don't** assume what the user wants. If a request has multiple interpretations or non-obvious tradeoffs, surface them in 2-3 sentences and ask before executing.
+
+---
+
+## When you're stuck
+
+- Check `docs/superpowers/STATUS.md` for the current state.
+- Check `git log --oneline -20` to see what shipped recently.
+- Check `docs/runbooks/<topic>.md` for the operator procedure on $topic.
+- Check existing `<app>/tests/` for the test pattern in that area.
+- Ask the user.
