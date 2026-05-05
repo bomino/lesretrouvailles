@@ -17,6 +17,8 @@ class CloudinaryClient(Protocol):
 
     def delete(self, public_id: str) -> None: ...
 
+    def download(self, public_id: str) -> bytes: ...
+
 
 class RealCloudinary:
     """Production client wrapping the `cloudinary` SDK."""
@@ -56,6 +58,20 @@ class RealCloudinary:
             return
         self._cloudinary.uploader.destroy(public_id, invalidate=True)
 
+    def download(self, public_id: str) -> bytes:
+        """Fetch the original (untransformed) bytes for a public_id.
+
+        Used by the P6a backup pipeline. Goes via the Cloudinary admin API to
+        resolve the secure_url, then downloads via stdlib urllib (no extra
+        dependency).
+        """
+        import urllib.request
+
+        info = self._cloudinary.api.resource(public_id)
+        url = info["secure_url"]
+        with urllib.request.urlopen(url, timeout=30) as resp:  # noqa: S310
+            return resp.read()
+
 
 class FakeCloudinary:
     """In-memory client used in tests. Records calls; never hits the network."""
@@ -64,6 +80,7 @@ class FakeCloudinary:
         self.sign_calls: list[dict[str, Any]] = []
         self.delete_calls: list[str] = []
         self.upload_calls: list[dict[str, Any]] = []
+        self.download_calls: list[str] = []
 
     def sign_upload(self, *, folder: str, timestamp: int) -> dict[str, Any]:
         self.sign_calls.append({"folder": folder, "timestamp": timestamp})
@@ -87,6 +104,12 @@ class FakeCloudinary:
 
     def delete(self, public_id: str) -> None:
         self.delete_calls.append(public_id)
+
+    def download(self, public_id: str) -> bytes:
+        """Return deterministic bytes derived from the public_id; record the call."""
+        self.download_calls.append(public_id)
+        digest = hashlib.sha1(f"download:{public_id}".encode()).digest()
+        return digest * 32  # 640 bytes of deterministic content
 
 
 _fake_singleton: FakeCloudinary | None = None

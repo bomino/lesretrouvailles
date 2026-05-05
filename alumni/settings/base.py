@@ -158,6 +158,18 @@ CLOUDINARY_URL = env(
     default=f"cloudinary://{CLOUDINARY_API_KEY}:{CLOUDINARY_API_SECRET}@{CLOUDINARY_CLOUD_NAME}",
 )
 
+# Object storage — media backup target (P6a). Default points at FakeStorage so
+# tests/dev never touch the network. The media-backup-cron Railway service
+# overrides STORAGE_CLIENT_PATH to RealStorage and sets the four credential
+# vars from a Railway bucket reference (see docs/runbooks/restore.md §1).
+STORAGE_CLIENT_PATH = env("STORAGE_CLIENT_PATH", default="alumni.storage.FakeStorage")
+STORAGE_BUCKET_NAME = env("STORAGE_BUCKET_NAME", default="")
+STORAGE_ENDPOINT_URL = env("STORAGE_ENDPOINT_URL", default="")
+STORAGE_ACCESS_KEY_ID = env("STORAGE_ACCESS_KEY_ID", default="")
+STORAGE_SECRET_ACCESS_KEY = env("STORAGE_SECRET_ACCESS_KEY", default="")
+STORAGE_REGION = env("STORAGE_REGION", default="auto")
+STORAGE_BACKUP_REQUIRED = env.bool("STORAGE_BACKUP_REQUIRED", default=False)
+
 # Rate limiting and other cache use (django-ratelimit, etc).
 #
 # Backend selection is env-driven so the same image runs in dev (LocMem),

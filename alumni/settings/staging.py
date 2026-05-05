@@ -4,7 +4,17 @@ import environ
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F401,F403
-from .base import CLOUDINARY_CLIENT_PATH, CLOUDINARY_CLOUD_NAME, MIDDLEWARE
+from .base import (
+    CLOUDINARY_CLIENT_PATH,
+    CLOUDINARY_CLOUD_NAME,
+    MIDDLEWARE,
+    STORAGE_ACCESS_KEY_ID,
+    STORAGE_BACKUP_REQUIRED,
+    STORAGE_BUCKET_NAME,
+    STORAGE_CLIENT_PATH,
+    STORAGE_ENDPOINT_URL,
+    STORAGE_SECRET_ACCESS_KEY,
+)
 
 env = environ.Env()
 
@@ -71,6 +81,25 @@ if CLOUDINARY_CLIENT_PATH.endswith("RealCloudinary") and CLOUDINARY_CLOUD_NAME =
         "CLOUDINARY_CLIENT_PATH=RealCloudinary requires CLOUDINARY_CLOUD_NAME "
         "to be set to your real Cloudinary cloud (currently 'fake-cloud')."
     )
+
+# P6a: defense-in-depth for the media-backup cron service. STORAGE_BACKUP_REQUIRED
+# is set to true on the media-backup-cron service only; if the operator forgot
+# any of the credential vars, refuse to boot rather than fail silently a week
+# later when the first scheduled run hits.
+if STORAGE_BACKUP_REQUIRED and STORAGE_CLIENT_PATH.endswith("RealStorage"):
+    if not all(
+        [
+            STORAGE_BUCKET_NAME,
+            STORAGE_ENDPOINT_URL,
+            STORAGE_ACCESS_KEY_ID,
+            STORAGE_SECRET_ACCESS_KEY,
+        ],
+    ):
+        raise ImproperlyConfigured(
+            "STORAGE_BACKUP_REQUIRED=true with RealStorage selected, but one or more "
+            "of STORAGE_BUCKET_NAME / STORAGE_ENDPOINT_URL / STORAGE_ACCESS_KEY_ID / "
+            "STORAGE_SECRET_ACCESS_KEY is missing.",
+        )
 
 EMAIL_BACKEND = "alumni.email.ResendBackend"
 PASSWORD_RESET_TIMEOUT = 7 * 24 * 60 * 60  # 7 days for the post-approval password-set link
