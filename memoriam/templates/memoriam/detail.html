@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load memory_photo %}
+{% block robots %}<meta name="robots" content="noindex,nofollow">{% endblock %}
+{% block title %}
+    {{ entry.full_name }} — {% trans "In Memoriam" %} — {{ block.super }}
+{% endblock %}
+{% block content %}
+    <article class="mx-auto max-w-2xl px-4 py-12">
+        <p class="text-center mb-2">
+            <a href="{% url 'memoriam:list' %}"
+               class="text-sm text-secondary hover:text-tertiary">← {% trans "Retour à In Memoriam" %}</a>
+        </p>
+        <header class="text-center mb-8">
+            <span class="inline-flex h-12 w-12 items-center justify-center rounded-full bg-ceremonial-gold/15 text-ceremonial-gold text-3xl">🕊️</span>
+            <h1 class="mt-4 font-display text-3xl font-semibold tracking-tight">{{ entry.full_name }}</h1>
+            {% if entry.nickname %}<p class="text-secondary italic">« {{ entry.nickname }} »</p>{% endif %}
+            {% if entry.years_attended %}
+                <p class="text-sm text-secondary mt-2">
+                    CEG 1 Birni · {{ entry.years_attended|join:", " }}
+                    {% if entry.classes %}· {{ entry.classes|join:", " }}{% endif %}
+                </p>
+            {% endif %}
+            {% if entry.birth_year and entry.death_year %}
+                <p class="text-sm text-secondary">{{ entry.birth_year }} — {{ entry.death_year }}</p>
+            {% endif %}
+        </header>
+        {% if entry.photo_public_id %}
+            <figure class="mb-8">
+                <img src="{% memory_full entry.photo_public_id 1200 %}"
+                     alt=""
+                     class="w-full rounded-2xl shadow-sm" />
+            </figure>
+        {% endif %}
+        <div class="prose prose-neutral max-w-none font-display">{{ tribute_html|safe }}</div>
+        <footer class="mt-12 pt-6 border-t border-secondary/15 text-sm text-secondary">
+            <p>
+                {% blocktrans with email=memoriam_contact_email %}Toute famille souhaitant le retrait de cette page peut écrire à <a href="mailto:{{ email }}">{{ email }}</a>.{% endblocktrans %}
+            </p>
+        </footer>
+    </article>
+{% endblock %}

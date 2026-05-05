@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block robots %}<meta name="robots" content="noindex,nofollow">{% endblock %}
+{% block title %}
+    {% trans "Nominer un camarade" %} — In Memoriam — {{ block.super }}
+{% endblock %}
+{% block content %}
+    <section class="mx-auto max-w-md px-4 py-12">
+        <header class="text-center mb-8">
+            <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-ceremonial-gold/15 text-ceremonial-gold text-2xl">🕊️</span>
+            <h1 class="mt-4 font-display text-2xl font-semibold tracking-tight">{% trans "Nominer un camarade" %}</h1>
+            <p class="mt-2 text-sm text-secondary">
+                {% trans "Pour proposer une fiche In Memoriam. Un administrateur prendra contact avec la famille avant toute publication." %}
+            </p>
+        </header>
+        <form method="post"
+              class="rounded-2xl bg-surface p-8 shadow-sm border border-secondary/15 space-y-4">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="rounded-lg bg-red-50 border border-red-300 p-3 text-sm text-red-800">{{ form.non_field_errors }}</div>
+            {% endif %}
+            <div>
+                <label for="{{ form.proposed_name.id_for_label }}"
+                       class="block text-sm font-medium mb-1">{% trans "Nom complet du camarade" %}</label>
+                {{ form.proposed_name }}
+                {% if form.proposed_name.errors %}
+                    <p class="text-xs text-red-700 mt-1">{{ form.proposed_name.errors|join:", " }}</p>
+                {% endif %}
+            </div>
+            <div>
+                <label for="{{ form.proposed_nickname.id_for_label }}"
+                       class="block text-sm font-medium mb-1">
+                    {% trans "Surnom" %} <span class="text-secondary">{% trans "(facultatif)" %}</span>
+                </label>
+                {{ form.proposed_nickname }}
+                {% if form.proposed_nickname.errors %}
+                    <p class="text-xs text-red-700 mt-1">{{ form.proposed_nickname.errors|join:", " }}</p>
+                {% endif %}
+            </div>
+            <div>
+                <label for="{{ form.proposed_years.id_for_label }}"
+                       class="block text-sm font-medium mb-1">
+                    {% trans "Années au CEG" %} <span class="text-secondary">{% trans "(facultatif)" %}</span>
+                </label>
+                {{ form.proposed_years }}
+                <p class="text-xs text-secondary mt-1">{% trans "Séparées par virgules, ex. : 1980,1981" %}</p>
+                {% if form.proposed_years.errors %}
+                    <p class="text-xs text-red-700 mt-1">{{ form.proposed_years.errors|join:", " }}</p>
+                {% endif %}
+            </div>
+            <div>
+                <label for="{{ form.personal_memory.id_for_label }}"
+                       class="block text-sm font-medium mb-1">{% trans "Pourquoi cette personne ?" %}</label>
+                {{ form.personal_memory }}
+                {% if form.personal_memory.errors %}
+                    <p class="text-xs text-red-700 mt-1">{{ form.personal_memory.errors|join:", " }}</p>
+                {% endif %}
+            </div>
+            <div>
+                <label for="{{ form.family_contact_hint.id_for_label }}"
+                       class="block text-sm font-medium mb-1">
+                    {% trans "Contact famille suggéré" %} <span class="text-secondary">{% trans "(facultatif)" %}</span>
+                </label>
+                {{ form.family_contact_hint }}
+                <p class="text-xs text-secondary mt-1">{% trans "Aide l'admin à joindre un proche pour obtenir le consentement." %}</p>
+                {% if form.family_contact_hint.errors %}
+                    <p class="text-xs text-red-700 mt-1">{{ form.family_contact_hint.errors|join:", " }}</p>
+                {% endif %}
+            </div>
+            <button type="submit"
+                    class="w-full bg-tertiary text-on-tertiary rounded-lg px-4 py-2.5 hover:bg-tertiary/90 transition font-medium">
+                {% trans "Envoyer la nomination" %}
+            </button>
+        </form>
+    </section>
+{% endblock %}

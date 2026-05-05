@@ -6,6 +6,7 @@ urlpatterns = [
     path("accounts/", include("allauth.urls")),
     path("", include("cooptation.urls")),
     path("", include("memoires.urls")),
+    path("", include("memoriam.urls")),
     path("", include("members.urls")),
     path("", include("core.urls")),
 ]

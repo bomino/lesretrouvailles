@@ -1,0 +1,40 @@
+{% load i18n %}
+<!DOCTYPE html>
+<html>
+    <body style="font-family: system-ui, sans-serif;
+                 color: #1f2937;
+                 max-width: 560px;
+                 margin: 0 auto;
+                 padding: 24px">
+        <p>Bonjour,</p>
+        <p>Un membre vient de soumettre une nomination In Memoriam.</p>
+        <p>
+            <strong>Camarade proposé(e) :</strong> {{ nomination.proposed_name }}
+            {% if nomination.proposed_nickname %}({{ nomination.proposed_nickname }}){% endif %}
+            <br>
+            {% if nomination.proposed_years %}
+                <strong>Années au CEG :</strong> {{ nomination.proposed_years|join:", " }}
+                <br>
+            {% endif %}
+            <strong>Proposé(e) par :</strong> {{ nomination.nominator.first_name }} {{ nomination.nominator.last_name }}
+        </p>
+        <p>
+            <strong>Souvenir partagé :</strong>
+        </p>
+        <blockquote style="border-left: 3px solid #ddd; padding-left: 12px; color: #555;">
+            {{ nomination.personal_memory|linebreaks }}
+        </blockquote>
+        {% if nomination.family_contact_hint %}
+            <p>
+                <strong>Contact famille suggéré :</strong>
+            </p>
+            <blockquote style="border-left: 3px solid #ddd; padding-left: 12px; color: #555;">
+                {{ nomination.family_contact_hint|linebreaks }}
+            </blockquote>
+        {% endif %}
+        <p>
+            <a href="{{ site_url }}/admin/memoriam/inmemoriamnomination/{{ nomination.pk }}/change/">Examiner la nomination dans l'admin</a>
+        </p>
+        <p>— Les Retrouvailles</p>
+    </body>
+</html>

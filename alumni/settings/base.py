@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     "members",
     "cooptation",
     "memoires",
+    "memoriam",
 ]
 
 MIDDLEWARE = [
@@ -62,6 +63,7 @@ TEMPLATES = [
                 "members.context.member_preferences",
                 "core.context_processors.site",
                 "cooptation.context_processors.pending_vouches_count",
+                "memoriam.context_processors.memoriam_contact",
             ],
         },
     },
@@ -102,6 +104,21 @@ EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.
 DEFAULT_FROM_EMAIL = env(
     "DEFAULT_FROM_EMAIL",
     default="Les Retrouvailles <noreply@villageretrouvailles.com>",
+)
+
+from email.utils import parseaddr  # noqa: E402
+
+# In Memoriam — family retrait inquiries (Annexe D §D.4). Strip any display
+# name so the value works as a `mailto:` link.
+MEMORIAM_CONTACT_EMAIL = env(
+    "MEMORIAM_CONTACT_EMAIL",
+    default=parseaddr(DEFAULT_FROM_EMAIL)[1],
+)
+
+# Admin alert recipients for new In Memoriam nominations.
+MEMORIAM_ADMIN_EMAILS = env.list(
+    "MEMORIAM_ADMIN_EMAILS",
+    default=[parseaddr(DEFAULT_FROM_EMAIL)[1]],
 )
 
 # django-allauth (older universal config style for compatibility)

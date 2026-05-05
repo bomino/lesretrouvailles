@@ -19,7 +19,8 @@ Single dashboard for tracking phase and task completion across all plans. Update
 | P3.1 | Parrain UX Polish (pending-vouches dashboard + 90-day session) | Complete (2026-05-03) | [plan](plans/2026-05-03-parrain-ux-polish.md) |
 | P5a | Mur des souvenirs (member-only photo gallery) | Complete (2026-05-03) | [plan](plans/2026-05-03-mur-souvenirs.md) |
 | Allauth styling | Allauth template overrides (full /accounts/* visual coverage) | Complete (2026-05-04) | [plan](plans/2026-05-04-styled-allauth-templates.md) |
-| P5 | Mémoire seed | (split into P5a + P5b) | — |
+| P5b | In Memoriam (member-only fiches + nomination form) | Complete (2026-05-04) | [plan](plans/2026-05-04-in-memoriam.md) |
+| P5 | Mémoire seed | Complete (P5a + P5b shipped 2026-05-04) | — |
 | P6 | Ops & RGPD | Not started | — |
 | P7 | Soft launch | Not started | — |
 
@@ -299,6 +300,39 @@ Single dashboard for tracking phase and task completion across all plans. Update
 **Status:** Not started.
 **Scope:** Seed content prep, pilot rollout, production launch checklist.
 **Plan:** not yet written.
+
+---
+
+## P5b — In Memoriam
+
+**Shipped:** 2026-05-04
+**Plan:** [plans/2026-05-04-in-memoriam.md](plans/2026-05-04-in-memoriam.md)
+**Spec:** [specs/2026-05-04-in-memoriam-design.md](specs/2026-05-04-in-memoriam-design.md)
+**Test suite:** 445 passing total (37 new memoriam tests across `memoriam/tests/*` and `core/tests/test_settings_memoriam.py`).
+
+| # | Task | Done | Commit |
+|---|------|------|--------|
+| 1 | Scaffold memoriam app + Dockerfile + INSTALLED_APPS | [x] | `5adf1f0` (+ review nits `53efe97`) |
+| 2 | Extend AuditLog ACTION_CHOICES with memoriam.* actions | [x] | `0e6b231` |
+| 3 | InMemoriamEntry model with clean() + queryset method | [x] | `dfc889e` (+ DRY fix `79fa6ff`) |
+| 4 | InMemoriamNomination model | [x] | `b4c6343` |
+| 5 | Settings + context processor (MEMORIAM_CONTACT_EMAIL) | [x] | `8ada59f` |
+| 6 | InMemoriamEntryAdmin with full save_model logic | [x] | `b5874c2` (+ cleanup `bdad459`) |
+| 7 | InMemoriamNominationAdmin (no manual add) | [x] | `8289912` |
+| 8 | AuditLog signal handlers | [x] | `aa9fcd1` |
+| 9 | Email senders + 6 templates | [x] | `fdd1cc9` |
+| 10 | List + Detail views with templates | [x] | `e5f8ce8` |
+| 11 | Nomination form + view + rate limit | [x] | `6d17193` |
+| 12 | Nav link + landing card wire | [x] | `0fb5fe4` |
+| 13 | STATUS.md update | [x] | _this commit_ |
+
+**Notable design decisions:**
+- Status lifecycle adds `archived` (P5a's `Memory` model has only draft/published) — required by Annexe D §D.4 retrait flow which hides without hard-deleting.
+- `approved_content_version` is a counter, not a content snapshot. P9 (Ops & RGPD) can add a snapshot table or use `django-simple-history`; counter is the documented MVP tradeoff.
+- Email recipients filter `status="active"` to avoid emailing soft-deleted members.
+- Members never publish content. They submit nominations via `/in-memoriam/nominer/`; the admin runs the family-consent process offline before creating the fiche.
+- `MEMORIAM_CONTACT_EMAIL` defaults to `parseaddr(DEFAULT_FROM_EMAIL)[1]` so the `mailto:` in the detail-page footer works out of the box.
+- `alumni.cloudinary.get_client()` was upgraded to a singleton pattern for `FakeCloudinary` (test mode) to enable inspection of `delete_calls` across multiple `get_client()` calls within a single test. `reset_fake_client()` helper added for fixture-driven isolation.
 
 ---
 

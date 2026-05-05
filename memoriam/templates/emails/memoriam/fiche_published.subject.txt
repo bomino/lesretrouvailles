@@ -1,0 +1,1 @@
+Une nouvelle page In Memoriam : {{ entry.full_name }}

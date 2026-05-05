@@ -1,0 +1,18 @@
+Bonjour,
+
+Un membre vient de soumettre une nomination In Memoriam.
+
+Camarade proposé(e) : {{ nomination.proposed_name }}{% if nomination.proposed_nickname %} ({{ nomination.proposed_nickname }}){% endif %}
+{% if nomination.proposed_years %}Années au CEG : {{ nomination.proposed_years|join:", " }}{% endif %}
+Proposé(e) par : {{ nomination.nominator.first_name }} {{ nomination.nominator.last_name }}
+
+Souvenir partagé :
+{{ nomination.personal_memory }}
+
+{% if nomination.family_contact_hint %}Contact famille suggéré :
+{{ nomination.family_contact_hint }}
+{% endif %}
+Pour examiner la nomination :
+{{ site_url }}/admin/memoriam/inmemoriamnomination/{{ nomination.pk }}/change/
+
+— Les Retrouvailles

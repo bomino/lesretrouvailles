@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block robots %}<meta name="robots" content="noindex,nofollow">{% endblock %}
+{% block title %}
+    {% trans "Merci" %} — In Memoriam — {{ block.super }}
+{% endblock %}
+{% block content %}
+    <section class="mx-auto max-w-md px-4 py-12 text-center">
+        <span class="inline-flex h-12 w-12 items-center justify-center rounded-full bg-ceremonial-gold/15 text-ceremonial-gold text-3xl">🕊️</span>
+        <h1 class="mt-4 font-display text-2xl font-semibold tracking-tight">{% trans "Merci pour votre nomination" %}</h1>
+        <p class="mt-4 text-secondary">
+            {% trans "Un administrateur examinera votre proposition et prendra contact avec la famille avant toute publication. Aucun contenu n'est publié sans accord explicite." %}
+        </p>
+        <a href="{% url 'memoriam:list' %}"
+           class="mt-8 inline-block rounded-lg border border-secondary/25 px-4 py-2 text-sm hover:border-tertiary/40 transition">
+            {% trans "Retour à In Memoriam" %}
+        </a>
+    </section>
+{% endblock %}

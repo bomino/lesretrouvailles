@@ -246,6 +246,9 @@ class AuditLog(models.Model):
         ("ghost.removal.executed", "Retrait exécuté"),
         ("ghost.removal.cancelled", "Demande de retrait annulée par admin"),
         ("ghost.entry.purged", "Fiche purgée"),
+        ("memoriam.entry.published", "Fiche In Memoriam publiée"),
+        ("memoriam.entry.archived", "Fiche In Memoriam archivée"),
+        ("memoriam.nomination.created", "Nomination In Memoriam soumise"),
     ]
 
     actor = models.ForeignKey(

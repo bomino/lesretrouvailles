@@ -99,10 +99,10 @@ def test_admin_edit_with_new_upload_replaces_photo_and_deletes_old(
     """Replacing the photo on an edit triggers a new Cloudinary upload and
     writes a different public_id into photo_public_id.
 
-    Note: get_client() returns a fresh FakeCloudinary instance each call, so
-    delete_calls cannot be inspected across the create and edit requests. We
-    assert the visible outcome instead: photo_public_id changes to a value
-    derived from the new filename (FakeCloudinary is deterministic on name)."""
+    Note: this test asserts the visible outcome (photo_public_id change) rather
+    than inspecting client.delete_calls. The singleton FakeCloudinary in test
+    mode does record delete_calls across requests, but checking the visible
+    result is more robust (doesn't depend on call ordering across requests)."""
     from memoires.models import Memory
 
     creator = make_admin_user()

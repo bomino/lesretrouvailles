@@ -1,0 +1,11 @@
+Bonjour {{ member.first_name }},
+
+Une nouvelle page In Memoriam vient d'être publiée pour honorer la mémoire de {{ entry.full_name }}.
+
+Pour la consulter :
+{{ site_url }}{{ entry.get_absolute_url }}
+
+— Les Retrouvailles
+
+—
+Vous recevez cet email car la préférence "Alertes In Memoriam" est activée sur votre profil. Pour vous désinscrire, modifiez vos préférences depuis votre profil.

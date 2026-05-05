@@ -1,0 +1,1 @@
+[In Memoriam] Nouvelle nomination : {{ nomination.proposed_name }}
