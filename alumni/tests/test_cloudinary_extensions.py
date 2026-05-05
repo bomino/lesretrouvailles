@@ -69,3 +69,34 @@ def test_memory_full_url_uses_limit_fit_no_crop(settings):
         "https://res.cloudinary.com/test-cloud/image/upload/"
         "f_auto,q_auto:eco,c_limit,w_1200/memoires/abc123"
     )
+
+
+def test_real_cloudinary_init_loads_required_submodules():
+    """RealCloudinary's methods reference cloudinary.api, cloudinary.uploader,
+    and cloudinary.utils. `import cloudinary` does NOT transitively pull in
+    api/uploader, so __init__ must import them explicitly. This test catches
+    future regressions where someone deletes one of those imports — without
+    it, the bug only surfaces in prod the first time the broken codepath
+    runs (e.g. uploading the first real photo)."""
+    import cloudinary
+
+    from alumni.cloudinary import RealCloudinary
+
+    # Construct (calls __init__, which performs the imports)
+    RealCloudinary()
+
+    # All three submodules must be present after init
+    assert hasattr(cloudinary, "api"), (
+        "cloudinary.api not loaded — RealCloudinary.download() will crash"
+    )
+    assert hasattr(cloudinary, "uploader"), (
+        "cloudinary.uploader not loaded — RealCloudinary.upload_file() / .delete() will crash"
+    )
+    assert hasattr(cloudinary, "utils"), (
+        "cloudinary.utils not loaded — RealCloudinary.sign_upload() will crash"
+    )
+    # And the actual callables we use must resolve
+    assert callable(cloudinary.api.resource)
+    assert callable(cloudinary.uploader.upload)
+    assert callable(cloudinary.uploader.destroy)
+    assert callable(cloudinary.utils.api_sign_request)

@@ -24,7 +24,17 @@ class RealCloudinary:
     """Production client wrapping the `cloudinary` SDK."""
 
     def __init__(self) -> None:
+        # `import cloudinary` does NOT transitively pull in cloudinary.api or
+        # cloudinary.uploader — they have to be imported explicitly. Without
+        # these next two lines, attribute access on the submodules raises
+        # AttributeError at first use ("module 'cloudinary' has no attribute
+        # 'uploader'") in production. The bug stayed hidden for months because
+        # FakeCloudinary doesn't go through the real SDK; it bites whoever
+        # tries to upload the first real photo. Pull both in here so every
+        # method on this class can rely on them.
         import cloudinary  # noqa: WPS433
+        import cloudinary.api  # noqa: F401, WPS433
+        import cloudinary.uploader  # noqa: F401, WPS433
 
         cloudinary.config(secure=True)
         self._cloudinary = cloudinary
@@ -67,14 +77,7 @@ class RealCloudinary:
         """
         import urllib.request
 
-        # cloudinary.api is a submodule that `import cloudinary` does NOT pull
-        # in transitively — without this explicit import, attribute access on
-        # cloudinary.api raises AttributeError at first use. Caught when the
-        # first real cron run failed with "module 'cloudinary' has no
-        # attribute 'api'" (the unit tests only exercise FakeCloudinary).
-        import cloudinary.api  # noqa: WPS433
-
-        info = cloudinary.api.resource(public_id)
+        info = self._cloudinary.api.resource(public_id)
         url = info["secure_url"]
         with urllib.request.urlopen(url, timeout=30) as resp:  # noqa: S310
             return resp.read()
