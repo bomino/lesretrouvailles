@@ -25,7 +25,7 @@ Single dashboard for tracking phase and task completion across all plans. Update
 | P6b | Ops — RGPD admin purge | Complete (2026-05-05) | [plan](plans/2026-05-05-rgpd-admin-purge.md) |
 | P6c | Ops — DMARC monitoring + AuditLog retention | Complete (2026-05-05) | [spec](specs/2026-05-05-p6c-dmarc-retention-design.md) |
 | P6 | Ops & RGPD | Complete (P6a + P6b + P6c shipped 2026-05-05) | — |
-| P7 | Soft launch | Not started | — |
+| P7 | Soft launch (auth flip + bulk-import tooling + launch runbooks) | Complete (tag `v1.0.0-soft-launch`, 2026-05-05) | [spec](specs/2026-05-05-p7-soft-launch-design.md) |
 
 ---
 
@@ -301,9 +301,25 @@ Single dashboard for tracking phase and task completion across all plans. Update
 
 ## P7 — Soft launch
 
-**Status:** Not started.
-**Scope:** Seed content prep, pilot rollout, production launch checklist.
-**Plan:** not yet written.
+**Shipped:** 2026-05-05 (tag `v1.0.0-soft-launch`).
+**Spec (combined design + plan):** [specs/2026-05-05-p7-soft-launch-design.md](specs/2026-05-05-p7-soft-launch-design.md)
+**Test suite:** 492 passing total (13 new tests across `members/tests/test_username_login.py`, `test_import_whatsapp_roster.py`, `test_reissue_login_link.py`, `test_audit_launch_readiness.py`).
+
+| # | Task | Done | Commit |
+|---|------|------|--------|
+| 1 | Allauth phone-or-email auth + new settings API | [x] | `8f8b8aa` |
+| 2 | `import_whatsapp_roster` bulk-import command | [x] | `d54eba7` |
+| 3 + 4 | `reissue_login_link` + `audit_launch_readiness` | [x] | `3203521` |
+| 5 | Launch + onboarding runbooks + CSV template | [x] | `4185b90` |
+| 6 | STATUS update + tag `v1.0.0-soft-launch` | [x] | _this commit_ |
+
+**Notable design decisions:**
+- **Phone-or-email login, not phone-only.** With ~80% of the cohort email-less, phone (WhatsApp digits) is the universal identifier; the 15-20% with email keep the standard email-based recovery flow they expect. New allauth settings API (`ACCOUNT_LOGIN_METHODS = {"email", "username"}`) replaces the deprecated trio — drops the 3 deprecation warnings cron logs were emitting on every startup.
+- **Two onboarding paths from one CSV.** Email-bearing rows go through the standard Resend password-set email; email-less rows get a magic-link URL written to `magic_links.csv` for the operator to copy-paste into a WhatsApp DM. Reuses cooptation's `_build_password_set_url()` so both paths produce allauth-compatible signed URLs.
+- **`reissue_login_link` for steady-state password resets.** The dominant path (no email) means the standard email-based password-reset flow doesn't work for most members. Pattern: member messages admin via WhatsApp; admin re-issues; admin shares URL via WhatsApp DM. One-line CLI command.
+- **No member self-service deletion or onboarding.** The cooptation flow (P3) remains for outside candidates; existing-WhatsApp-member self-service is deferred (P6b's RGPD purge engine is the building block when that flow ships).
+- **Pre-launch DB cleanup is operator-driven, not code.** Launch runbook Step 0 walks the operator through `createsuperuser` → manual deletion via Django admin → optional bucket cleanup. Avoids a one-shot management command that would never be reused after launch.
+- **Photo upload during import is best-effort.** A failed photo upload doesn't fail the row; the member is created without a photo and can upload their own via Profile → Modifier later. Most of the 200 members won't have a pre-loaded photo anyway.
 
 ---
 
