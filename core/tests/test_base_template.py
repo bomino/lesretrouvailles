@@ -80,3 +80,124 @@ def test_nav_includes_souvenirs_link_for_authenticated_member(client):
     # Link must appear at least twice (desktop + mobile nav blocks)
     assert body.count("/souvenirs/") >= 2
     assert "Souvenirs" in body
+
+
+# -------- Mobile navbar (P7.2) --------
+
+
+@pytest.mark.django_db
+def test_anonymous_landing_has_visible_login_link_on_mobile(client):
+    """Anonymous mobile users must have a path to /accounts/login/ from
+    the navbar. Pre-fix the link was hidden behind sm:inline-flex."""
+    response = client.get(reverse("landing"))
+    html = response.content.decode("utf-8")
+    # The Connexion link is rendered without sm:hidden — visible across breakpoints
+    assert reverse("account_login") in html
+    # Confirm it's not gated behind a class that hides it on mobile.
+    # Find a snippet around the connexion href and assert no "hidden" class
+    # appears in the visible classes for that anchor's parent.
+    import re
+
+    pattern = re.compile(
+        r'<a[^>]*href="' + re.escape(reverse("account_login")) + r'"[^>]*class="([^"]*)"',
+        re.MULTILINE | re.DOTALL,
+    )
+    matches = pattern.findall(html)
+    assert matches, "Could not find Connexion <a> for inspection"
+    # At least one match should NOT begin with "hidden" (i.e. be visible on mobile)
+    assert any(not m.strip().startswith("hidden") for m in matches), (
+        f"All Connexion links carry a 'hidden' base class; mobile users have no login path. "
+        f"Classes seen: {matches}"
+    )
+
+
+@pytest.mark.django_db
+def test_authenticated_navbar_renders_hamburger_toggle_with_a11y(client):
+    """Logged-in members on mobile see a hamburger button with proper
+    aria attributes; the dropdown menu starts collapsed."""
+    from django.contrib.auth import get_user_model
+
+    from members.charters import CHARTER_CURRENT_VERSION
+    from members.models import ConsentRecord, Member
+
+    User = get_user_model()  # noqa: N806
+    user = User.objects.create_user(
+        username="hambtest@example.test", email="hambtest@example.test", password="x"
+    )
+    member = Member.objects.create(
+        user=user,
+        first_name="Ham",
+        last_name="Burger",
+        years_attended=[1980],
+        classes=["6e"],
+        city="Niamey",
+        status="active",
+    )
+    ConsentRecord.objects.create(
+        member=member, charter_version=CHARTER_CURRENT_VERSION, ip_address="127.0.0.1"
+    )
+    client.force_login(user)
+
+    response = client.get(reverse("landing"))
+    html = response.content.decode("utf-8")
+
+    # Hamburger button exists with proper aria attributes
+    assert 'id="nav-toggle"' in html
+    assert 'aria-expanded="false"' in html
+    assert 'aria-controls="mobile-nav"' in html
+    # Mobile nav exists, starts collapsed (has 'hidden' class)
+    assert 'id="mobile-nav"' in html
+    # The mobile-nav should have BOTH md:hidden (desktop hidden) AND hidden (initial state)
+    import re
+
+    nav_match = re.search(r'<nav[^>]*id="mobile-nav"[^>]*class="([^"]*)"', html)
+    assert nav_match, "mobile-nav element not found"
+    classes = nav_match.group(1)
+    assert "md:hidden" in classes  # hidden on desktop
+    assert "hidden" in classes.split()  # collapsed by default on mobile
+
+
+@pytest.mark.django_db
+def test_mobile_dropdown_contains_all_nav_links_and_logout(client):
+    """The mobile dropdown holds the full nav, the WhatsApp link, and a
+    Se déconnecter button — replacing the old horizontal bottom-bar."""
+    from django.contrib.auth import get_user_model
+
+    from members.charters import CHARTER_CURRENT_VERSION
+    from members.models import ConsentRecord, Member
+
+    User = get_user_model()  # noqa: N806
+    user = User.objects.create_user(
+        username="mobnavtest@example.test", email="mobnavtest@example.test", password="x"
+    )
+    member = Member.objects.create(
+        user=user,
+        first_name="Mob",
+        last_name="Nav",
+        years_attended=[1980],
+        classes=["6e"],
+        city="Niamey",
+        status="active",
+    )
+    ConsentRecord.objects.create(
+        member=member, charter_version=CHARTER_CURRENT_VERSION, ip_address="127.0.0.1"
+    )
+    client.force_login(user)
+
+    response = client.get(reverse("landing"))
+    html = response.content.decode("utf-8")
+
+    # Extract just the mobile-nav block to avoid matching the desktop nav
+    import re
+
+    block = re.search(r'<nav[^>]*id="mobile-nav".*?</nav>', html, re.DOTALL)
+    assert block, "mobile-nav block not found"
+    mobile_html = block.group(0)
+
+    assert "/annuaire/" in mobile_html
+    assert "/souvenirs/" in mobile_html
+    assert reverse("memoriam:list") in mobile_html
+    assert "/cooptations-a-valider/" in mobile_html
+    assert "/profil/" in mobile_html
+    assert "Groupe WhatsApp" in mobile_html
+    assert "Se déconnecter" in mobile_html
