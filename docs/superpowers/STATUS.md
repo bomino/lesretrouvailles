@@ -21,7 +21,8 @@ Single dashboard for tracking phase and task completion across all plans. Update
 | Allauth styling | Allauth template overrides (full /accounts/* visual coverage) | Complete (2026-05-04) | [plan](plans/2026-05-04-styled-allauth-templates.md) |
 | P5b | In Memoriam (member-only fiches + nomination form) | Complete (2026-05-04) | [plan](plans/2026-05-04-in-memoriam.md) |
 | P5 | Mémoire seed | Complete (P5a + P5b shipped 2026-05-04) | — |
-| P6 | Ops & RGPD | Not started | — |
+| P6a | Ops — media backup (Cloudinary→Railway bucket) | Complete (2026-05-05) | [plan](plans/2026-05-04-media-backup.md) |
+| P6 | Ops & RGPD (full) | In progress (P6a complete; P6b/P6c not started) | — |
 | P7 | Soft launch | Not started | — |
 
 ---
@@ -289,9 +290,9 @@ Single dashboard for tracking phase and task completion across all plans. Update
 
 ## P6 — Ops & RGPD
 
-**Status:** Not started.
-**Scope:** GitHub Actions backup workflow Cloudinary→B2, `purge_user_from_backups.py`, RGPD deletion flow, DMARC monitoring, `AuditLog` model + decorator.
-**Plan:** not yet written.
+**Status:** In progress (P6a complete; P6b/P6c not started).
+**Scope:** Media backup (P6a, complete — see below), `purge_user_from_backups.py`, RGPD deletion flow, DMARC monitoring, `AuditLog` model + decorator.
+**Plans:** P6a [plan](plans/2026-05-04-media-backup.md); P6b/P6c not yet written.
 
 ---
 
@@ -333,6 +334,35 @@ Single dashboard for tracking phase and task completion across all plans. Update
 - Members never publish content. They submit nominations via `/in-memoriam/nominer/`; the admin runs the family-consent process offline before creating the fiche.
 - `MEMORIAM_CONTACT_EMAIL` defaults to `parseaddr(DEFAULT_FROM_EMAIL)[1]` so the `mailto:` in the detail-page footer works out of the box.
 - `alumni.cloudinary.get_client()` was upgraded to a singleton pattern for `FakeCloudinary` (test mode) to enable inspection of `delete_calls` across multiple `get_client()` calls within a single test. `reset_fake_client()` helper added for fixture-driven isolation.
+
+---
+
+## P6a — Ops: media backup
+
+**Shipped:** 2026-05-05
+**Plan:** [plans/2026-05-04-media-backup.md](plans/2026-05-04-media-backup.md)
+**Spec:** [specs/2026-05-04-media-backup-design.md](specs/2026-05-04-media-backup-design.md)
+**Test suite:** 463 passing total (12 new tests across `alumni/tests/test_storage.py`, `alumni/tests/test_cloudinary_download.py`, `core/tests/test_backup_media.py`).
+
+| # | Task | Done | Commit |
+|---|------|------|--------|
+| 1 | Cloudinary `download(public_id)` method | [x] | `9028d13` |
+| 2 | S3-compatible storage client wrapper + settings + `boto3` dep | [x] | `15de40c` |
+| 3 | `backup_media` management command | [x] | `060c1b0` |
+| 4 | Restore + provisioning runbook | [x] | `59210ff` |
+| 5 | STATUS update | [x] | _this commit_ |
+
+**Notable design decisions:**
+- **Backup target = Railway-native S3-compatible bucket**, not Backblaze B2. The master spec §8.2 originally specified B2 + GitHub Actions for cross-cloud DR; we explicitly downgraded to single-cloud (Railway) for operational simplicity. Reasoning: spec §A. The architecture supports a future swap to true off-cloud DR cleanly (any S3-compatible client; or write to two clients in parallel).
+- Cron runs as a Railway scheduled service (`media-backup-cron`), sibling to `lesretrouvailles` in the same Railway project. Schedule: `0 3 * * 0` (Sunday 03:00 UTC).
+- **Path dedup, not hash dedup.** The bucket path mirrors the Cloudinary `public_id` exactly; `head_file(path)` short-circuits already-backed-up photos. Simpler than maintaining a manifest, correct for our use case.
+- **95% success-rate exit threshold.** Cloudinary occasionally has 5xx flakes; we don't want every weekly run to alert on transient noise. Below the threshold, the command exits 1 and Railway flags the deploy as failed.
+- **Lifecycle = 90-day rolling retention** via S3 lifecycle rule (configured manually once via the AWS CLI against the bucket endpoint). Runbook §1.2 documents.
+- **One-time provisioning** (Railway bucket creation, lifecycle rule, cron service creation, env var wiring) is operator-driven via runbook §1; not in code.
+- **Cloudinary-disaster fallback** (master spec §8.2 "Plan de bascule médias") is documented as a manual procedure in runbook §5; not a built-in code path. Deferred per the spec's non-goals.
+- **Photo-bearing model discovery is hardcoded** (`Member`, `Memory`, `InMemoriamEntry`). Future phases adding a `photo_public_id` field must update `_collect_photo_public_ids()` in `core/management/commands/backup_media.py`. Acceptable until ≥5 such models exist.
+- **Database backup is NOT in P6a** — relies on Railway's automatic daily Postgres snapshots (7-day retention). Documented in runbook §6.
+- The command lives in `core/management/commands/` (already an installed app) instead of `alumni/management/`. Avoids promoting `alumni/` (the project package) to a Django app just for command discovery.
 
 ---
 
