@@ -67,7 +67,14 @@ class RealCloudinary:
         """
         import urllib.request
 
-        info = self._cloudinary.api.resource(public_id)
+        # cloudinary.api is a submodule that `import cloudinary` does NOT pull
+        # in transitively — without this explicit import, attribute access on
+        # cloudinary.api raises AttributeError at first use. Caught when the
+        # first real cron run failed with "module 'cloudinary' has no
+        # attribute 'api'" (the unit tests only exercise FakeCloudinary).
+        import cloudinary.api  # noqa: WPS433
+
+        info = cloudinary.api.resource(public_id)
         url = info["secure_url"]
         with urllib.request.urlopen(url, timeout=30) as resp:  # noqa: S310
             return resp.read()
