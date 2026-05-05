@@ -118,7 +118,7 @@ MEMORIAM_CONTACT_EMAIL = env(
 # Admin alert recipients for new In Memoriam nominations.
 MEMORIAM_ADMIN_EMAILS = env.list(
     "MEMORIAM_ADMIN_EMAILS",
-    default=[a[1] for a in env.list("ADMINS", default=[])] or [parseaddr(DEFAULT_FROM_EMAIL)[1]],
+    default=[parseaddr(DEFAULT_FROM_EMAIL)[1]],
 )
 
 # django-allauth (older universal config style for compatibility)

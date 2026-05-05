@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import bleach
 import markdown as _markdown
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
@@ -13,6 +14,25 @@ from members.models import Member
 from .emails import send_nomination_received_to_admins
 from .forms import NominationForm
 from .models import InMemoriamEntry
+
+_ALLOWED_TAGS = [
+    "p",
+    "br",
+    "strong",
+    "em",
+    "a",
+    "ul",
+    "ol",
+    "li",
+    "blockquote",
+    "h2",
+    "h3",
+    "h4",
+    "code",
+    "pre",
+    "hr",
+]
+_ALLOWED_ATTRS = {"a": ["href", "title"]}
 
 
 @login_required
@@ -26,7 +46,13 @@ def list_view(request):
 @require_http_methods(["GET"])
 def detail_view(request, pk: int):
     entry = get_object_or_404(InMemoriamEntry.objects.published(), pk=pk)
-    tribute_html = _markdown.markdown(entry.tribute, extensions=["extra"])
+    raw_html = _markdown.markdown(entry.tribute, extensions=["extra"])
+    tribute_html = bleach.clean(
+        raw_html,
+        tags=_ALLOWED_TAGS,
+        attributes=_ALLOWED_ATTRS,
+        strip=True,
+    )
     return render(
         request,
         "memoriam/detail.html",
@@ -42,7 +68,7 @@ def nominate_view(request):
         form = NominationForm(request.POST)
         if form.is_valid():
             nom = form.save(commit=False)
-            nom.nominator = Member.objects.get(user=request.user)
+            nom.nominator = get_object_or_404(Member, user=request.user)
             nom.save()
             send_nomination_received_to_admins(nom)
             return redirect("memoriam:nominate_thanks")

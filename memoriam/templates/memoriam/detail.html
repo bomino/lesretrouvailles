@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load i18n %}
 {% load memory_photo %}
-{% block robots %}noindex,nofollow{% endblock %}
+{% block robots %}<meta name="robots" content="noindex,nofollow">{% endblock %}
 {% block title %}
     {{ entry.full_name }} — {% trans "In Memoriam" %} — {{ block.super }}
 {% endblock %}
