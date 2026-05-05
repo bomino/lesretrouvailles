@@ -126,9 +126,15 @@ AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
     "allauth.account.auth_backends.AuthenticationBackend",
 ]
-ACCOUNT_AUTHENTICATION_METHOD = "email"
-ACCOUNT_EMAIL_REQUIRED = True
-ACCOUNT_USERNAME_REQUIRED = False
+# P7: phone-or-email auth. Username = WhatsApp digits-only is the
+# universal identifier for the CEG1 Birni alumni community (~80% have
+# no email); email-bearing members can still log in either way. New
+# allauth settings API; the deprecated trio
+# (ACCOUNT_AUTHENTICATION_METHOD, ACCOUNT_EMAIL_REQUIRED,
+# ACCOUNT_USERNAME_REQUIRED) is removed in this migration so cron logs
+# stop emitting the deprecation warnings.
+ACCOUNT_LOGIN_METHODS = {"email", "username"}
+ACCOUNT_SIGNUP_FIELDS = ["username*", "email", "password1*", "password2*"]
 # Foundation runs without an outbound email backend. P3 will switch this
 # to "mandatory" once Resend + SPF/DKIM/DMARC are wired (spec §7.3).
 ACCOUNT_EMAIL_VERIFICATION = "none"

@@ -1,0 +1,4 @@
+first_name,last_name,nickname,whatsapp,email,years_attended,classes,city,country,profession,photo_filename
+Alice,Yamoussa,,+22790000001,alice.y@example.com,"1980,1981,1982,1983","6e,5e,4e,3e",Niamey,Niger,Médecin,alice.jpg
+Boubou,Souley,Bou,+22790000002,,"1981,1982,1983","5e,4e,3e",Paris,France,Comptable,
+Chitto,Ali,,+22790000003,chitto.a@example.com,"1982,1983","4e,3e",Lyon,France,,

@@ -1,0 +1,14 @@
+Bonjour {{ full_name }},
+
+Votre compte a été créé sur Les Retrouvailles, la plateforme privée des anciens du CEG 1 Birni (1980-1985).
+
+Pour activer votre accès, choisissez votre mot de passe ici :
+
+{{ password_set_url }}
+
+Ce lien est valable pendant 7 jours. Passé ce délai, contactez l'administrateur via WhatsApp pour en recevoir un nouveau.
+
+Une fois connecté·e, complétez votre profil et retrouvez les camarades qui se sont déjà inscrits.
+
+À très bientôt,
+L'équipe Les Retrouvailles
