@@ -88,3 +88,66 @@ def test_member_updated_at_changes_on_save(make_member):
     m.profession = "Enseignant"
     m.save()
     assert m.updated_at > first
+
+
+# -------- Class pattern flexibility (P7.1) --------
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "klass",
+    [
+        "6e",
+        "5e",
+        "4e",
+        "3e",  # level only (long form)
+        "6eA",
+        "5eb",
+        "4eC",
+        "3eZ",  # full form with section letter
+        "6a",
+        "6A",
+        "5b",
+        "4B",
+        "3c",
+        "3C",  # short form (P7.1)
+    ],
+)
+def test_member_clean_accepts_class_format(make_member, klass):
+    """Both long form ("6eA") and short form ("6a") are valid. Casing is
+    flexible in either form — the value is stored verbatim."""
+    m = make_member()
+    m.classes = [klass]
+    m.full_clean()  # should not raise
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "klass",
+    [
+        "6",  # bare level — ambiguous
+        "7",  # out of range
+        "2nde",  # high school
+        "6eAB",  # two section letters
+        "6 a",  # whitespace
+        "",  # empty
+    ],
+)
+def test_member_clean_rejects_invalid_class(make_member, klass):
+    m = make_member()
+    m.classes = [klass]
+    with pytest.raises(ValidationError):
+        m.full_clean()
+
+
+@pytest.mark.django_db
+def test_member_can_save_with_short_form_classes(make_member):
+    """Regression for P7.1: the DB CHECK constraint that previously
+    blocked anything except ['6e','5e','4e','3e'] is gone (migration
+    0013), so saving a Member with short-form classes now succeeds."""
+    m = make_member()
+    m.classes = ["6a", "5b", "4b", "3c"]
+    m.full_clean()
+    m.save()
+    m.refresh_from_db()
+    assert m.classes == ["6a", "5b", "4b", "3c"]

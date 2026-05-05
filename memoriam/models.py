@@ -115,7 +115,7 @@ class InMemoriamEntry(models.Model):
         bad_classes = [c for c in self.classes if not VALID_CLASS_PATTERN.match(c)]
         if bad_classes:
             errors["classes"] = (
-                f"Classes invalides : {bad_classes}. Format attendu : 6e, 6eA, 5eB, etc."
+                f"Classes invalides : {bad_classes}. Format attendu : 6e, 6eA, 6a, 5b, etc."
             )
 
         if self.birth_year and self.death_year and self.birth_year >= self.death_year:

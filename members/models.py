@@ -22,11 +22,14 @@ GRADE_CHOICES = [
     ("3e", "3e"),
 ]
 
-# Match a French middle-school class label: a level (6e/5e/4e/3e) optionally
-# followed by a single ASCII section letter (A-Z, a-z). Examples accepted:
-# "6e", "5eA", "4eb", "3eC". Examples rejected: "2nde" (high school),
-# "7e" (out of range), "4eAB" (no two-letter sections), "4a" (missing "e").
-VALID_CLASS_PATTERN = re.compile(r"^[3-6]e[A-Za-z]?$")
+# French middle-school class label. Two forms accepted:
+#   1. Long form:  level + "e" + optional section letter ("6e", "5eA", "4eb")
+#   2. Short form: level + section letter           ("6a", "5b", "4B", "3C")
+# Both reflect how Niger CEG1 alumni write their grades; the short form
+# is the dominant idiom on WhatsApp and informal exchanges.
+# Rejects: "6" alone (ambiguous), "7" (out of range), "2nde" (high school),
+# "6eAB" (two section letters), "6 a" (whitespace).
+VALID_CLASS_PATTERN = re.compile(r"^[3-6](e[A-Za-z]?|[A-Za-z])$")
 
 STATUS_CHOICES = [
     ("active", "Actif"),
