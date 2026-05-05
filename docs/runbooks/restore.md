@@ -34,16 +34,78 @@ railway bucket credentials --bucket media-backup --json
 
 Save those values in 1Password as "Retrouvailles media-backup bucket".
 
-### 1.2 Lifecycle (90-day rolling retention)
+### 1.2 Enable versioning + apply the 90-day rolling retention lifecycle
 
-Railway buckets are S3-compatible and accept S3 lifecycle rules. From any host with the AWS CLI installed and the credentials above exported:
+> **Read this first.** The `backup_media` command uses **path dedup** — once a photo lands in the bucket, subsequent runs skip it. So under normal operation the bucket only grows when admins add *new* photos. This lifecycle rule is **defense-in-depth** for the case where an admin replaces a photo at an existing `public_id` (re-uploading a profile picture, say): with versioning + the 90-day rule, the previous version stays recoverable for a window, then gets cleaned up automatically. Current (live) versions are never auto-deleted.
+>
+> If Railway's bucket implementation does not yet support S3 lifecycle (you'll see `NotImplemented` or `MalformedXML` from the put call), it is safe to **skip this whole section**. The bucket stays small at our scale (~200 members ⇒ a few hundred MB) and you can apply the rule later when Railway adds support.
+
+#### Step 0: install the AWS CLI (skip if you already have v2)
 
 ```bash
-export AWS_ACCESS_KEY_ID=<BUCKET_ACCESS_KEY_ID>
-export AWS_SECRET_ACCESS_KEY=<BUCKET_SECRET_ACCESS_KEY>
-ENDPOINT=<BUCKET_ENDPOINT>
-BUCKET=<BUCKET_NAME>
+# macOS
+brew install awscli
 
+# Linux (Debian/Ubuntu)
+sudo apt install awscli
+
+# Windows (PowerShell)
+winget install Amazon.AWSCLI
+
+# verify
+aws --version   # should print "aws-cli/2.x"
+```
+
+#### Step 1: pull bucket credentials and inspect the field names
+
+```bash
+railway bucket credentials --bucket media-backup --json
+```
+
+The JSON looks something like (exact key names may differ between Railway versions):
+
+```json
+{
+  "endpoint": "https://bukt-prod-xxxx.up.railway.app",
+  "bucket": "media-backup",
+  "accessKeyId": "...",
+  "secretAccessKey": "..."
+}
+```
+
+Map whatever Railway returns onto the AWS-standard env vars in the next step.
+
+#### Step 2: export them as standard AWS env vars
+
+```bash
+export AWS_ACCESS_KEY_ID=<accessKeyId from JSON>
+export AWS_SECRET_ACCESS_KEY=<secretAccessKey from JSON>
+export AWS_DEFAULT_REGION=auto
+ENDPOINT=<endpoint from JSON>
+BUCKET=<bucket from JSON>
+```
+
+(`AWS_DEFAULT_REGION=auto` keeps boto from complaining; Railway buckets don't use AWS regions.)
+
+#### Step 3: enable versioning (precondition)
+
+```bash
+aws s3api put-bucket-versioning \
+  --bucket "$BUCKET" \
+  --endpoint-url "$ENDPOINT" \
+  --versioning-configuration Status=Enabled
+```
+
+Verify:
+
+```bash
+aws s3api get-bucket-versioning --bucket "$BUCKET" --endpoint-url "$ENDPOINT"
+# expected: { "Status": "Enabled" }
+```
+
+#### Step 4: write the lifecycle policy
+
+```bash
 cat > /tmp/lifecycle.json <<'EOF'
 {
   "Rules": [
@@ -57,14 +119,42 @@ cat > /tmp/lifecycle.json <<'EOF'
   ]
 }
 EOF
+```
 
+What each field does:
+
+- `Filter.Prefix=""` — applies to every object in the bucket.
+- `NoncurrentVersionExpiration.NoncurrentDays=90` — once a version becomes "noncurrent" (because the same path was re-uploaded with new content), delete it after 90 days.
+- `Expiration.ExpiredObjectDeleteMarker=true` — clean up tombstone delete markers when no other versions remain. Housekeeping.
+- Notably: **no `Expiration.Days` rule.** Current versions live forever; backups are never auto-deleted by this rule.
+
+#### Step 5: apply the policy
+
+```bash
 aws s3api put-bucket-lifecycle-configuration \
   --endpoint-url "$ENDPOINT" \
   --bucket "$BUCKET" \
   --lifecycle-configuration file:///tmp/lifecycle.json
 ```
 
-Net effect: noncurrent versions expire after 90 days; current versions stay until overwritten or deleted.
+Success is silent (no stdout, exit code 0).
+
+#### Step 6: verify
+
+```bash
+aws s3api get-bucket-lifecycle-configuration --bucket "$BUCKET" --endpoint-url "$ENDPOINT"
+```
+
+Expected: the JSON from step 4 echoed back.
+
+#### Troubleshooting
+
+| Error | What it means | What to do |
+|---|---|---|
+| `NotImplemented` | Railway's S3 implementation doesn't support `put-bucket-lifecycle-configuration` yet | Skip §1.2; revisit when Railway adds support. Path-dedup keeps the bucket small at our scale. |
+| `MalformedXML` | Same family of issue: Railway accepted the call but choked on the rule shape | Try a minimal rule first (just `NoncurrentVersionExpiration`, no `Expiration`); if still failing, skip §1.2. |
+| `AccessDenied` on `put-bucket-versioning` | The bucket's app key doesn't have versioning permissions | Regenerate the bucket credentials in the Railway dashboard with broader scope, or apply the rule via Railway's web console if available. |
+| `InvalidEndpoint` / connection refused | Wrong endpoint URL | Re-run `railway bucket credentials --bucket media-backup --json` and copy the value verbatim — the URL must include the `https://` scheme. |
 
 ### 1.3 Create the `media-backup-cron` Railway service
 
