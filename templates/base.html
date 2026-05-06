@@ -16,6 +16,29 @@
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap"
               rel="stylesheet">
         <link rel="stylesheet" href="{% static 'css/output.css' %}">
+        {# Favicons / app icons. Regenerate via scripts/generate_favicons.py. #}
+        <link rel="icon" type="image/x-icon" href="{% static 'favicon.ico' %}">
+        <link rel="icon"
+              type="image/png"
+              sizes="16x16"
+              href="{% static 'img/favicon-16x16.png' %}">
+        <link rel="icon"
+              type="image/png"
+              sizes="32x32"
+              href="{% static 'img/favicon-32x32.png' %}">
+        <link rel="icon"
+              type="image/png"
+              sizes="48x48"
+              href="{% static 'img/favicon-48x48.png' %}">
+        <link rel="icon"
+              type="image/png"
+              sizes="96x96"
+              href="{% static 'img/favicon-96x96.png' %}">
+        <link rel="apple-touch-icon"
+              sizes="180x180"
+              href="{% static 'img/favicon-180x180.png' %}">
+        <link rel="manifest" href="{% static 'manifest.webmanifest' %}">
+        <meta name="theme-color" content="#7a3b2e">
         <script defer src="{% static 'js/htmx.min.js' %}"></script>
         {% if not request.user.is_authenticated and CLOUDFLARE_ANALYTICS_TOKEN %}
             <script defer
