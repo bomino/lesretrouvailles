@@ -25,7 +25,7 @@
 | **P6c** | Ops — DMARC + rétention AuditLog | ✅ |
 | **P7** | Soft launch (auth téléphone-ou-email, import en masse) | ✅ |
 
-Suite (Phase 2) : galerie ouverte aux membres, carte géographique, In Memoriam ouvert, traduction Hausa.
+Suite (Phase 2 — backlog dans [`docs/superpowers/STATUS.md`](docs/superpowers/STATUS.md)) : mode sombre, galerie ouverte aux membres, carte géographique, In Memoriam ouvert, traduction Hausa, flow RGPD self-service, route `/aide/` en application.
 
 ---
 

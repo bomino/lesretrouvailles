@@ -446,11 +446,33 @@ Small fixes and UX improvements shipped after the milestone tag, in chronologica
 | 2026-05-05 | `fix/public-search-initial-ux` | `a01a0c9` | `PublicSearchEntry.last_name_initial` admin form was throwing `"La contrainte « initial_must_be_one_or_two_chars » n'est pas respectée"` when admins typed the full surname (understandable English-label confusion). Three layered fixes: French `verbose_name` + `help_text` with worked examples, `max_length=10`→`2` (browser maxlength cap), `Model.clean()` raises a friendly French message before the DB CHECK fires. Migration `0014`. |
 | 2026-05-05 | `feat/navbar-admin-link` | `102f1f8` | New ⚙ Administration link in the navbar (desktop + mobile dropdown), visible only to `request.user.is_staff`. Saves admins typing `/admin/` manually. Defense-in-depth: `/admin/` enforces the same staff check server-side. |
 | 2026-05-05 | `docs/comprehensive-update` | `3722faa` | Top-level `README.md` (status, tech stack, quick-start, doc index, prod architecture) and `CLAUDE.md` (project conventions for AI agents — captures the load-bearing decisions and gotchas the codebase has accumulated). Refresh of the two user guides for the new admin link + class-pattern flexibility + improved PublicSearchEntry UX. |
-| 2026-05-05 | `docs/status-post-launch` | _this commit_ | This section + `.gitattributes` to silence the LF/CRLF noise on Windows commits. |
+| 2026-05-05 | `docs/status-post-launch` | `01f0f61` | Post-launch polish section + `.gitattributes` extension to silence the LF/CRLF noise on Windows commits. |
+| 2026-05-05 | `docs/gitattributes` | `9fdb31f` | Extend `.gitattributes` to all common text + binary types. |
+| 2026-05-05 | `feat/favicon` | `1bdce6d` | Browser tab + Google search + iOS + Android PWA icons. Generated from `static/img/logo.png` via `scripts/generate_favicons.py`. 7 PNG sizes (16/32/48/96/180/192/512) + multi-size `favicon.ico`. Manifest at `static/manifest.webmanifest` for Android home-screen install. |
+| 2026-05-05 | `docs/dark-mode-deferred` | _this commit_ | Decision logged: dark mode deferred to Phase 2 (see backlog below). No code change. |
 
-**Test suite trajectory:** 492 (v1.0.0) → 513 (class fix) → 516 (mobile nav) → 517 (cloudinary fix) → 519 (public-search-entry UX) → 521 (admin nav link). New tests added with each fix; no regressions introduced.
+**Test suite trajectory:** 492 (v1.0.0) → 513 (class fix) → 516 (mobile nav) → 517 (cloudinary fix) → 519 (public-search-entry UX) → 521 (admin nav link) → 522 (favicon). New tests added with each fix; no regressions introduced.
 
 **Cumulative impact:** the platform is materially more usable end-to-end than it was at the v1.0.0 tag. Worth considering a `v1.0.1-soft-launch-polish` tag when this round of post-launch iteration settles.
+
+---
+
+## Phase 2 backlog (post-soft-launch)
+
+Items consciously deferred until the launch dust settles and we have real-usage signal. Not promises — just a parking lot for ideas with rationale captured at the moment of deferral.
+
+| Item | Why deferred | Effort estimate |
+|---|---|---|
+| **Dark mode (light/dark theme toggle)** | Audience is older (~55-65), mostly mobile, and currently get a startling-white page when their phone is in dark mode. Real fix requires defining a full `alumni-dark` DaisyUI theme alongside the existing `alumni`, sun/moon toggle button with localStorage persistence, inline `<head>` script for no-flash-of-wrong-theme, palette design (warm brand tones translated to dark), logo verification on dark background, audit of templates that use compile-time custom tokens (`bg-tertiary`, `border-secondary/15`, etc.). Not blocking for launch. Master spec doesn't require it. Decision recorded 2026-05-05 — ship after the launch is stable. | 4-6 hours focused phase |
+| **Member-uploaded gallery** | Master spec Phase 2 — opens the Mur des souvenirs to uploads from members (with droit-à-l'image workflow). Phase 1 is admin-curated. | Master spec timeline: 6-8 weeks |
+| **Carte géographique** | Master spec Phase 2 — Leaflet.js + OpenStreetMap. Plot members on a world map by current city. | Master spec timeline: 6-8 weeks |
+| **In Memoriam open submissions** | Master spec Phase 2 — members can directly submit (with the family-consent procedure inline). Phase 1 keeps it admin-only. | Master spec timeline: 6-8 weeks |
+| **Hausa translation** | i18n machinery is already in place (`LANGUAGES = [("fr", "Français")]` plus `gettext` everywhere). Adding Hausa is a translation file + a language selector, no infrastructure work. Wait until a community volunteer steps up. | Mostly translator hours |
+| **Self-service RGPD deletion flow** | Member-facing "Delete my account" form with granular content choices. Engine (`rgpd_purge_member`) already shipped in P6b — just needs UX layered on top. Defer until first real RGPD self-request signals demand. | Master spec §9.4 |
+| **AdminApplication 6-month auto-purge** *(already done in P3, kept here for reference)* | — | — |
+| **`/aide/` route** | Render `docs/guides/guide_*.md` as in-app HTML pages with footer link. Members would have built-in help instead of needing a PDF or admin DM. | ~1 hour |
+
+When a Phase 2 item is picked up, move it to a phase number (P8, P9, etc.) and follow the standard spec → plan → TDD → ship workflow.
 
 ---
 
@@ -460,3 +482,4 @@ Small fixes and UX improvements shipped after the milestone tag, in chronologica
 - When a task within a phase ships: tick its checkbox and add the short commit SHA.
 - When a phase ships: set status to `Complete`, add the date and milestone tag, and confirm test count.
 - For post-tag fixes: append to the **Post-launch polish** section above.
+- For deferred ideas with rationale: add to the **Phase 2 backlog** section above.
