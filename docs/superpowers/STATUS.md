@@ -433,8 +433,30 @@ Single dashboard for tracking phase and task completion across all plans. Update
 
 ---
 
+## Post-launch polish (post-v1.0.0-soft-launch)
+
+Small fixes and UX improvements shipped after the milestone tag, in chronological order. Each ships as its own branch + merge — not formal sub-phases, just iteration based on real usage.
+
+| Date | Branch | Commit | What |
+|---|---|---|---|
+| 2026-05-05 | `fix/class-pattern-flexible` | `948ed80` | `VALID_CLASS_PATTERN` regex loosened to accept short form (`6a`, `5b`, `4B`) alongside the existing long form (`6e`, `6eA`); reflects how Niger CEG1 alumni naturally write their grades on WhatsApp. Drops the `members_member_classes_in_set` DB CHECK constraint (migration `0013`); Python `clean()` is now canonical. |
+| 2026-05-05 | `fix/mobile-navbar` | `6d477ad` | Mobile nav rewritten as hamburger pattern. Old design crammed 6 items into a horizontal `flex justify-around` row that overflowed on 360px viewports ("all over the place" symptom). New: vertical dropdown via tiny inline JS, 44px tap targets, Esc-to-close, click-outside-to-close, full a11y attrs. Anonymous mobile users now have a visible Connexion link (was hidden `sm:inline-flex`). |
+| 2026-05-05 | `fix/cloudinary-server-upload` | `21be1d9` | Server-side Cloudinary upload was broken since P5a — `import cloudinary` doesn't transitively pull in `cloudinary.uploader`. Hidden until the first real Memory upload tonight. Fix: import all needed submodules in `RealCloudinary.__init__` once. Same root cause as the P6a `cloudinary.api` issue, but worse (affected `upload_file` + `delete`). Added `test_real_cloudinary_init_loads_required_submodules` regression test. |
+| 2026-05-05 | `docs/user-guides` | `6ee84fb` | French user guides for both audiences — `docs/guides/guide_membre.md` (~10 sections, mobile-first instructions) and `docs/guides/guide_admin.md` (12 sections, cross-references to existing runbooks). |
+| 2026-05-05 | `fix/public-search-initial-ux` | `a01a0c9` | `PublicSearchEntry.last_name_initial` admin form was throwing `"La contrainte « initial_must_be_one_or_two_chars » n'est pas respectée"` when admins typed the full surname (understandable English-label confusion). Three layered fixes: French `verbose_name` + `help_text` with worked examples, `max_length=10`→`2` (browser maxlength cap), `Model.clean()` raises a friendly French message before the DB CHECK fires. Migration `0014`. |
+| 2026-05-05 | `feat/navbar-admin-link` | `102f1f8` | New ⚙ Administration link in the navbar (desktop + mobile dropdown), visible only to `request.user.is_staff`. Saves admins typing `/admin/` manually. Defense-in-depth: `/admin/` enforces the same staff check server-side. |
+| 2026-05-05 | `docs/comprehensive-update` | `3722faa` | Top-level `README.md` (status, tech stack, quick-start, doc index, prod architecture) and `CLAUDE.md` (project conventions for AI agents — captures the load-bearing decisions and gotchas the codebase has accumulated). Refresh of the two user guides for the new admin link + class-pattern flexibility + improved PublicSearchEntry UX. |
+| 2026-05-05 | `docs/status-post-launch` | _this commit_ | This section + `.gitattributes` to silence the LF/CRLF noise on Windows commits. |
+
+**Test suite trajectory:** 492 (v1.0.0) → 513 (class fix) → 516 (mobile nav) → 517 (cloudinary fix) → 519 (public-search-entry UX) → 521 (admin nav link). New tests added with each fix; no regressions introduced.
+
+**Cumulative impact:** the platform is materially more usable end-to-end than it was at the v1.0.0 tag. Worth considering a `v1.0.1-soft-launch-polish` tag when this round of post-launch iteration settles.
+
+---
+
 ## How to update
 
 - When a phase plan is written: link it in the Phase Index and in that phase's section.
 - When a task within a phase ships: tick its checkbox and add the short commit SHA.
 - When a phase ships: set status to `Complete`, add the date and milestone tag, and confirm test count.
+- For post-tag fixes: append to the **Post-launch polish** section above.
