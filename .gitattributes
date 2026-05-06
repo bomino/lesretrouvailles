@@ -2,9 +2,37 @@
 # Linux containers regardless of the contributor's OS. Without this, the
 # entrypoint.sh script breaks silently inside the Railway/Docker image
 # because bash chokes on \r characters in `if [ "$X" = "db" ]` etc.
-*.sh        text eol=lf
-Dockerfile  text eol=lf
-.dockerignore text eol=lf
+*.sh           text eol=lf
+Dockerfile     text eol=lf
+.dockerignore  text eol=lf
 
 # Ensure Python files stay LF too (some editors flip them on Windows).
-*.py        text eol=lf
+*.py           text eol=lf
+
+# All other text files: LF too. Silences the
+# "LF will be replaced by CRLF the next time Git touches it"
+# warnings that fire on every Windows commit when the working-tree
+# file ends with LF but Git's auto-conversion would have made it CRLF.
+*.html         text eol=lf
+*.css          text eol=lf
+*.js           text eol=lf
+*.json         text eol=lf
+*.md           text eol=lf
+*.toml         text eol=lf
+*.yaml         text eol=lf
+*.yml          text eol=lf
+*.txt          text eol=lf
+*.csv          text eol=lf
+*.po           text eol=lf
+
+# Binary types — never auto-convert.
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.webp   binary
+*.gif    binary
+*.ico    binary
+*.pdf    binary
+*.woff   binary
+*.woff2  binary
+*.mo     binary
