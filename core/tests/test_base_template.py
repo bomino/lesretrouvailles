@@ -273,3 +273,26 @@ def test_admin_link_hidden_from_regular_member(client):
     assert 'href="/admin/"' not in html
     # Defense: ensure no other rendering of the admin label slipped through
     assert "Administration" not in html
+
+
+@pytest.mark.django_db
+def test_base_template_has_favicon_and_manifest_links(client):
+    """Browser tab + Google search results + iOS home screen + Android PWA
+    install all rely on the favicon links being present in <head>."""
+    response = client.get(reverse("landing"))
+    html = response.content.decode("utf-8")
+
+    # Legacy + modern browser tab icons
+    assert 'rel="icon"' in html
+    assert "favicon.ico" in html
+    assert "favicon-16x16.png" in html
+    assert "favicon-32x32.png" in html
+    # Google Search results icon (≥48×48 recommended per Google's docs)
+    assert "favicon-48x48.png" in html
+    # iOS home screen
+    assert 'rel="apple-touch-icon"' in html
+    assert "favicon-180x180.png" in html
+    # Android PWA / theme color
+    assert 'rel="manifest"' in html
+    assert "manifest.webmanifest" in html
+    assert 'name="theme-color"' in html
