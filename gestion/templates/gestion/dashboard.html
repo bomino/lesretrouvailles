@@ -1,0 +1,48 @@
+{% extends "gestion/base.html" %}
+{% block gestion_title %}Tableau de bord{% endblock %}
+{% block gestion_heading %}Tableau de bord{% endblock %}
+{% block gestion_content %}
+    <section aria-labelledby="kpi-heading" class="space-y-4">
+        <h2 id="kpi-heading" class="sr-only">Indicateurs clés</h2>
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <a href="/gestion/membres/?status=active"
+               data-kpi="active-members"
+               data-count="{{ kpis.active_members }}"
+               class="rounded-2xl border border-secondary/15 bg-surface p-5 shadow-sm transition hover:border-tertiary/40 hover:shadow-md">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">Membres actifs</p>
+                <p class="mt-2 font-display text-3xl font-semibold text-tertiary">
+                    {{ kpis.active_members }} <span class="text-base font-normal text-primary">membres actifs</span>
+                </p>
+                <p class="mt-2 text-sm text-secondary">Comptes en règle, accès à la plateforme.</p>
+            </a>
+            <a href="/gestion/cooptations/"
+               data-kpi="pending-cooptations"
+               data-count="{{ kpis.pending_cooptations }}"
+               class="rounded-2xl border border-secondary/15 bg-surface p-5 shadow-sm transition hover:border-tertiary/40 hover:shadow-md">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">Cooptations à traiter</p>
+                <p class="mt-2 font-display text-3xl font-semibold text-tertiary">{{ kpis.pending_cooptations }}</p>
+                <p class="mt-2 text-sm text-secondary">Candidatures en cours ou en attente d'approbation.</p>
+            </a>
+            <a href="/gestion/membres/?status=suspended"
+               data-kpi="suspended-members"
+               data-count="{{ kpis.suspended_members }}"
+               class="rounded-2xl border border-secondary/15 bg-surface p-5 shadow-sm transition hover:border-tertiary/40 hover:shadow-md">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">Membres suspendus</p>
+                <p class="mt-2 font-display text-3xl font-semibold text-tertiary">{{ kpis.suspended_members }}</p>
+                <p class="mt-2 text-sm text-secondary">Comptes désactivés en attendant régularisation.</p>
+            </a>
+        </div>
+    </section>
+    <section class="mt-8 rounded-2xl border border-secondary/15 bg-surface-variant/40 p-5 text-sm text-secondary">
+        <p class="font-medium text-primary">Comment utiliser cette console</p>
+        <ul class="mt-2 list-disc space-y-1 pl-5">
+            <li>
+                <strong>Membres</strong> — rechercher, modifier, suspendre ou réactiver un compte.
+            </li>
+            <li>
+                <strong>Cooptations</strong> — approuver ou refuser les candidatures soumises via /inscription/.
+            </li>
+            <li>Pour les actions avancées (purge RGPD, import en masse), utilisez le panneau Django (super-admin uniquement).</li>
+        </ul>
+    </section>
+{% endblock %}

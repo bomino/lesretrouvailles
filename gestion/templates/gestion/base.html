@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}
+    {% block gestion_title %}Gestion{% endblock %}
+    · Les Retrouvailles
+{% endblock %}
+{% block content %}
+    <div class="mb-6 flex flex-col gap-3 border-b border-secondary/15 pb-4 md:flex-row md:items-center md:justify-between">
+        <div>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-tertiary">Gestion · Console admin</p>
+            <h1 class="mt-1 font-display text-2xl font-semibold tracking-tight">
+                {% block gestion_heading %}Tableau de bord{% endblock %}
+            </h1>
+        </div>
+        <nav class="flex flex-wrap gap-1 text-sm" aria-label="Navigation Gestion">
+            <a href="{% url 'gestion:dashboard' %}"
+               class="rounded-lg px-3 py-2 min-h-tap hover:bg-base-200 hover:text-tertiary transition {% if request.resolver_match.url_name == 'dashboard' %}bg-base-200 text-tertiary{% endif %}">
+                Tableau de bord
+            </a>
+            <a href="/gestion/membres/"
+               class="rounded-lg px-3 py-2 min-h-tap hover:bg-base-200 hover:text-tertiary transition">Membres</a>
+            <a href="/gestion/cooptations/"
+               class="rounded-lg px-3 py-2 min-h-tap hover:bg-base-200 hover:text-tertiary transition">Cooptations</a>
+            {% if request.user.is_superuser %}
+                <a href="/admin/"
+                   class="ml-2 inline-flex items-center gap-1.5 rounded-lg border border-secondary/20 px-3 py-2 min-h-tap text-sm hover:border-tertiary/40 hover:bg-base-200 hover:text-tertiary transition"
+                   title="Panneau d'administration Django (super-admin)">
+                    <span aria-hidden="true">⚙</span>
+                    Outils avancés
+                </a>
+            {% endif %}
+        </nav>
+    </div>
+    {% block gestion_content %}{% endblock %}
+{% endblock %}

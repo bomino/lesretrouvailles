@@ -204,8 +204,10 @@ def test_mobile_dropdown_contains_all_nav_links_and_logout(client):
 
 
 @pytest.mark.django_db
-def test_admin_link_visible_to_staff_user(client):
-    """A staff user (is_staff=True) sees the 'Administration' link in the navbar."""
+def test_gestion_link_visible_to_staff_user(client):
+    """A staff user (is_staff=True) sees the 'Gestion' link in the navbar
+    pointing to the new /gestion/ console (replaces the prior 'Administration'
+    link to /admin/, which is now super-admin only)."""
     from django.contrib.auth import get_user_model
 
     from members.charters import CHARTER_CURRENT_VERSION
@@ -234,15 +236,18 @@ def test_admin_link_visible_to_staff_user(client):
     client.force_login(admin)
 
     html = client.get(reverse("landing")).content.decode("utf-8")
-    # 'Administration' link to /admin/ appears at least once (desktop) and
+    # 'Gestion' link to /gestion/ appears at least once (desktop) and
     # also in the mobile dropdown — so >=2 occurrences in the rendered page.
-    assert html.count('href="/admin/"') >= 2
-    assert "Administration" in html
+    assert html.count('href="/gestion/"') >= 2
+    assert "Gestion" in html
+    # /admin/ should NOT be linked from the global nav anymore (super-admin's
+    # escape hatch lives inside /gestion/'s subnav, not the global nav)
+    assert 'href="/admin/"' not in html
 
 
 @pytest.mark.django_db
-def test_admin_link_hidden_from_regular_member(client):
-    """A non-staff member never sees the 'Administration' link."""
+def test_gestion_link_hidden_from_regular_member(client):
+    """A non-staff member never sees the 'Gestion' link."""
     from django.contrib.auth import get_user_model
 
     from members.charters import CHARTER_CURRENT_VERSION
@@ -270,9 +275,8 @@ def test_admin_link_hidden_from_regular_member(client):
     client.force_login(user)
 
     html = client.get(reverse("landing")).content.decode("utf-8")
+    assert 'href="/gestion/"' not in html
     assert 'href="/admin/"' not in html
-    # Defense: ensure no other rendering of the admin label slipped through
-    assert "Administration" not in html
 
 
 @pytest.mark.django_db
