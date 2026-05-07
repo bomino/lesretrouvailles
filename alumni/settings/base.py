@@ -14,7 +14,7 @@ ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost"])
 SITE_URL = env("SITE_URL", default="http://localhost:8000").strip().rstrip("/")
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
+    "alumni.admin.GestionAdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.postgres",

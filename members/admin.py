@@ -24,6 +24,15 @@ class MemberAdmin(admin.ModelAdmin):
     readonly_fields = ("slug", "created_at", "updated_at", "photo_uploader")
     actions = ("rgpd_purge_action",)
 
+    def get_actions(self, request):
+        """RGPD purge is irreversible — restrict to superusers even if a
+        non-superuser-staff user reaches /admin/ (they shouldn't, per
+        GestionAdminSite.has_permission, but defense-in-depth)."""
+        actions = super().get_actions(request)
+        if not request.user.is_superuser:
+            actions.pop("rgpd_purge_action", None)
+        return actions
+
     fieldsets = (
         (
             "Identité",
