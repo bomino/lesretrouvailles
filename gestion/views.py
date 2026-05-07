@@ -17,12 +17,20 @@ from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
-from cooptation.models import AdminApplication
-from cooptation.services import _build_password_set_url
+from cooptation.models import AdminApplication, CooptationRequest, QuestionnaireResponse
+from cooptation.services import (
+    _build_password_set_url,
+    approve_application,
+    reject_application,
+)
 from members.models import AuditLog, Member
 
 from .decorators import staff_required
-from .forms import MemberAdminEditForm, MemberUsernameChangeForm
+from .forms import (
+    ApplicationRejectForm,
+    MemberAdminEditForm,
+    MemberUsernameChangeForm,
+)
 
 PAGE_SIZE = 20
 STATUS_FILTERS = ("active", "suspended", "all")
@@ -221,6 +229,143 @@ def member_login_link_view(request, slug):
             "link_url": link_url,
             "wa_me_url": wa_me_url,
         },
+    )
+
+
+APPLICATION_STATUS_FILTERS = ("awaiting_admin", "pending", "all")
+
+
+@staff_required
+@require_http_methods(["GET"])
+def application_list_view(request):
+    """Cooptation queue. Default filter: 'awaiting_admin' (the actionable
+    set). 'pending' adds applications still in cooptation. 'all' shows
+    everything except purged ones."""
+    status = request.GET.get("status", "awaiting_admin")
+    if status not in APPLICATION_STATUS_FILTERS:
+        status = "awaiting_admin"
+
+    qs = AdminApplication.objects.exclude(status="purged")
+    if status == "awaiting_admin":
+        qs = qs.filter(status="awaiting_admin")
+    elif status == "pending":
+        qs = qs.filter(status__in=("awaiting_admin", "cooptation_pending"))
+    qs = qs.order_by("-submitted_at")
+
+    paginator = Paginator(qs, PAGE_SIZE)
+    raw_page = request.GET.get("page", "1")
+    try:
+        page_number = max(1, int(raw_page))
+    except (TypeError, ValueError):
+        page_number = 1
+    try:
+        page = paginator.page(page_number)
+    except (EmptyPage, PageNotAnInteger):
+        page = paginator.page(paginator.num_pages or 1)
+
+    return render(
+        request,
+        "gestion/application_list.html",
+        {
+            "page": page,
+            "applications": page.object_list,
+            "status": status,
+        },
+    )
+
+
+@staff_required
+@require_http_methods(["GET"])
+def application_detail_view(request, pk):
+    application = get_object_or_404(AdminApplication, pk=pk)
+    cooptation_requests = (
+        CooptationRequest.objects.filter(application=application)
+        .select_related("parrain", "parrain__user")
+        .order_by("expires_at")
+    )
+    questionnaire_responses = (
+        QuestionnaireResponse.objects.filter(application=application)
+        .select_related("question")
+        .order_by("question__position")
+    )
+    reject_form = ApplicationRejectForm()
+    return render(
+        request,
+        "gestion/application_detail.html",
+        {
+            "application": application,
+            "cooptation_requests": cooptation_requests,
+            "questionnaire_responses": questionnaire_responses,
+            "reject_form": reject_form,
+        },
+    )
+
+
+@staff_required
+@require_http_methods(["POST"])
+def application_approve_view(request, pk):
+    application = get_object_or_404(AdminApplication, pk=pk)
+    approve_application(application, reviewed_by=request.user)
+    AuditLog.objects.create(
+        actor=request.user,
+        action="gestion.application.approved",
+        target_type="cooptation.AdminApplication",
+        target_id=str(application.pk),
+        metadata={
+            "candidate_full_name": application.full_name,
+            "candidate_email": application.email,
+        },
+    )
+    return HttpResponseRedirect(
+        reverse("gestion:application_detail", kwargs={"pk": application.pk}) + "?flash=approved"
+    )
+
+
+@staff_required
+@require_http_methods(["POST"])
+def application_reject_view(request, pk):
+    application = get_object_or_404(AdminApplication, pk=pk)
+    form = ApplicationRejectForm(request.POST)
+    if not form.is_valid():
+        # Re-render the detail page with the error inline so the operator
+        # doesn't lose context. Reuse the detail context-builder to keep
+        # parrain panels + questionnaire responses visible.
+        cooptation_requests = (
+            CooptationRequest.objects.filter(application=application)
+            .select_related("parrain", "parrain__user")
+            .order_by("expires_at")
+        )
+        questionnaire_responses = (
+            QuestionnaireResponse.objects.filter(application=application)
+            .select_related("question")
+            .order_by("question__position")
+        )
+        return render(
+            request,
+            "gestion/application_detail.html",
+            {
+                "application": application,
+                "cooptation_requests": cooptation_requests,
+                "questionnaire_responses": questionnaire_responses,
+                "reject_form": form,
+                "show_reject_form": True,
+            },
+        )
+
+    reason = form.cleaned_data["reason"]
+    reject_application(application, reviewed_by=request.user, note=reason)
+    AuditLog.objects.create(
+        actor=request.user,
+        action="gestion.application.rejected",
+        target_type="cooptation.AdminApplication",
+        target_id=str(application.pk),
+        metadata={
+            "candidate_full_name": application.full_name,
+            "reviewer_note": reason,
+        },
+    )
+    return HttpResponseRedirect(
+        reverse("gestion:application_detail", kwargs={"pk": application.pk}) + "?flash=rejected"
     )
 
 

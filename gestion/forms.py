@@ -182,3 +182,29 @@ class MemberUsernameChangeForm(forms.Form):
             },
         )
         return new_username
+
+
+class ApplicationRejectForm(forms.Form):
+    """Required reason for rejecting a cooptation application. Free text
+    matches the existing /admin/ action's behavior. The reason ends up in
+    the rejection email to the candidate (cooptation.emails.send_application_rejected)
+    so phrasing matters."""
+
+    reason = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 3}),
+        min_length=5,
+        max_length=500,
+        label="Motif de refus",
+        help_text=(
+            "Visible par le candidat dans l'email qu'il recevra. Restez factuel et bienveillant."
+        ),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["reason"].widget.attrs.setdefault(
+            "class",
+            "block w-full rounded-lg border border-secondary/20 bg-white px-3 py-2"
+            " text-base shadow-sm focus:border-tertiary focus:outline-none"
+            " focus:ring-2 focus:ring-tertiary/30",
+        )

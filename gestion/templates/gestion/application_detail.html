@@ -1,0 +1,172 @@
+{% extends "gestion/base.html" %}
+{% block gestion_title %}{{ application.full_name }} — cooptation{% endblock %}
+{% block gestion_heading %}{{ application.full_name|default:"<purgé>" }}{% endblock %}
+{% block gestion_content %}
+    {% if request.GET.flash == "approved" %}
+        <div class="mb-4 rounded-lg border border-whatsapp-green/30 bg-whatsapp-green/10 px-4 py-3 text-sm text-whatsapp-green">
+            Candidature approuvée. Le candidat reçoit son email de confirmation.
+        </div>
+    {% elif request.GET.flash == "rejected" %}
+        <div class="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+            Candidature rejetée. Le candidat a été notifié.
+        </div>
+    {% endif %}
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <article class="md:col-span-2 space-y-4">
+            <section class="rounded-2xl border border-secondary/15 bg-surface p-5 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <h2 class="font-display text-lg font-semibold tracking-tight">Candidat</h2>
+                    <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold {% if application.status == 'awaiting_admin' %}bg-ceremonial-gold/15 text-on-ceremonial-gold{% elif application.status == 'cooptation_pending' %}bg-base-200 text-secondary{% elif application.status == 'approved' %}bg-whatsapp-green/10 text-whatsapp-green{% elif application.status == 'rejected' %}bg-red-100 text-red-700{% endif %}">
+                        {{ application.get_status_display }}
+                    </span>
+                </div>
+                <dl class="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+                    <div>
+                        <dt class="text-xs uppercase tracking-[0.18em] text-secondary">Nom complet</dt>
+                        <dd class="mt-0.5">
+                            {{ application.full_name }}
+                        </dd>
+                    </div>
+                    {% if application.nickname %}
+                        <div>
+                            <dt class="text-xs uppercase tracking-[0.18em] text-secondary">Surnom</dt>
+                            <dd class="mt-0.5">
+                                {{ application.nickname }}
+                            </dd>
+                        </div>
+                    {% endif %}
+                    <div>
+                        <dt class="text-xs uppercase tracking-[0.18em] text-secondary">Années au CEG</dt>
+                        <dd class="mt-0.5">
+                            {{ application.years_attended|join:", " }}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs uppercase tracking-[0.18em] text-secondary">Classes</dt>
+                        <dd class="mt-0.5">
+                            {{ application.classes|join:", "|default:"—" }}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs uppercase tracking-[0.18em] text-secondary">Ville</dt>
+                        <dd class="mt-0.5">
+                            {{ application.city }}
+                            {% if application.country %}({{ application.country }}){% endif %}
+                        </dd>
+                    </div>
+                    {% if application.profession %}
+                        <div>
+                            <dt class="text-xs uppercase tracking-[0.18em] text-secondary">Profession</dt>
+                            <dd class="mt-0.5">
+                                {{ application.profession }}
+                            </dd>
+                        </div>
+                    {% endif %}
+                    <div>
+                        <dt class="text-xs uppercase tracking-[0.18em] text-secondary">Email</dt>
+                        <dd class="mt-0.5">
+                            {{ application.email }}
+                        </dd>
+                    </div>
+                    {% if application.whatsapp %}
+                        <div>
+                            <dt class="text-xs uppercase tracking-[0.18em] text-secondary">WhatsApp</dt>
+                            <dd class="mt-0.5">
+                                {{ application.whatsapp }}
+                            </dd>
+                        </div>
+                    {% endif %}
+                    <div>
+                        <dt class="text-xs uppercase tracking-[0.18em] text-secondary">Soumise le</dt>
+                        <dd class="mt-0.5">
+                            {{ application.submitted_at|date:"d M Y H:i" }}
+                        </dd>
+                    </div>
+                </dl>
+            </section>
+            <section class="rounded-2xl border border-secondary/15 bg-surface p-5 shadow-sm">
+                <h2 class="font-display text-lg font-semibold tracking-tight">Parrains</h2>
+                <p class="mt-1 text-sm text-secondary">Décision : {{ application.get_cooptation_outcome_display }}</p>
+                <div class="mt-3 space-y-2">
+                    {% for req in cooptation_requests %}
+                        <details class="rounded-lg border border-secondary/15 bg-white p-3"
+                                 {% if req.response != 'pending' %}open{% endif %}>
+                            <summary class="cursor-pointer text-sm font-medium">
+                                {{ req.parrain.full_name }} —
+                                <span class="{% if req.response == 'accepted' %}text-whatsapp-green{% elif req.response == 'refused' %}text-red-700{% else %}text-secondary{% endif %}">
+                                    {{ req.get_response_display }}
+                                </span>
+                            </summary>
+                            <div class="mt-2 text-sm text-secondary">
+                                <p>Échéance : {{ req.expires_at|date:"d M Y" }}</p>
+                                {% if req.responded_at %}<p>Répondu le {{ req.responded_at|date:"d M Y H:i" }}</p>{% endif %}
+                                {% if req.reminder_sent_at %}<p>Rappel envoyé le {{ req.reminder_sent_at|date:"d M Y H:i" }}</p>{% endif %}
+                                {% if req.comment %}<p class="mt-2 italic">« {{ req.comment }} »</p>{% endif %}
+                            </div>
+                        </details>
+                    {% empty %}
+                        <p class="text-sm text-secondary">Aucun parrain enregistré.</p>
+                    {% endfor %}
+                </div>
+            </section>
+            {% if questionnaire_responses %}
+                <section class="rounded-2xl border border-secondary/15 bg-surface p-5 shadow-sm">
+                    <h2 class="font-display text-lg font-semibold tracking-tight">Questionnaire</h2>
+                    <ul class="mt-3 space-y-3 text-sm">
+                        {% for r in questionnaire_responses %}
+                            <li class="rounded-lg bg-base-200 p-3">
+                                <p class="font-medium">Q{{ r.question.position }}. {{ r.question.text }}</p>
+                                <p class="mt-1 text-secondary">{{ r.candidate_answer }}</p>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </section>
+            {% endif %}
+            {% if application.review_note %}
+                <section class="rounded-2xl border border-red-200 bg-red-50 p-5 shadow-sm">
+                    <h2 class="font-display text-base font-semibold tracking-tight text-red-800">Motif de refus</h2>
+                    <p class="mt-2 text-sm text-red-800">{{ application.review_note }}</p>
+                </section>
+            {% endif %}
+        </article>
+        <aside class="space-y-3">
+            {% if application.status == "awaiting_admin" or application.status == "cooptation_pending" %}
+                <form method="post"
+                      action="{% url 'gestion:application_approve' pk=application.pk %}">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="w-full rounded-lg bg-whatsapp-green px-4 py-2 min-h-tap text-sm font-medium text-on-whatsapp-green shadow-sm hover:opacity-95 transition"
+                            onclick="return confirm('Approuver {{ application.full_name }} ? Cette action est irréversible : un compte Membre va être créé et un email envoyé.');">
+                        Approuver
+                    </button>
+                </form>
+                <details class="rounded-lg border border-red-200 bg-red-50 p-3"
+                         {% if show_reject_form %}open{% endif %}>
+                    <summary class="cursor-pointer text-sm font-medium text-red-800">Rejeter…</summary>
+                    <form method="post"
+                          action="{% url 'gestion:application_reject' pk=application.pk %}"
+                          class="mt-3 space-y-2">
+                        {% csrf_token %}
+                        <label class="block">
+                            <span class="block text-sm font-medium">{{ reject_form.reason.label }}</span>
+                            {{ reject_form.reason }}
+                            <span class="mt-1 block text-xs text-secondary">{{ reject_form.reason.help_text }}</span>
+                            {% if reject_form.reason.errors %}
+                                <p class="mt-1 text-xs text-red-700">{{ reject_form.reason.errors|join:" " }}</p>
+                            {% endif %}
+                        </label>
+                        <button type="submit"
+                                class="w-full rounded-lg border border-red-400 px-4 py-2 min-h-tap text-sm font-medium text-red-700 hover:bg-red-100 transition"
+                                onclick="return confirm('Rejeter cette candidature ? Le candidat recevra le motif par email.');">
+                            Confirmer le rejet
+                        </button>
+                    </form>
+                </details>
+            {% endif %}
+            <a href="{% url 'gestion:application_list' %}"
+               class="block rounded-lg border border-secondary/20 px-4 py-2 min-h-tap text-center text-sm hover:border-tertiary/40 hover:text-tertiary transition">
+                ← Retour à la liste
+            </a>
+        </aside>
+    </div>
+{% endblock %}

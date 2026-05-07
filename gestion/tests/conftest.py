@@ -81,6 +81,57 @@ def make_application(db):
 
 
 @pytest.fixture
+def make_cooptation_request(db, make_application, make_user):
+    """Build a CooptationRequest with a parrain Member behind it."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from cooptation.models import CooptationRequest
+    from members.models import Member
+
+    counter = {"i": 0}
+
+    def _make(**kwargs):
+        counter["i"] += 1
+        application = kwargs.pop("application", None) or make_application()
+        parrain = kwargs.pop("parrain", None)
+        if parrain is None:
+            parrain_user = make_user(
+                username=f"parrain_gestion_{counter['i']}",
+                email=f"parrain_gestion_{counter['i']}@example.test",
+            )
+            parrain = Member.objects.create(
+                user=parrain_user,
+                first_name=f"Parrain{counter['i']}",
+                last_name="Test",
+                years_attended=[1980, 1981, 1982, 1983],
+                classes=["6e", "5e", "4e", "3e"],
+                city="Niamey",
+            )
+        defaults = {
+            "application": application,
+            "parrain": parrain,
+            "expires_at": timezone.now() + timedelta(days=14),
+        }
+        defaults.update(kwargs)
+        return CooptationRequest.objects.create(**defaults)
+
+    return _make
+
+
+@pytest.fixture(autouse=True)
+def _clear_fake_email_backend():
+    """Mirror cooptation/tests/conftest.py: keep FakeResendBackend.sent_messages
+    isolated between gestion tests."""
+    from alumni.email import FakeResendBackend
+
+    FakeResendBackend.sent_messages.clear()
+    yield
+    FakeResendBackend.sent_messages.clear()
+
+
+@pytest.fixture
 def coadmin_user(db):
     """is_staff=True, is_superuser=False — a non-superuser co-admin.
 
