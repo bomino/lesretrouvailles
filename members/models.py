@@ -69,6 +69,7 @@ class Member(models.Model):
         models.CharField(max_length=4),
         size=4,
         default=default_classes,
+        blank=True,
     )
 
     city = models.CharField(max_length=80)
