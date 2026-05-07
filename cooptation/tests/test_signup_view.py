@@ -207,6 +207,21 @@ def test_signup_accepts_classes_with_section_letters(client, active_member, seco
 
 
 @pytest.mark.django_db
+def test_signup_accepts_empty_classes(client, active_member, second_active_member):
+    """Many alumni don't remember their class sections — the field is optional.
+    Empty submission must validate and produce an application with classes=[]."""
+    from cooptation.models import AdminApplication
+
+    response = client.post(
+        "/inscription/",
+        _form_payload(active_member, second_active_member, classes=""),
+    )
+    assert response.status_code == 302
+    app = AdminApplication.objects.get()
+    assert app.classes == []
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize(
     "bad_value",
     [
