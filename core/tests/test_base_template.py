@@ -280,6 +280,43 @@ def test_gestion_link_hidden_from_regular_member(client):
 
 
 @pytest.mark.django_db
+def test_navbar_greets_authenticated_member_by_first_name(client):
+    """Both desktop and mobile nav surface the member's first name so users
+    on shared devices know which account they're logged into."""
+    from django.contrib.auth import get_user_model
+
+    from members.charters import CHARTER_CURRENT_VERSION
+    from members.models import ConsentRecord, Member
+
+    User = get_user_model()  # noqa: N806
+    user = User.objects.create_user(
+        username="greet@example.test",
+        email="greet@example.test",
+        password="x",
+    )
+    member = Member.objects.create(
+        user=user,
+        first_name="Idrissa",
+        last_name="Saidou",
+        years_attended=[1980],
+        classes=["6e"],
+        city="Niamey",
+        status="active",
+    )
+    ConsentRecord.objects.create(
+        member=member, charter_version=CHARTER_CURRENT_VERSION, ip_address="127.0.0.1"
+    )
+    client.force_login(user)
+
+    html = client.get(reverse("landing")).content.decode("utf-8")
+    # The greeting "Bonjour, Idrissa" appears at least twice (desktop + mobile)
+    assert html.count("Bonjour, Idrissa") >= 2
+    # And both placement hooks are present
+    assert "data-current-user" in html
+    assert "data-current-user-mobile" in html
+
+
+@pytest.mark.django_db
 def test_base_template_has_favicon_and_manifest_links(client):
     """Browser tab + Google search results + iOS home screen + Android PWA
     install all rely on the favicon links being present in <head>."""
