@@ -16,6 +16,10 @@
         <div class="mb-4 rounded-lg border border-ceremonial-gold/40 bg-ceremonial-gold/10 px-4 py-3 text-sm text-on-ceremonial-gold">
             Compte suspendu.
         </div>
+    {% elif request.GET.flash == "username_changed" %}
+        <div class="mb-4 rounded-lg border border-whatsapp-green/30 bg-whatsapp-green/10 px-4 py-3 text-sm text-whatsapp-green">
+            Identifiant WhatsApp mis à jour.
+        </div>
     {% endif %}
     <section class="grid grid-cols-1 gap-6 md:grid-cols-3">
         <article class="md:col-span-2 rounded-2xl border border-secondary/15 bg-surface p-5 shadow-sm">
@@ -75,6 +79,9 @@
                     <dt class="text-xs uppercase tracking-[0.18em] text-secondary">Identifiant (WhatsApp)</dt>
                     <dd class="mt-0.5" data-field="username">
                         @{{ member.user.username }}
+                        <a href="{% url 'gestion:member_username' slug=member.slug %}"
+                           class="ml-1 text-xs text-tertiary hover:underline"
+                           title="Changer le numéro WhatsApp utilisé pour la connexion">(modifier)</a>
                     </dd>
                 </div>
                 <div>

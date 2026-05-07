@@ -1,0 +1,51 @@
+{% extends "gestion/base.html" %}
+{% block gestion_title %}Identifiant — {{ member.full_name }}{% endblock %}
+{% block gestion_heading %}Modifier l'identifiant de {{ member.full_name }}{% endblock %}
+{% block gestion_content %}
+    <section class="max-w-2xl space-y-4">
+        <div class="rounded-lg border border-ceremonial-gold/40 bg-ceremonial-gold/10 px-4 py-3 text-sm text-on-ceremonial-gold">
+            <p class="font-medium">Opération sensible</p>
+            <p class="mt-1">
+                Le numéro WhatsApp est l'identifiant utilisé par {{ member.full_name }} pour se connecter.
+                Une faute de frappe peut le bloquer. Tapez d'abord le numéro actuel pour confirmer, puis le nouveau.
+            </p>
+        </div>
+        <p class="text-sm text-secondary">
+            Identifiant actuel : <strong>@{{ member.user.username }}</strong>
+        </p>
+        <form method="post" class="space-y-4" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+                    {{ form.non_field_errors }}
+                </div>
+            {% endif %}
+            <label class="block">
+                <span class="block text-sm font-medium">{{ form.confirm_current.label }}</span>
+                {{ form.confirm_current }}
+                <span class="mt-1 block text-xs text-secondary">{{ form.confirm_current.help_text }}</span>
+                {% if form.confirm_current.errors %}
+                    <p class="mt-1 text-xs text-red-700">{{ form.confirm_current.errors|join:" " }}</p>
+                {% endif %}
+            </label>
+            <label class="block">
+                <span class="block text-sm font-medium">{{ form.new_username.label }}</span>
+                {{ form.new_username }}
+                <span class="mt-1 block text-xs text-secondary">{{ form.new_username.help_text }}</span>
+                {% if form.new_username.errors %}
+                    <p class="mt-1 text-xs text-red-700">{{ form.new_username.errors|join:" " }}</p>
+                {% endif %}
+            </label>
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
+                <a href="{% url 'gestion:member_detail' slug=member.slug %}"
+                   class="rounded-lg border border-secondary/20 px-4 py-2 min-h-tap text-sm text-center hover:border-tertiary/40 hover:text-tertiary transition">
+                    Annuler
+                </a>
+                <button type="submit"
+                        class="rounded-lg bg-tertiary px-4 py-2 min-h-tap text-sm font-medium text-on-tertiary shadow-sm hover:opacity-95 transition">
+                    Mettre à jour l'identifiant
+                </button>
+            </div>
+        </form>
+    </section>
+{% endblock %}
