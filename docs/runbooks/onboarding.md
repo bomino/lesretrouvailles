@@ -14,7 +14,7 @@ Template: [`roster_template.csv`](roster_template.csv) (3 sample rows). Copy and
 | `whatsapp` | ✓ | E.164 format, with `+` (e.g. `+22790000001`). Digits-only becomes `User.username`. |
 | `email` | optional | If present, member receives password-set email via Resend. Empty for ~80% of the roster. |
 | `years_attended` | ✓ | Comma-separated, in quotes. Each year between 1980 and 1985. Skipping is fine (`"1980,1982"`). |
-| `classes` | ✓ | Comma-separated, in quotes. Format: `6e`, `5e`, `4e`, `3e`, optionally with a section letter (`6eA`, `4eb`). |
+| `classes` | optional | Comma-separated, in quotes. Format: `6e`, `5e`, `4e`, `3e`, optionally with a section letter (`6eA`, `4eb`). Empty is fine — many alumni don't recall their grade-by-grade history. |
 | `city` | ✓ | Ville actuelle. |
 | `country` | optional (defaults `Niger`) | Pays actuel. |
 | `profession` | optional | Métier. Free-form. |

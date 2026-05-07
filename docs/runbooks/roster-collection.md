@@ -45,7 +45,7 @@ Create a new Google Form titled:
 | 4 | **Numéro WhatsApp** | Réponse courte | ✓ | « Avec l'indicatif pays, ex: +227 90 00 00 00 » |
 | 5 | **Email (optionnel)** | Réponse courte | ✗ | « Si tu en as un que tu consultes. Sinon laisse vide — tu recevras un lien par WhatsApp. » |
 | 6 | **Années au CEG 1 Birni** | Cases à cocher | ✓ | Options: `1980` · `1981` · `1982` · `1983` · `1984` · `1985` (multi-select) |
-| 7 | **Classes fréquentées** | Réponse longue | ✓ | « Indique tes classes par année. Ex: 6eA en 1980, 5eA en 1981, 4eB en 1982, 3eC en 1983. Pas grave si tu ne te souviens pas des lettres de section. » |
+| 7 | **Classes fréquentées (optionnel)** | Réponse longue | ✗ | « Indique tes classes par année si tu t'en souviens. Ex: 6eA en 1980, 5eA en 1981, 4eB en 1982, 3eC en 1983. Tu peux laisser vide — c'est facultatif. » |
 | 8 | **Ville actuelle** | Réponse courte | ✓ | « Où vis-tu aujourd'hui ? » |
 | 9 | **Pays** | Réponse courte | ✗ | « Niger par défaut. » |
 | 10 | **Profession** | Réponse courte | ✗ | « En quelques mots. » |
@@ -76,8 +76,9 @@ Post in the WhatsApp group with the form URL inserted at `[LIEN GOOGLE FORM]` an
 > 📌 Quoi indiquer :
 > • Ton prénom et nom
 > • Ton numéro WhatsApp (le même que celui de ce groupe)
-> • Tes années au CEG (1980-1985) et tes classes
-> • Ta ville et ta profession (optionnel)
+> • Tes années au CEG (1980-1985)
+> • Ta ville
+> • Tes classes et ta profession (optionnel)
 >
 > 📅 *Avant le [DEADLINE]*
 >
@@ -116,8 +117,8 @@ Two days before the deadline, identify who responded vs who didn't (compare the 
 > Ça prend 5 minutes. Si tu n'arrives pas à remplir le formulaire (réseau, pas de Google, etc.), réponds-moi simplement ici avec :
 > - Ton prénom et nom
 > - Tes années au CEG (1980-1985)
-> - Tes classes (ex: 6eA, 5eB, 4eA, 3eA)
 > - Ta ville actuelle
+> - (Optionnel) tes classes si tu t'en souviens (ex: 6eA, 5eB, 4eA, 3eA)
 >
 > Je m'occupe du reste. Date limite : **[DEADLINE]**. À bientôt !
 

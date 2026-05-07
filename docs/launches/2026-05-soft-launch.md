@@ -96,8 +96,8 @@ J'avais posté il y a quelques jours un message dans le groupe pour s'inscrire s
 Ça prend 5 minutes. Si tu n'arrives pas à remplir le formulaire (réseau, pas de Google, etc.), réponds-moi simplement ici avec :
 - Ton prénom et nom
 - Tes années au CEG (1980-1985)
-- Tes classes (ex: 6eA, 5eB, 4eA, 3eA)
 - Ta ville actuelle
+- (Optionnel) tes classes si tu t'en souviens (ex: 6eA, 5eB, 4eA, 3eA)
 
 Je m'occupe du reste. Date limite : *dimanche 21 mai*. À bientôt !
 ```
