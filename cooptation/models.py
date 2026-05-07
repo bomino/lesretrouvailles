@@ -33,7 +33,7 @@ class AdminApplication(models.Model):
     full_name = models.CharField(max_length=160, blank=True)
     nickname = models.CharField(max_length=60, blank=True)
     years_attended = ArrayField(models.IntegerField(), size=6, default=list)
-    classes = ArrayField(models.CharField(max_length=4), size=4, default=list)
+    classes = ArrayField(models.CharField(max_length=4), size=4, default=list, blank=True)
     city = models.CharField(max_length=80, blank=True)
     country = models.CharField(max_length=80, blank=True, default="Niger")
     profession = models.CharField(max_length=120, blank=True)

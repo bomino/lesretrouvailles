@@ -81,6 +81,21 @@ def test_application_clean_accepts_classes_with_section_letters(make_application
     app.full_clean()  # Must not raise.
 
 
+def test_application_classes_field_is_optional():
+    """Admin form must accept an empty classes submission. The clean()
+    method already tolerates an empty list (any() over [] is False)."""
+    from cooptation.models import AdminApplication
+
+    assert AdminApplication._meta.get_field("classes").blank is True
+
+
+@pytest.mark.django_db
+def test_application_full_clean_accepts_empty_classes(make_application):
+    app = make_application()
+    app.classes = []
+    app.full_clean()  # must not raise
+
+
 @pytest.mark.django_db
 def test_application_clean_rejects_invalid_classes(make_application):
     """Defense-in-depth: dropping choices from the inner CharField removed
