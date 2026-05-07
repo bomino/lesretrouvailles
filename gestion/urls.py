@@ -18,4 +18,9 @@ urlpatterns = [
         views.member_status_view,
         name="member_status",
     ),
+    path(
+        "membres/<uuid:slug>/identifiant/",
+        views.member_username_view,
+        name="member_username",
+    ),
 ]

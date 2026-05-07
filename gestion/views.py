@@ -19,7 +19,7 @@ from cooptation.models import AdminApplication
 from members.models import AuditLog, Member
 
 from .decorators import staff_required
-from .forms import MemberAdminEditForm
+from .forms import MemberAdminEditForm, MemberUsernameChangeForm
 
 PAGE_SIZE = 20
 STATUS_FILTERS = ("active", "suspended", "all")
@@ -153,6 +153,30 @@ def member_status_view(request, slug):
     )
 
     return _redirect_to_detail(member, flash=f"status_{target}")
+
+
+@staff_required
+@require_http_methods(["GET", "POST"])
+def member_username_view(request, slug):
+    """Confirm-the-old-number flow for changing User.username."""
+    member = get_object_or_404(
+        Member.objects.select_related("user"),
+        slug=slug,
+    )
+
+    if request.method == "POST":
+        form = MemberUsernameChangeForm(request.POST, member=member)
+        if form.is_valid():
+            form.save_with_audit(actor=request.user)
+            return _redirect_to_detail(member, flash="username_changed")
+    else:
+        form = MemberUsernameChangeForm(member=member)
+
+    return render(
+        request,
+        "gestion/member_username.html",
+        {"member": member, "form": form},
+    )
 
 
 def _redirect_to_detail(member, flash: str, changed: list | None = None):
