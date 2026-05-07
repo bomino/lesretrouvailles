@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "cooptation",
     "memoires",
     "memoriam",
+    "gestion",
 ]
 
 MIDDLEWARE = [
