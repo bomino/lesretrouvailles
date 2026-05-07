@@ -6,6 +6,7 @@ will add the cooptation queue."""
 
 from __future__ import annotations
 
+import re
 from urllib.parse import quote
 
 from django.contrib.postgres.lookups import Unaccent
@@ -34,6 +35,11 @@ from .forms import (
 
 PAGE_SIZE = 20
 STATUS_FILTERS = ("active", "suspended", "all")
+
+# wa.me only resolves digits-only WhatsApp numbers (E.164 without +).
+# Used by member_login_link_view to suppress the share button for users
+# whose username is an email or admin handle.
+WA_ME_USERNAME_RE = re.compile(r"^\d{8,15}$")
 
 
 @staff_required
@@ -209,7 +215,12 @@ def member_login_link_view(request, slug):
 
     if request.method == "POST":
         link_url = _build_password_set_url(member.user)
-        wa_me_url = _build_wa_me_share_url(member, link_url)
+        # wa.me only resolves digits-only WhatsApp numbers. For members whose
+        # username is an email (cooptation flow) or an admin handle (e.g. the
+        # super-admin 'bominomla'), the deeplink would 404. Hide the button
+        # rather than send the operator into a dead end.
+        if WA_ME_USERNAME_RE.fullmatch(member.user.username):
+            wa_me_url = _build_wa_me_share_url(member, link_url)
         AuditLog.objects.create(
             actor=request.user,
             action="gestion.login_link.reissued",

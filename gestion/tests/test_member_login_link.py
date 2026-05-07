@@ -135,3 +135,38 @@ def test_login_link_post_renders_copy_button(client, coadmin_user, make_member):
     assert "Copier" in body
     # The clipboard JS reads the URL from a data-attribute or text content
     assert "data-copy-url" in body or 'id="magic-link-url"' in body
+
+
+@pytest.mark.django_db
+def test_login_link_hides_wa_me_button_for_non_digit_username(
+    client, coadmin_user, make_user, make_member
+):
+    """wa.me only resolves digits-only WhatsApp numbers. For users whose
+    username is an email (cooptation flow) or an admin handle (super-admin),
+    the deeplink would 404. The button must be hidden in that case so the
+    operator doesn't end up on a WhatsApp 'phone number invalid' page."""
+    user = make_user(username="bominomla")  # alphabetic admin handle
+    member = make_member(user=user)
+    client.force_login(coadmin_user)
+    response = client.post(f"/gestion/membres/{member.slug}/lien/")
+    body = response.content.decode("utf-8")
+    assert "https://wa.me/" not in body
+    # The Copier button still renders so the operator can paste manually
+    assert "Copier" in body
+    # And we explain why the wa.me button is missing
+    assert "n'est pas un num" in body  # "n'est pas un numéro WhatsApp"
+
+
+@pytest.mark.django_db
+def test_login_link_hides_wa_me_button_for_email_username(
+    client, coadmin_user, make_user, make_member
+):
+    """Coopted members get username = email (cooptation/services.py:30).
+    Same defensive hiding."""
+    user = make_user(username="candidate@example.test")
+    member = make_member(user=user)
+    client.force_login(coadmin_user)
+    response = client.post(f"/gestion/membres/{member.slug}/lien/")
+    body = response.content.decode("utf-8")
+    assert "https://wa.me/" not in body
+    assert "Copier" in body
