@@ -87,8 +87,6 @@
                                 </span>
                             {% endif %}
                         </a>
-                        <a href="/profil/"
-                           class="rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "Mon profil" %}</a>
                         {% if request.user.is_staff %}
                             <a href="/gestion/"
                                class="inline-flex items-center gap-1.5 rounded-lg border border-secondary/20 px-3 py-2 hover:border-tertiary/40 hover:bg-base-200 hover:text-tertiary transition"
@@ -109,25 +107,39 @@
                 {% endif %}
                 <div class="flex items-center gap-2">
                     {% block header_actions %}
-                        {# WhatsApp button: visible on md+ desktop. On mobile it lives inside the dropdown menu (auth) or as an icon-only button (anon). #}
+                        {# WhatsApp CTA: shown only to anonymous users on desktop (a "join the community" pitch). #}
+                        {# Authenticated users have already joined and find the link in the footer + mobile dropdown. #}
                         {# TODO P2: replace href with the real "Les Retrouvailles" WhatsApp invite URL. #}
-                        <a href="https://chat.whatsapp.com/"
-                           rel="noopener noreferrer"
-                           target="_blank"
-                           class="hidden md:inline-flex items-center gap-2 rounded-full bg-whatsapp-green px-4 py-2 min-h-tap text-sm font-medium text-on-whatsapp-green shadow-sm hover:opacity-95 transition">
-                            <span aria-hidden="true">💬</span>
-                            <span class="hidden lg:inline">{% trans "Rejoindre le groupe WhatsApp" %}</span>
-                            <span class="lg:hidden">{% trans "WhatsApp" %}</span>
-                        </a>
+                        {% if not request.user.is_authenticated %}
+                            <a href="https://chat.whatsapp.com/"
+                               rel="noopener noreferrer"
+                               target="_blank"
+                               class="hidden md:inline-flex items-center gap-2 rounded-full bg-whatsapp-green px-4 py-2 min-h-tap text-sm font-medium text-on-whatsapp-green shadow-sm hover:opacity-95 transition">
+                                <span aria-hidden="true">💬</span>
+                                <span class="hidden lg:inline">{% trans "Rejoindre le groupe WhatsApp" %}</span>
+                                <span class="lg:hidden">{% trans "WhatsApp" %}</span>
+                            </a>
+                        {% endif %}
                         {% if request.user.is_authenticated %}
                             {% with current_member=request.user.member %}
-                                <span class="hidden md:inline text-sm text-secondary" data-current-user>
+                                <a href="/profil/"
+                                   class="hidden md:inline-flex items-center gap-1.5 rounded-lg px-3 py-2 min-h-tap text-sm hover:bg-base-200 hover:text-tertiary transition"
+                                   data-current-user
+                                   title="{% trans 'Aller à mon profil' %}">
+                                    <svg class="h-4 w-4"
+                                         viewBox="0 0 24 24"
+                                         fill="none"
+                                         stroke="currentColor"
+                                         stroke-width="2"
+                                         aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
                                     {% if current_member %}
                                         {% blocktrans with name=current_member.first_name %}Bonjour, {{ name }}{% endblocktrans %}
                                     {% else %}
                                         {{ request.user.email|default:request.user.username }}
                                     {% endif %}
-                                </span>
+                                </a>
                             {% endwith %}
                             <form method="post"
                                   action="{% url 'account_logout' %}"

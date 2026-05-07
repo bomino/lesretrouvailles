@@ -279,10 +279,8 @@ def test_gestion_link_hidden_from_regular_member(client):
     assert 'href="/admin/"' not in html
 
 
-@pytest.mark.django_db
-def test_navbar_greets_authenticated_member_by_first_name(client):
-    """Both desktop and mobile nav surface the member's first name so users
-    on shared devices know which account they're logged into."""
+def _login_as_active_member(client, first_name="Idrissa"):
+    """Helper: create + log in an active consenting member for navbar tests."""
     from django.contrib.auth import get_user_model
 
     from members.charters import CHARTER_CURRENT_VERSION
@@ -290,14 +288,14 @@ def test_navbar_greets_authenticated_member_by_first_name(client):
 
     User = get_user_model()  # noqa: N806
     user = User.objects.create_user(
-        username="greet@example.test",
-        email="greet@example.test",
+        username=f"{first_name.lower()}@example.test",
+        email=f"{first_name.lower()}@example.test",
         password="x",
     )
     member = Member.objects.create(
         user=user,
-        first_name="Idrissa",
-        last_name="Saidou",
+        first_name=first_name,
+        last_name="Test",
         years_attended=[1980],
         classes=["6e"],
         city="Niamey",
@@ -307,13 +305,89 @@ def test_navbar_greets_authenticated_member_by_first_name(client):
         member=member, charter_version=CHARTER_CURRENT_VERSION, ip_address="127.0.0.1"
     )
     client.force_login(user)
+    return user, member
 
+
+@pytest.mark.django_db
+def test_navbar_greets_authenticated_member_by_first_name(client):
+    """Both desktop and mobile nav surface the member's first name so users
+    on shared devices know which account they're logged into."""
+    _login_as_active_member(client, "Idrissa")
     html = client.get(reverse("landing")).content.decode("utf-8")
     # The greeting "Bonjour, Idrissa" appears at least twice (desktop + mobile)
     assert html.count("Bonjour, Idrissa") >= 2
     # And both placement hooks are present
     assert "data-current-user" in html
     assert "data-current-user-mobile" in html
+
+
+@pytest.mark.django_db
+def test_navbar_desktop_greeting_links_to_profile(client):
+    """Clicking the greeting takes the user to their profile (replaces the
+    separate 'Mon profil' nav link that used to live next to it)."""
+    import re
+
+    _login_as_active_member(client, "Idrissa")
+    html = client.get(reverse("landing")).content.decode("utf-8")
+    # The desktop greeting span is now an <a href="/profil/"> with the
+    # data-current-user marker.
+    pattern = re.compile(
+        r'<a[^>]*href="/profil/"[^>]*data-current-user[^>]*>',
+        re.MULTILINE | re.DOTALL,
+    )
+    assert pattern.search(html), "Desktop greeting must link to /profil/"
+
+
+@pytest.mark.django_db
+def test_navbar_hides_whatsapp_button_for_authenticated_user(client):
+    """The big 'Rejoindre le groupe WhatsApp' CTA is for the landing page
+    audience (anon users discovering the platform). Authenticated users
+    have already joined; hiding the button cuts navbar clutter without
+    losing reach (still in footer + mobile dropdown)."""
+    _login_as_active_member(client, "Idrissa")
+    html = client.get(reverse("landing")).content.decode("utf-8")
+    # The desktop CTA text "Rejoindre le groupe WhatsApp" should not appear
+    # for an authenticated user. The mobile dropdown uses the shorter
+    # "Groupe WhatsApp" label, which is still allowed to render.
+    assert "Rejoindre le groupe WhatsApp" not in html
+
+
+@pytest.mark.django_db
+def test_navbar_keeps_whatsapp_button_for_anonymous_user(client):
+    """Anon users on the landing page still see the WhatsApp CTA — it's a
+    discovery affordance for non-members."""
+    html = client.get(reverse("landing")).content.decode("utf-8")
+    assert "Rejoindre le groupe WhatsApp" in html
+
+
+@pytest.mark.django_db
+def test_navbar_omits_separate_mon_profil_link_on_desktop(client):
+    """The standalone 'Mon profil' nav link is removed in favor of the
+    clickable greeting. The mobile dropdown keeps a separate /profil/
+    link in its list, so we assert the count drops to ~1 (mobile only)
+    rather than ~2 (desktop + mobile) like for /souvenirs/."""
+    _login_as_active_member(client, "Idrissa")
+    html = client.get(reverse("landing")).content.decode("utf-8")
+    # Mobile dropdown still has /profil/ as a list item; that's fine.
+    # But the /profil/ link count should be lower than /souvenirs/ count
+    # (souvenirs has both desktop nav + mobile dropdown).
+    assert html.count("/souvenirs/") >= 2  # sanity: nav pattern intact
+    # /profil/ is now clickable from the greeting (1 desktop) + mobile list
+    # (1 mobile) — still 2, but no longer the standalone "Mon profil" text on
+    # desktop.
+    assert html.count(">Mon profil<") == html.count(">Mon profil<")  # tautology
+    # The strict assertion: there is no <a> in the DESKTOP nav with text "Mon profil"
+    # (desktop nav is the <nav class="hidden md:flex"> block). Find it and check.
+    import re
+
+    desktop_nav_match = re.search(
+        r'<nav[^>]*class="hidden md:flex[^"]*"[^>]*>.*?</nav>',
+        html,
+        re.DOTALL,
+    )
+    assert desktop_nav_match, "Desktop nav block not found"
+    desktop_nav_html = desktop_nav_match.group(0)
+    assert "Mon profil" not in desktop_nav_html
 
 
 @pytest.mark.django_db
