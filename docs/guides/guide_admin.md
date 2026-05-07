@@ -1,46 +1,83 @@
 # Guide administrateur — Les Retrouvailles
 
-Ce guide est destiné aux **Super Administrateurs** de la plateforme. Il complète les runbooks opérationnels (`docs/runbooks/`) en présentant le travail d'administration courante du point de vue d'un humain qui clique dans `/admin/`.
+Ce guide s'adresse à toute personne avec des droits d'administration : **Super Admin** (le propriétaire de la plateforme, Bomino) ainsi que les **co-administrateurs** que le Super Admin peut désigner. Il complète les runbooks opérationnels (`docs/runbooks/`).
 
 > 🔒 Ce guide contient des actions destructives (suppression de comptes, purge de données). Lisez chaque section avant d'agir, et préférez le **mode aperçu** ou **dry-run** quand il existe.
 
 ---
 
-## 1. Votre rôle de Super Admin
+## 1. Deux niveaux d'administration
 
-Vous êtes responsable de :
+La plateforme a deux niveaux distincts depuis Gestion v1 (mai 2026) :
 
-- **Onboarder** les nouveaux membres (cooptation publique, import en masse, création manuelle)
-- **Curer le contenu** : Mur des souvenirs, In Memoriam, liste publique « Nous recherchons aussi »
-- **Modérer** : approuver les candidatures, gérer les demandes de retrait, traiter les demandes RGPD
-- **Surveiller** : santé des sauvegardes, rapports DMARC, logs Railway
-- **Soutenir** les membres : répondre aux questions par WhatsApp, renvoyer les liens magiques perdus, gérer les comptes oubliés
+### **Super Admin** (un seul compte)
+- Accès complet : la console **`/gestion/`** (interface simple) **et** le panneau Django **`/admin/`** (avancé).
+- Seul à pouvoir : purger des comptes (RGPD), importer un roster en masse, promouvoir un autre membre comme co-admin, modifier la liste « Nous recherchons aussi », publier des fiches In Memoriam.
+- En production aujourd'hui : `bominomla`.
 
-Tout passe par l'interface admin Django : **https://villageretrouvailles.com/admin/** (avec votre identifiant de super admin).
+### **Co-administrateur** (1 à 3 comptes prévus)
+- Accès uniquement à la console **`/gestion/`** — la zone Django `/admin/` lui est invisible.
+- Peut faire toutes les opérations courantes : annuaire des membres, modification de profil, suspendre/réactiver un compte, changer le numéro WhatsApp d'un membre, regénérer un lien de connexion, approuver ou refuser une cooptation.
+- Le Super Admin peut promouvoir un membre en co-admin (voir §2.2 ci-dessous).
 
-> 💡 Cette plateforme est conçue pour rester gérable par 2-3 administrateurs bénévoles. La plupart des opérations courantes prennent quelques minutes par semaine.
+> 💡 Cette répartition reste gérable par 2-3 administrateurs bénévoles. La plupart des opérations courantes prennent quelques minutes par semaine.
+
+Vos responsabilités selon votre rôle :
+
+- **Onboarder** les nouveaux membres (cooptation publique en `/gestion/cooptations/` ; import en masse — Super Admin uniquement)
+- **Modérer** : approuver les candidatures, gérer les demandes de retrait, suspendre les comptes problématiques
+- **Soutenir** les membres : répondre aux questions par WhatsApp, renvoyer les liens magiques perdus
+- **Curer le contenu** (Super Admin uniquement pour v1) : Mur des souvenirs, In Memoriam, liste publique
+- **Surveiller** (Super Admin uniquement) : santé des sauvegardes, rapports DMARC, logs Railway
+- **Traiter les demandes RGPD** (Super Admin uniquement) — irréversibles
 
 ---
 
-## 2. Accéder à l'interface admin
+## 2. Accéder aux outils
 
-Deux chemins :
+### 2.1 La console `/gestion/` (utilisée par tous les admins)
 
-- **Depuis la plateforme** : connectez-vous comme d'habitude, puis cliquez sur **« ⚙ Administration »** dans la barre de navigation. Ce lien n'est visible que pour les comptes Super Admin (`is_staff=True`) — les membres réguliers ne le voient jamais.
-- **Directement** : allez à **https://villageretrouvailles.com/admin/** et connectez-vous avec votre nom d'utilisateur (par exemple `bominomla`) ou votre email + votre mot de passe.
+C'est l'interface principale, simple et adaptée au mobile, conçue pour ne jamais avoir besoin de la zone Django.
 
-Vous arrivez sur le tableau de bord Django Admin, organisé par sections :
-   - **Members** — comptes des membres, candidatures de cooptation, journal d'audit, etc.
-   - **Cooptation** — candidatures (`AdminApplication`), requêtes de parrainage, questions
-   - **Memoires** — Mur des souvenirs (`Memory`)
-   - **Memoriam** — fiches In Memoriam et nominations
-   - **Authentication and Authorization** — utilisateurs Django, groupes, permissions
+- **Depuis la plateforme** : connectez-vous, cliquez sur **« ⚙ Gestion »** dans la barre de navigation. Le lien n'est visible que pour les comptes admin (`is_staff=True`).
+- **Directement** : **https://villageretrouvailles.com/gestion/**.
+
+Vous arrivez sur un tableau de bord avec trois compteurs (membres actifs, cooptations à traiter, comptes suspendus) et trois liens :
+
+- **Membres** — annuaire complet, recherche, modification de profil, suspendre/réactiver, changer le numéro WhatsApp, regénérer un lien de connexion.
+- **Cooptations** — file des candidatures (par défaut : « à traiter »), revue détaillée avec parrains et questionnaire, approuver ou refuser.
+- **Outils avancés** — visible **uniquement pour le Super Admin**. Lien direct vers `/admin/` pour les actions non couvertes par `/gestion/` (purge RGPD, import en masse, fiches In Memoriam, etc.).
 
 > 🔒 **Sécurité élémentaire :**
 > - Ne partagez **jamais** votre mot de passe d'admin (ni par WhatsApp, ni par email).
 > - Changez-le immédiatement si vous l'avez écrit dans une conversation.
 > - Déconnectez-vous toujours après usage sur un appareil partagé.
-> - Toute action destructive est tracée dans le journal d'audit (`Members → Audit log`).
+> - Chaque action de `/gestion/` est tracée dans le journal d'audit avec le préfixe `gestion.*` (visible par le Super Admin dans `/admin/auditlog/`).
+
+### 2.2 Promouvoir un co-administrateur (Super Admin uniquement)
+
+Pour donner à un membre actif l'accès à `/gestion/` :
+
+1. Trouvez son `User` dans `/admin/auth/user/` (recherche par email ou nom d'utilisateur).
+2. Ouvrez la fiche, cochez **« Staff status »** (mais **pas** « Superuser status »).
+3. Sauvegardez.
+
+Effet immédiat : le membre voit maintenant le lien **« ⚙ Gestion »** dans sa barre de navigation et peut accéder à `/gestion/`. Il **ne voit pas** `/admin/` (la console `/admin/` est verrouillée à `is_superuser=True` depuis Phase 0 de Gestion v1).
+
+Pour révoquer : décocher **« Staff status »**. Le membre reste un membre régulier de la plateforme.
+
+> 💡 **Recommandation** : ne donnez le `Staff status` qu'à des personnes que vous connaissez personnellement. Les actions sont auditables, mais une RGPD purge accidentelle reste irréversible — gardez ce pouvoir entre vos mains.
+
+### 2.3 Le panneau Django `/admin/` (Super Admin uniquement)
+
+Réservé au Super Admin pour les actions avancées :
+- **Members** — purge RGPD (irréversible), demandes de retrait, journal d'audit complet
+- **Cooptation** — questions de connaissance (config), réponses au questionnaire
+- **Memoires** — Mur des souvenirs (création, publication)
+- **Memoriam** — fiches In Memoriam et modération de nominations
+- **Authentication and Authorization** — utilisateurs, groupes, permissions, EmailAddresses Allauth
+
+Tout co-admin qui tente d'accéder à `/admin/` sera redirigé vers la page de connexion Django sans pouvoir y entrer.
 
 ---
 
@@ -78,23 +115,26 @@ Quelqu'un d'extérieur au groupe WhatsApp découvre la plateforme et veut s'insc
 1. Le candidat remplit le formulaire public à `/inscription/`.
 2. Il choisit deux parrains parmi les membres existants.
 3. Les parrains reçoivent un email les invitant à valider.
-4. Quand les deux parrains ont accepté (ou délais expirés), la candidature passe en **« Awaiting admin »**.
-5. Vous voyez la candidature dans **Cooptation → Admin Applications** (filtre statut = `awaiting_admin`).
+4. Quand les deux parrains ont accepté (ou délais expirés), la candidature passe en **« À traiter »**.
+5. Vous la voyez dans **`/gestion/cooptations/`** (filtre par défaut : « à traiter »).
 
-Pour approuver :
+Pour approuver (Super Admin **et** co-admins) :
 
 1. Cliquez sur la candidature.
-2. Vérifiez les informations (nom, années, classes si renseignées, ville, parrainages).
-3. Dans la liste d'actions en haut : choisir **« Approve and create member »** → confirmer.
-4. Le système crée automatiquement le `User` + `Member` + envoie l'email de définition de mot de passe.
+2. Vérifiez les informations (nom, années, classes si renseignées, ville, parrainages, questionnaire).
+3. Cliquez **« Approuver »** dans la barre latérale → confirmez le pop-up.
+4. Le système crée automatiquement le `User` + `Member` et envoie l'email de définition de mot de passe au candidat.
+5. Une entrée `gestion.application.approved` est ajoutée au journal d'audit.
 
 Pour refuser :
 
-1. Choisir l'action **« Reject application (with reason) »**.
-2. Saisissez la raison (sera incluse dans l'email au candidat).
-3. Confirmer.
+1. Cliquez sur **« Rejeter… »** dans la barre latérale (le formulaire se déplie).
+2. Saisissez le motif (5 caractères minimum, visible par le candidat dans son email de notification).
+3. Cliquez **« Confirmer le rejet »** → confirmez le pop-up.
+4. Une entrée `gestion.application.rejected` est ajoutée au journal d'audit.
 
 > 💡 La candidature refusée est conservée 6 mois (rétention RGPD), puis purgée automatiquement.
+> 💡 L'approbation est **irréversible** (création d'un compte Membre). Le rejet est techniquement réversible mais douloureux (édition manuelle en `/admin/`) — réfléchissez avant de cliquer.
 
 ### 3c. Création manuelle (cas exceptionnels)
 
@@ -118,27 +158,32 @@ Pour ajouter un membre directement sans passer par la cooptation (par exemple : 
 
 C'est le cas le plus fréquent en régime de croisière (rappelez-vous : ~80 % de notre cohorte n'a pas d'email).
 
-### Procédure
+### Procédure recommandée — depuis `/gestion/` (Super Admin **et** co-admins)
 
 1. Le membre vous écrit sur WhatsApp : *« J'ai oublié mon mot de passe »* ou *« Le lien ne fonctionne plus »*.
-2. Demandez-lui son **numéro WhatsApp** pour confirmer (en chiffres seulement, par exemple `22790000001`).
-3. Depuis votre terminal connecté au projet Railway :
-   ```bash
-   railway run --service lesretrouvailles python manage.py reissue_login_link 22790000001
-   ```
-4. La commande imprime un nouveau lien magique.
-5. **Copiez l'URL complète** et envoyez-la au membre via WhatsApp DM avec un message du type :
-   ```
-   Salut {Prénom},
-   Voici ton nouveau lien (valable 7 jours) :
-   {URL}
-   Touche le lien depuis ton téléphone, choisis un mot de passe que tu retiendras.
-   ```
+2. Allez à **`/gestion/membres/`**, recherchez le membre par nom, prénom ou numéro WhatsApp, cliquez sur son nom.
+3. Sur la fiche, cliquez **« Régénérer un lien de connexion »**.
+4. Lisez l'encadré (lien valable 7 jours, l'ancien reste valide jusqu'à expiration), puis cliquez **« Générer un nouveau lien »**.
+5. Le lien apparaît dans une boîte verte. Deux options :
+   - **« Envoyer par WhatsApp »** — ouvre WhatsApp Web/mobile avec un message déjà rédigé pour ce membre. Vérifiez et envoyez.
+   - **« Copier »** — copie l'URL dans votre presse-papier ; collez-la où vous voulez (email, autre messagerie).
+6. Une entrée `gestion.login_link.reissued` est ajoutée au journal d'audit.
+
+### Procédure de secours — ligne de commande (Super Admin uniquement)
+
+Utile si la console est en panne ou si vous traitez plusieurs réémissions en série :
+
+```bash
+railway run --service lesretrouvailles python manage.py reissue_login_link 22790000001
+```
+
+Copiez l'URL imprimée et envoyez-la au membre via WhatsApp DM avec le message du Template 3 (`docs/runbooks/onboarding.md`).
 
 ### Cas particuliers
 
 - **Le membre dit que le lien ne s'ouvre pas** → demandez-lui de le copier-coller dans son navigateur (Chrome / Safari) au lieu d'ouvrir directement depuis WhatsApp ; ça contourne d'éventuels problèmes de prévisualisation.
-- **Le numéro WhatsApp donné ne trouve pas de compte** → vérifiez le format : la commande attend les chiffres seulement, sans `+` ni espace ni tiret. Listez les comptes existants depuis le shell admin si nécessaire.
+- **Le numéro WhatsApp donné ne trouve pas de compte** → vérifiez le format : `/gestion/membres/` accepte la recherche partielle ; côté CLI, la commande attend les chiffres seulement, sans `+` ni espace ni tiret.
+- **Le membre a un nouveau numéro WhatsApp** → utilisez `/gestion/membres/<slug>/identifiant/` pour changer son identifiant (avec confirmation du numéro actuel) avant de regénérer un lien.
 
 ---
 
