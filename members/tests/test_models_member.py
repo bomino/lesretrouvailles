@@ -151,3 +151,20 @@ def test_member_can_save_with_short_form_classes(make_member):
     m.save()
     m.refresh_from_db()
     assert m.classes == ["6a", "5b", "4b", "3c"]
+
+
+def test_member_classes_field_is_optional():
+    """Admin and ModelForm flows derive 'required' from the model field's
+    blank flag. The classes field is optional because many alumni in the
+    WhatsApp roster don't remember their grade-by-grade history."""
+    assert Member._meta.get_field("classes").blank is True
+
+
+@pytest.mark.django_db
+def test_member_full_clean_accepts_empty_classes(make_member):
+    m = make_member()
+    m.classes = []
+    m.full_clean()  # must not raise
+    m.save()
+    m.refresh_from_db()
+    assert m.classes == []

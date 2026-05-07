@@ -52,6 +52,21 @@ def test_entry_clean_rejects_invalid_class(make_memoriam_entry):
         entry.full_clean()
 
 
+def test_entry_classes_field_is_optional():
+    """Mirrors Member and AdminApplication: families nominating a deceased
+    alum may not remember the section letters or grade-by-grade history."""
+    from memoriam.models import InMemoriamEntry
+
+    assert InMemoriamEntry._meta.get_field("classes").blank is True
+
+
+@pytest.mark.django_db
+def test_entry_full_clean_accepts_empty_classes(make_memoriam_entry):
+    entry = make_memoriam_entry()
+    entry.classes = []
+    entry.full_clean()  # must not raise
+
+
 @pytest.mark.django_db
 def test_entry_clean_rejects_published_without_consent(make_memoriam_entry):
     entry = make_memoriam_entry()

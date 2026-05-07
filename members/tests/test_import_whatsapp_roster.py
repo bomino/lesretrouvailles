@@ -231,6 +231,33 @@ def test_idempotent_skips_existing_username(fake_clients, tmp_path, settings):
 
 
 @pytest.mark.django_db
+def test_imports_row_with_empty_classes(fake_clients, tmp_path, settings):
+    """Many WhatsApp-roster alumni don't recall their grade-by-grade history.
+    A row with classes='' must validate and import (Member.classes=[])."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from members.models import Member
+
+    csv_path = _write_csv(
+        tmp_path / "roster.csv",
+        [_row(classes="", whatsapp="+22790000099", email="noclass@example.com")],
+    )
+
+    out = StringIO()
+    call_command(
+        "import_whatsapp_roster",
+        str(csv_path),
+        "--magic-links-out",
+        str(tmp_path / "magic_links.csv"),
+        stdout=out,
+    )
+
+    user = User.objects.get(username="22790000099")
+    member = Member.objects.get(user=user)
+    assert member.classes == []
+    assert "1 created" in out.getvalue()
+
+
+@pytest.mark.django_db
 def test_validation_rejects_bad_year_class(fake_clients, tmp_path, settings):
     settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
     from members.models import Member

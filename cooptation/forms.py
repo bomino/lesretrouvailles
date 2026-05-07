@@ -18,8 +18,12 @@ class SignupForm(forms.Form):
     )
     classes = forms.CharField(
         max_length=40,
-        label="Classes (séparées par virgule)",
-        help_text="Ex. 6e, 6eA, 6a, 4b (avec ou sans 'e', lettre de section optionnelle)",
+        required=False,
+        label="Classes (séparées par virgule, optionnel)",
+        help_text=(
+            "Ex. 6e, 6eA, 6a, 4b (avec ou sans 'e', lettre de section optionnelle). "
+            "Laissez vide si vous ne vous souvenez pas."
+        ),
     )
     city = forms.CharField(max_length=80, label="Ville actuelle")
     country = forms.CharField(max_length=80, initial="Niger", label="Pays")

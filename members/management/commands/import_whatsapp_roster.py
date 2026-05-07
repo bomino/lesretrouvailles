@@ -11,6 +11,7 @@ CSV columns (header required, exact names):
 - email is optional; ~80% of the cohort doesn't have one
 - photo_filename is optional; references a file inside --photos-dir
 - years_attended and classes are comma-separated, in quotes
+- classes is optional; format is validated only if a value is supplied
 
 Behavior:
 - Email present  -> standard Allauth password-set email via Resend
@@ -77,15 +78,14 @@ def _validate_row(row: dict, line_no: int) -> list[str]:
     except ValueError:
         errors.append("years_attended must be integers, comma-separated")
 
+    # classes is optional — many alumni don't remember their grade-by-grade
+    # history. Validate format only when something was supplied.
     classes = _parse_str_list(row.get("classes", ""))
-    if not classes:
-        errors.append("classes is required (comma-separated, in quotes)")
-    else:
-        bad_classes = [c for c in classes if not VALID_CLASS_PATTERN.match(c)]
-        if bad_classes:
-            errors.append(
-                f"classes {bad_classes!r} don't match pattern (e.g. 6e, 5eA, 4eb)",
-            )
+    bad_classes = [c for c in classes if not VALID_CLASS_PATTERN.match(c)]
+    if bad_classes:
+        errors.append(
+            f"classes {bad_classes!r} don't match pattern (e.g. 6e, 5eA, 4eb)",
+        )
     return errors
 
 
