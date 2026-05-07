@@ -135,7 +135,7 @@ docs/
 
 Modèles principaux (Postgres) :
 
-- **`Member`** (members) — profil d'un ancien : prénom, nom, surnom, années au CEG (1980-1985), classes (6e, 6eA, 6a…), ville, profession, photo Cloudinary.
+- **`Member`** (members) — profil d'un ancien : prénom, nom, surnom, années au CEG (1980-1985), classes (6e, 6eA, 6a… ou aucune), ville, profession, photo Cloudinary.
 - **`User`** (auth Django) — compte de connexion. Username = numéro WhatsApp digits-only ; email optionnel.
 - **`AdminApplication`** (cooptation) — candidature soumise via `/inscription/`, en attente de cooptation par 2 parrains.
 - **`CooptationRequest`** (cooptation) — une instance de parrainage demandé.
