@@ -69,8 +69,16 @@
                 <span class="mt-1 block text-xs text-secondary">{{ form.email.help_text }}</span>
                 {% if form.email.errors %}<p class="mt-1 text-xs text-red-700">{{ form.email.errors|join:" " }}</p>{% endif %}
             </label>
+            <label class="block">
+                <span class="block text-sm font-medium">Numéro WhatsApp</span>
+                {{ form.whatsapp }}
+                <span class="mt-1 block text-xs text-secondary">
+                    Chiffres uniquement, format international sans « + ». Ex. <code>22790000123</code>. Laissez vide si le membre n'a pas WhatsApp.
+                </span>
+                {% if form.whatsapp.errors %}<p class="mt-1 text-xs text-red-700">{{ form.whatsapp.errors|join:" " }}</p>{% endif %}
+            </label>
             <p class="text-xs text-secondary">
-                Pour changer le numéro WhatsApp (identifiant), contactez Bomino — c'est une opération qui invalide les liens de connexion existants.
+                Pour changer l'identifiant de connexion (distinct du numéro WhatsApp), utilisez la page « Modifier l'identifiant » accessible depuis la fiche.
             </p>
         </fieldset>
         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-end">

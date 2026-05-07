@@ -91,6 +91,16 @@
                     </dd>
                 </div>
                 <div>
+                    <dt class="text-xs uppercase tracking-[0.18em] text-secondary">WhatsApp</dt>
+                    <dd class="mt-0.5" data-field="whatsapp">
+                        {% if member.whatsapp %}
+                            +{{ member.whatsapp }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </dd>
+                </div>
+                <div>
                     <dt class="text-xs uppercase tracking-[0.18em] text-secondary">Statut</dt>
                     <dd class="mt-0.5" data-field="status">
                         {% if member.status == "active" %}

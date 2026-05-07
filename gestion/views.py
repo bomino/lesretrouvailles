@@ -215,12 +215,14 @@ def member_login_link_view(request, slug):
 
     if request.method == "POST":
         link_url = _build_password_set_url(member.user)
-        # wa.me only resolves digits-only WhatsApp numbers. For members whose
-        # username is an email (cooptation flow) or an admin handle (e.g. the
-        # super-admin 'bominomla'), the deeplink would 404. Hide the button
-        # rather than send the operator into a dead end.
-        if WA_ME_USERNAME_RE.fullmatch(member.user.username):
-            wa_me_url = _build_wa_me_share_url(member, link_url)
+        # wa.me only resolves digits-only WhatsApp numbers. Prefer the explicit
+        # member.whatsapp field; fall back to User.username if it happens to
+        # match the digits format (legacy path for imported members before the
+        # migration ran). Otherwise hide the button rather than send the
+        # operator to api.whatsapp.com's "phone number invalid" page.
+        wa_target = member.whatsapp or member.user.username
+        if WA_ME_USERNAME_RE.fullmatch(wa_target):
+            wa_me_url = _build_wa_me_share_url(member, link_url, wa_target)
         AuditLog.objects.create(
             actor=request.user,
             action="gestion.login_link.reissued",
@@ -380,11 +382,15 @@ def application_reject_view(request, pk):
     )
 
 
-def _build_wa_me_share_url(member, link_url: str) -> str:
+def _build_wa_me_share_url(member, link_url: str, wa_number: str) -> str:
     """Build a wa.me deep link with the magic-link reissue Template 3
     (docs/runbooks/onboarding.md:114-121) pre-filled in the WhatsApp
     composer. The operator clicks → WhatsApp opens with the message
-    drafted to the member's number → press Send."""
+    drafted to the member's number → press Send.
+
+    `wa_number` is the digits-only target (already validated by the caller)
+    — usually member.whatsapp; for legacy imported rows pre-migration we
+    fall back to member.user.username."""
     message = (
         f"Salut {member.first_name},\n"
         "Voici ton nouveau lien de connexion (valable 7 jours) :\n"
@@ -393,7 +399,7 @@ def _build_wa_me_share_url(member, link_url: str) -> str:
         "\n"
         "Choisis ton nouveau mot de passe en suivant le lien."
     )
-    return f"https://wa.me/{member.user.username}?text={quote(message)}"
+    return f"https://wa.me/{wa_number}?text={quote(message)}"
 
 
 def _redirect_to_detail(member, flash: str, changed: list | None = None):
