@@ -18,16 +18,24 @@
                             class="rounded-lg bg-tertiary px-4 py-2 min-h-tap text-sm font-medium text-on-tertiary shadow-sm hover:opacity-95 transition">
                         Copier
                     </button>
-                    <a href="{{ wa_me_url }}"
-                       target="_blank"
-                       rel="noopener noreferrer"
-                       class="rounded-lg bg-whatsapp-green px-4 py-2 min-h-tap text-center text-sm font-medium text-on-whatsapp-green shadow-sm hover:opacity-95 transition">
-                        Envoyer par WhatsApp
-                    </a>
+                    {% if wa_me_url %}
+                        <a href="{{ wa_me_url }}"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           class="rounded-lg bg-whatsapp-green px-4 py-2 min-h-tap text-center text-sm font-medium text-on-whatsapp-green shadow-sm hover:opacity-95 transition">
+                            Envoyer par WhatsApp
+                        </a>
+                    {% endif %}
                 </div>
-                <p class="mt-3 text-xs text-secondary">
-                    Le bouton « Envoyer par WhatsApp » ouvre WhatsApp avec un message déjà rédigé à destination du membre. Vérifiez le message puis cliquez sur Envoyer.
-                </p>
+                {% if wa_me_url %}
+                    <p class="mt-3 text-xs text-secondary">
+                        Le bouton « Envoyer par WhatsApp » ouvre WhatsApp avec un message déjà rédigé à destination du membre. Vérifiez le message puis cliquez sur Envoyer.
+                    </p>
+                {% else %}
+                    <p class="mt-3 text-xs text-secondary">
+                        L'identifiant de ce membre (<strong>@{{ member.user.username }}</strong>) n'est pas un numéro WhatsApp (chiffres uniquement). Le partage automatique WhatsApp est désactivé pour ce profil — utilisez « Copier » et envoyez le lien manuellement.
+                    </p>
+                {% endif %}
             </div>
             <script nonce="">
                 (function () {
