@@ -23,4 +23,9 @@ urlpatterns = [
         views.member_username_view,
         name="member_username",
     ),
+    path(
+        "membres/<uuid:slug>/lien/",
+        views.member_login_link_view,
+        name="member_login_link",
+    ),
 ]

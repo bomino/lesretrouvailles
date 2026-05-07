@@ -115,6 +115,10 @@
                class="block rounded-lg bg-tertiary px-4 py-2 min-h-tap text-center text-sm font-medium text-on-tertiary shadow-sm hover:opacity-95 transition">
                 Modifier le profil
             </a>
+            <a href="{% url 'gestion:member_login_link' slug=member.slug %}"
+               class="block rounded-lg border border-tertiary/40 bg-white px-4 py-2 min-h-tap text-center text-sm font-medium text-tertiary hover:bg-base-200 transition">
+                Régénérer un lien de connexion
+            </a>
             {% if member.status == "active" %}
                 <form method="post"
                       action="{% url 'gestion:member_status' slug=member.slug %}">

@@ -1,10 +1,12 @@
 """Views for the /gestion/ console.
 
 Phase 1 ships the dashboard. Phase 2 adds the member directory and
-edit/suspend/reactivate flows. Phase 3 will add magic-link reissue.
-Phase 4 will add the cooptation queue."""
+edit/suspend/reactivate flows. Phase 3 adds magic-link reissue. Phase 4
+will add the cooptation queue."""
 
 from __future__ import annotations
+
+from urllib.parse import quote
 
 from django.contrib.postgres.lookups import Unaccent
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
@@ -16,6 +18,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
 from cooptation.models import AdminApplication
+from cooptation.services import _build_password_set_url
 from members.models import AuditLog, Member
 
 from .decorators import staff_required
@@ -177,6 +180,64 @@ def member_username_view(request, slug):
         "gestion/member_username.html",
         {"member": member, "form": form},
     )
+
+
+@staff_required
+@require_http_methods(["GET", "POST"])
+def member_login_link_view(request, slug):
+    """Regenerate a 7-day allauth password-reset URL for the member.
+
+    GET shows a confirmation page (no link generated). POST issues a fresh
+    URL, writes an audit row, and renders a display page with the URL,
+    a "Copier" button, and a wa.me share button so the operator can DM
+    it through WhatsApp without leaving the platform."""
+    member = get_object_or_404(
+        Member.objects.select_related("user"),
+        slug=slug,
+    )
+
+    link_url: str | None = None
+    wa_me_url: str | None = None
+
+    if request.method == "POST":
+        link_url = _build_password_set_url(member.user)
+        wa_me_url = _build_wa_me_share_url(member, link_url)
+        AuditLog.objects.create(
+            actor=request.user,
+            action="gestion.login_link.reissued",
+            target_type="members.Member",
+            target_id=str(member.pk),
+            metadata={
+                "target_username": member.user.username,
+                "member_full_name": member.full_name,
+            },
+        )
+
+    return render(
+        request,
+        "gestion/member_login_link.html",
+        {
+            "member": member,
+            "link_url": link_url,
+            "wa_me_url": wa_me_url,
+        },
+    )
+
+
+def _build_wa_me_share_url(member, link_url: str) -> str:
+    """Build a wa.me deep link with the magic-link reissue Template 3
+    (docs/runbooks/onboarding.md:114-121) pre-filled in the WhatsApp
+    composer. The operator clicks → WhatsApp opens with the message
+    drafted to the member's number → press Send."""
+    message = (
+        f"Salut {member.first_name},\n"
+        "Voici ton nouveau lien de connexion (valable 7 jours) :\n"
+        "\n"
+        f"{link_url}\n"
+        "\n"
+        "Choisis ton nouveau mot de passe en suivant le lien."
+    )
+    return f"https://wa.me/{member.user.username}?text={quote(message)}"
 
 
 def _redirect_to_detail(member, flash: str, changed: list | None = None):
