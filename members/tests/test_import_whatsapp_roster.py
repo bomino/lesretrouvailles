@@ -231,6 +231,30 @@ def test_idempotent_skips_existing_username(fake_clients, tmp_path, settings):
 
 
 @pytest.mark.django_db
+def test_import_sets_member_whatsapp_to_digits_only_phone(fake_clients, tmp_path, settings):
+    """The roster import must populate Member.whatsapp explicitly (not just
+    rely on User.username happening to equal the phone). This decouples
+    login identity from messaging identity for everything downstream."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from members.models import Member
+
+    csv_path = _write_csv(
+        tmp_path / "roster.csv",
+        [_row(whatsapp="+22790000314", email="m@example.test")],
+    )
+    out = StringIO()
+    call_command(
+        "import_whatsapp_roster",
+        str(csv_path),
+        "--magic-links-out",
+        str(tmp_path / "magic_links.csv"),
+        stdout=out,
+    )
+    member = Member.objects.get(user__username="22790000314")
+    assert member.whatsapp == "22790000314"
+
+
+@pytest.mark.django_db
 def test_imports_row_with_empty_classes(fake_clients, tmp_path, settings):
     """Many WhatsApp-roster alumni don't recall their grade-by-grade history.
     A row with classes='' must validate and import (Member.classes=[])."""

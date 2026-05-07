@@ -31,6 +31,12 @@ GRADE_CHOICES = [
 # "6eAB" (two section letters), "6 a" (whitespace).
 VALID_CLASS_PATTERN = re.compile(r"^[3-6](e[A-Za-z]?|[A-Za-z])$")
 
+# WhatsApp number format: E.164 digits-only, 8-15 chars (no +, no spaces).
+# Stored separately from User.username because username serves login (and may
+# be an email for coopted members or an admin handle for super-admin) while
+# whatsapp is the messaging channel for wa.me deep links and operator DMs.
+VALID_WHATSAPP_PATTERN = re.compile(r"^\d{8,15}$")
+
 STATUS_CHOICES = [
     ("active", "Actif"),
     ("suspended", "Suspendu"),
@@ -76,6 +82,13 @@ class Member(models.Model):
     country = models.CharField(max_length=80, default="Niger")
     profession = models.CharField(max_length=120, blank=True)
 
+    # Digits-only WhatsApp number (E.164 without +). Distinct from
+    # User.username — username is the login identity, whatsapp is the
+    # messaging channel. Optional because the platform can have admin
+    # accounts (super-admin, manual creates) that aren't reachable on
+    # WhatsApp at all.
+    whatsapp = models.CharField(max_length=15, blank=True)
+
     photo_public_id = models.CharField(max_length=200, blank=True)
 
     show_email = models.BooleanField(default=True)
@@ -118,6 +131,15 @@ class Member(models.Model):
             raise ValidationError({"years_attended": "Années hors plage 1980-1985."})
         if any(not VALID_CLASS_PATTERN.match(c) for c in self.classes):
             raise ValidationError({"classes": "Classe inconnue."})
+        if self.whatsapp and not VALID_WHATSAPP_PATTERN.fullmatch(self.whatsapp):
+            raise ValidationError(
+                {
+                    "whatsapp": (
+                        "Format invalide : chiffres uniquement, "
+                        "entre 8 et 15 chiffres (sans espaces, sans « + »)."
+                    ),
+                }
+            )
 
 
 class NotificationPreference(models.Model):

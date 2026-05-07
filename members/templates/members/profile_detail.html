@@ -34,12 +34,23 @@
                         {% endfor %}
                     </dd>
                 </div>
-                {% if target.show_email %}
+                {% if target.show_email and target.user.email %}
                     <div class="sm:col-span-2">
                         <dt class="text-xs font-medium uppercase tracking-wider text-secondary">{% trans "Email" %}</dt>
                         <dd class="mt-1 text-base">
                             <a class="text-tertiary hover:underline"
                                href="mailto:{{ target.user.email }}">{{ target.user.email }}</a>
+                        </dd>
+                    </div>
+                {% endif %}
+                {% if target.show_whatsapp and target.whatsapp %}
+                    <div class="sm:col-span-2">
+                        <dt class="text-xs font-medium uppercase tracking-wider text-secondary">WhatsApp</dt>
+                        <dd class="mt-1 text-base">
+                            <a class="text-tertiary hover:underline"
+                               href="https://wa.me/{{ target.whatsapp }}"
+                               target="_blank"
+                               rel="noopener noreferrer">+{{ target.whatsapp }}</a>
                         </dd>
                     </div>
                 {% endif %}

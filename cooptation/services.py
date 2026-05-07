@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import timedelta
 
 from allauth.account.forms import default_token_generator as allauth_token_generator
@@ -10,10 +11,15 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
-from members.models import Member
+from members.models import VALID_WHATSAPP_PATTERN, Member
 
 from . import emails
 from .models import AdminApplication
+
+
+def _digits_only(phone: str) -> str:
+    """Normalize a free-form phone string to digits only (no +, no spaces)."""
+    return re.sub(r"\D", "", phone or "")
 
 
 @transaction.atomic
@@ -37,6 +43,14 @@ def approve_application(application: AdminApplication, *, reviewed_by) -> tuple:
     first_name = parts[0] if parts else ""
     last_name = parts[1] if len(parts) > 1 else ""
 
+    # Coopted members come in with a whatsapp number on the AdminApplication
+    # (free-form, possibly with +/spaces). Strip to digits-only so wa.me deep
+    # links and operator DMs work without further normalization. Drop it if
+    # the result doesn't match the expected 8-15 digit shape.
+    candidate_whatsapp = _digits_only(application.whatsapp)
+    if not VALID_WHATSAPP_PATTERN.fullmatch(candidate_whatsapp):
+        candidate_whatsapp = ""
+
     member, _ = Member.objects.update_or_create(
         user=user,
         defaults={
@@ -48,6 +62,7 @@ def approve_application(application: AdminApplication, *, reviewed_by) -> tuple:
             "city": application.city,
             "country": application.country,
             "profession": application.profession,
+            "whatsapp": candidate_whatsapp,
             "status": "active",
         },
     )

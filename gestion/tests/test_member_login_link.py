@@ -162,11 +162,30 @@ def test_login_link_hides_wa_me_button_for_email_username(
     client, coadmin_user, make_user, make_member
 ):
     """Coopted members get username = email (cooptation/services.py:30).
-    Same defensive hiding."""
+    Same defensive hiding (when member.whatsapp is also empty)."""
     user = make_user(username="candidate@example.test")
     member = make_member(user=user)
+    member.whatsapp = ""  # explicit: no whatsapp set
+    member.save()
     client.force_login(coadmin_user)
     response = client.post(f"/gestion/membres/{member.slug}/lien/")
     body = response.content.decode("utf-8")
     assert "https://wa.me/" not in body
     assert "Copier" in body
+
+
+@pytest.mark.django_db
+def test_login_link_uses_member_whatsapp_when_set(client, coadmin_user, make_user, make_member):
+    """The wa.me URL targets Member.whatsapp when set, not User.username.
+    This is the path that makes the share button work for coopted members
+    and manually-created admins who provided a phone number separately."""
+    user = make_user(username="candidate@example.test")  # email, NOT digits
+    member = make_member(user=user)
+    member.whatsapp = "22790000888"  # explicit phone
+    member.save()
+    client.force_login(coadmin_user)
+    response = client.post(f"/gestion/membres/{member.slug}/lien/")
+    body = response.content.decode("utf-8")
+    assert "https://wa.me/22790000888" in body
+    # The email-as-username should NOT appear in the wa.me URL
+    assert "wa.me/candidate" not in body

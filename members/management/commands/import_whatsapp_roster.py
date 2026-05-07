@@ -264,6 +264,10 @@ class Command(BaseCommand):
             city=row["city"].strip(),
             country=row.get("country", "").strip() or "Niger",
             profession=row.get("profession", "").strip(),
+            # Persist the WhatsApp number on Member alongside (and equal to)
+            # User.username for imported members. Decoupling lets cooptation
+            # and manual creates set whatsapp without affecting login identity.
+            whatsapp=username,
             status="active",
         )
         return user, member

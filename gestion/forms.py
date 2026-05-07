@@ -48,6 +48,7 @@ class MemberAdminEditForm(forms.ModelForm):
             "city",
             "country",
             "profession",
+            "whatsapp",
         ]
 
     def __init__(self, *args, **kwargs):

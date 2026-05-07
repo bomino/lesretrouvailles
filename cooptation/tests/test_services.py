@@ -47,6 +47,40 @@ def test_approve_creates_user_and_member(make_application, staff_user, settings)
 
 
 @pytest.mark.django_db
+def test_approve_copies_whatsapp_digits_to_member(make_application, staff_user, settings):
+    """A coopted candidate's AdminApplication.whatsapp (free-form, may have
+    + and spaces) is normalized to digits-only and copied into
+    Member.whatsapp at approval time."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from cooptation.services import approve_application
+
+    app = make_application(
+        full_name="Awa Diallo",
+        email="awa@example.test",
+        whatsapp="+227 90 00 01 23",  # free-form, must be normalized
+    )
+    _, member = approve_application(app, reviewed_by=staff_user)
+    assert member.whatsapp == "22790000123"
+
+
+@pytest.mark.django_db
+def test_approve_drops_unrecognizable_whatsapp(make_application, staff_user, settings):
+    """If the whatsapp field on the application is missing or doesn't look
+    like a phone number (e.g., the candidate left it blank), Member.whatsapp
+    stays empty rather than storing garbage."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from cooptation.services import approve_application
+
+    app = make_application(
+        full_name="Awa Diallo",
+        email="awa2@example.test",
+        whatsapp="",  # blank
+    )
+    _, member = approve_application(app, reviewed_by=staff_user)
+    assert member.whatsapp == ""
+
+
+@pytest.mark.django_db
 def test_approve_handles_full_name_with_one_token(make_application, staff_user):
     """A candidate who put only a single name in full_name still gets a Member;
     last_name becomes empty string rather than crashing."""
