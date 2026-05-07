@@ -28,4 +28,24 @@ urlpatterns = [
         views.member_login_link_view,
         name="member_login_link",
     ),
+    path(
+        "cooptations/",
+        views.application_list_view,
+        name="application_list",
+    ),
+    path(
+        "cooptations/<int:pk>/",
+        views.application_detail_view,
+        name="application_detail",
+    ),
+    path(
+        "cooptations/<int:pk>/approuver/",
+        views.application_approve_view,
+        name="application_approve",
+    ),
+    path(
+        "cooptations/<int:pk>/rejeter/",
+        views.application_reject_view,
+        name="application_reject",
+    ),
 ]
