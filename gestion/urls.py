@@ -6,4 +6,16 @@ app_name = "gestion"
 
 urlpatterns = [
     path("", views.dashboard_view, name="dashboard"),
+    path("membres/", views.member_list_view, name="member_list"),
+    path("membres/<uuid:slug>/", views.member_detail_view, name="member_detail"),
+    path(
+        "membres/<uuid:slug>/modifier/",
+        views.member_edit_view,
+        name="member_edit",
+    ),
+    path(
+        "membres/<uuid:slug>/statut/",
+        views.member_status_view,
+        name="member_status",
+    ),
 ]

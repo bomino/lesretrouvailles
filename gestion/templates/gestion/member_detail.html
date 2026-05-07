@@ -1,0 +1,139 @@
+{% extends "gestion/base.html" %}
+{% block gestion_title %}{{ member.full_name }}{% endblock %}
+{% block gestion_heading %}{{ member.full_name }}{% endblock %}
+{% block gestion_content %}
+    {% if request.GET.flash == "updated" %}
+        <div class="mb-4 rounded-lg border border-whatsapp-green/30 bg-whatsapp-green/10 px-4 py-3 text-sm text-whatsapp-green">
+            Profil mis à jour
+            {% if request.GET.changed %}({{ request.GET.changed }}){% endif %}
+            .
+        </div>
+    {% elif request.GET.flash == "status_active" %}
+        <div class="mb-4 rounded-lg border border-whatsapp-green/30 bg-whatsapp-green/10 px-4 py-3 text-sm text-whatsapp-green">
+            Compte réactivé.
+        </div>
+    {% elif request.GET.flash == "status_suspended" %}
+        <div class="mb-4 rounded-lg border border-ceremonial-gold/40 bg-ceremonial-gold/10 px-4 py-3 text-sm text-on-ceremonial-gold">
+            Compte suspendu.
+        </div>
+    {% endif %}
+    <section class="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <article class="md:col-span-2 rounded-2xl border border-secondary/15 bg-surface p-5 shadow-sm">
+            <h2 class="font-display text-lg font-semibold tracking-tight">Identité</h2>
+            <dl class="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+                <div>
+                    <dt class="text-xs uppercase tracking-[0.18em] text-secondary">Prénom</dt>
+                    <dd class="mt-0.5">
+                        {{ member.first_name }}
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-xs uppercase tracking-[0.18em] text-secondary">Nom</dt>
+                    <dd class="mt-0.5">
+                        {{ member.last_name }}
+                    </dd>
+                </div>
+                {% if member.nickname %}
+                    <div>
+                        <dt class="text-xs uppercase tracking-[0.18em] text-secondary">Surnom</dt>
+                        <dd class="mt-0.5">
+                            {{ member.nickname }}
+                        </dd>
+                    </div>
+                {% endif %}
+                <div>
+                    <dt class="text-xs uppercase tracking-[0.18em] text-secondary">Années au CEG</dt>
+                    <dd class="mt-0.5" data-field="years_attended">
+                        {{ member.years_attended|join:", " }}
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-xs uppercase tracking-[0.18em] text-secondary">Classes</dt>
+                    <dd class="mt-0.5" data-field="classes">
+                        {{ member.classes|join:", "|default:"—" }}
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-xs uppercase tracking-[0.18em] text-secondary">Ville</dt>
+                    <dd class="mt-0.5">
+                        {{ member.city }}
+                        {% if member.country %}({{ member.country }}){% endif %}
+                    </dd>
+                </div>
+                {% if member.profession %}
+                    <div>
+                        <dt class="text-xs uppercase tracking-[0.18em] text-secondary">Profession</dt>
+                        <dd class="mt-0.5">
+                            {{ member.profession }}
+                        </dd>
+                    </div>
+                {% endif %}
+            </dl>
+            <h3 class="mt-6 font-display text-base font-semibold tracking-tight">Compte</h3>
+            <dl class="mt-2 grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+                <div>
+                    <dt class="text-xs uppercase tracking-[0.18em] text-secondary">Identifiant (WhatsApp)</dt>
+                    <dd class="mt-0.5" data-field="username">
+                        @{{ member.user.username }}
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-xs uppercase tracking-[0.18em] text-secondary">Email</dt>
+                    <dd class="mt-0.5" data-field="email">
+                        {{ member.user.email|default:"—" }}
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-xs uppercase tracking-[0.18em] text-secondary">Statut</dt>
+                    <dd class="mt-0.5" data-field="status">
+                        {% if member.status == "active" %}
+                            Actif
+                        {% elif member.status == "suspended" %}
+                            Suspendu
+                        {% else %}
+                            {{ member.status }}
+                        {% endif %}
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-xs uppercase tracking-[0.18em] text-secondary">Dernière connexion</dt>
+                    <dd class="mt-0.5">
+                        {{ member.user.last_login|default:"—" }}
+                    </dd>
+                </div>
+            </dl>
+        </article>
+        <aside class="space-y-3">
+            <a href="{% url 'gestion:member_edit' slug=member.slug %}"
+               class="block rounded-lg bg-tertiary px-4 py-2 min-h-tap text-center text-sm font-medium text-on-tertiary shadow-sm hover:opacity-95 transition">
+                Modifier le profil
+            </a>
+            {% if member.status == "active" %}
+                <form method="post"
+                      action="{% url 'gestion:member_status' slug=member.slug %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="target_status" value="suspended">
+                    <button type="submit"
+                            class="w-full rounded-lg border border-ceremonial-gold/50 px-4 py-2 min-h-tap text-sm font-medium text-on-ceremonial-gold hover:bg-ceremonial-gold/10 transition"
+                            onclick="return confirm('Suspendre {{ member.full_name }} ? Le membre ne pourra plus se connecter jusqu’à réactivation.');">
+                        Suspendre le compte
+                    </button>
+                </form>
+            {% elif member.status == "suspended" %}
+                <form method="post"
+                      action="{% url 'gestion:member_status' slug=member.slug %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="target_status" value="active">
+                    <button type="submit"
+                            class="w-full rounded-lg border border-whatsapp-green/40 px-4 py-2 min-h-tap text-sm font-medium text-whatsapp-green hover:bg-whatsapp-green/10 transition">
+                        Réactiver le compte
+                    </button>
+                </form>
+            {% endif %}
+            <a href="{% url 'gestion:member_list' %}"
+               class="block rounded-lg border border-secondary/20 px-4 py-2 min-h-tap text-center text-sm hover:border-tertiary/40 hover:text-tertiary transition">
+                ← Retour à la liste
+            </a>
+        </aside>
+    </section>
+{% endblock %}

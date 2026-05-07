@@ -1,0 +1,87 @@
+{% extends "gestion/base.html" %}
+{% block gestion_title %}Modifier — {{ member.full_name }}{% endblock %}
+{% block gestion_heading %}Modifier {{ member.full_name }}{% endblock %}
+{% block gestion_content %}
+    <form method="post" class="space-y-6 max-w-2xl" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+            <div class="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+        <fieldset class="space-y-4">
+            <legend class="font-display text-base font-semibold tracking-tight">Identité</legend>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <label class="block">
+                    <span class="block text-sm font-medium">Prénom</span>
+                    {{ form.first_name }}
+                    {% if form.first_name.errors %}
+                        <p class="mt-1 text-xs text-red-700">{{ form.first_name.errors|join:" " }}</p>
+                    {% endif %}
+                </label>
+                <label class="block">
+                    <span class="block text-sm font-medium">Nom</span>
+                    {{ form.last_name }}
+                    {% if form.last_name.errors %}<p class="mt-1 text-xs text-red-700">{{ form.last_name.errors|join:" " }}</p>{% endif %}
+                </label>
+            </div>
+            <label class="block">
+                <span class="block text-sm font-medium">Surnom (optionnel)</span>
+                {{ form.nickname }}
+            </label>
+            <label class="block">
+                <span class="block text-sm font-medium">Années au CEG</span>
+                {{ form.years_attended }}
+                <span class="mt-1 block text-xs text-secondary">{{ form.years_attended.help_text }}</span>
+                {% if form.years_attended.errors %}
+                    <p class="mt-1 text-xs text-red-700">{{ form.years_attended.errors|join:" " }}</p>
+                {% endif %}
+            </label>
+            <label class="block">
+                <span class="block text-sm font-medium">Classes</span>
+                {{ form.classes }}
+                <span class="mt-1 block text-xs text-secondary">{{ form.classes.help_text }}</span>
+                {% if form.classes.errors %}<p class="mt-1 text-xs text-red-700">{{ form.classes.errors|join:" " }}</p>{% endif %}
+            </label>
+        </fieldset>
+        <fieldset class="space-y-4">
+            <legend class="font-display text-base font-semibold tracking-tight">Localisation</legend>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <label class="block">
+                    <span class="block text-sm font-medium">Ville</span>
+                    {{ form.city }}
+                </label>
+                <label class="block">
+                    <span class="block text-sm font-medium">Pays</span>
+                    {{ form.country }}
+                </label>
+            </div>
+            <label class="block">
+                <span class="block text-sm font-medium">Profession</span>
+                {{ form.profession }}
+            </label>
+        </fieldset>
+        <fieldset class="space-y-4">
+            <legend class="font-display text-base font-semibold tracking-tight">Compte</legend>
+            <label class="block">
+                <span class="block text-sm font-medium">Email</span>
+                {{ form.email }}
+                <span class="mt-1 block text-xs text-secondary">{{ form.email.help_text }}</span>
+                {% if form.email.errors %}<p class="mt-1 text-xs text-red-700">{{ form.email.errors|join:" " }}</p>{% endif %}
+            </label>
+            <p class="text-xs text-secondary">
+                Pour changer le numéro WhatsApp (identifiant), contactez Bomino — c'est une opération qui invalide les liens de connexion existants.
+            </p>
+        </fieldset>
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
+            <a href="{% url 'gestion:member_detail' slug=member.slug %}"
+               class="rounded-lg border border-secondary/20 px-4 py-2 min-h-tap text-sm text-center hover:border-tertiary/40 hover:text-tertiary transition">
+                Annuler
+            </a>
+            <button type="submit"
+                    class="rounded-lg bg-tertiary px-4 py-2 min-h-tap text-sm font-medium text-on-tertiary shadow-sm hover:opacity-95 transition">
+                Enregistrer
+            </button>
+        </div>
+    </form>
+{% endblock %}

@@ -284,6 +284,13 @@ class AuditLog(models.Model):
         ("memoriam.entry.archived", "Fiche In Memoriam archivée"),
         ("memoriam.nomination.created", "Nomination In Memoriam soumise"),
         ("rgpd.member.purged", "Membre purgé (RGPD)"),
+        ("gestion.member.edited", "Profil membre modifié (gestion)"),
+        ("gestion.member.suspended", "Compte suspendu (gestion)"),
+        ("gestion.member.reactivated", "Compte réactivé (gestion)"),
+        ("gestion.member.username_changed", "Identifiant WhatsApp modifié (gestion)"),
+        ("gestion.login_link.reissued", "Lien de connexion régénéré (gestion)"),
+        ("gestion.application.approved", "Candidature approuvée (gestion)"),
+        ("gestion.application.rejected", "Candidature rejetée (gestion)"),
     ]
 
     actor = models.ForeignKey(
