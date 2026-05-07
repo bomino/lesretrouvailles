@@ -58,7 +58,7 @@ C'est la méthode utilisée pour intégrer les ~200 membres du groupe WhatsApp e
 
 En résumé :
 
-1. Préparez un fichier `roster.csv` avec une ligne par membre (colonnes : prénom, nom, surnom, WhatsApp, email optionnel, années, classes, ville, pays, profession, photo optionnelle).
+1. Préparez un fichier `roster.csv` avec une ligne par membre (colonnes : prénom, nom, surnom, WhatsApp, email optionnel, années, classes optionnel, ville, pays, profession, photo optionnelle).
 2. (Optionnel) Mettez les photos dans un dossier `roster_photos/`.
 3. **Aperçu sans changement** :
    ```bash
@@ -84,7 +84,7 @@ Quelqu'un d'extérieur au groupe WhatsApp découvre la plateforme et veut s'insc
 Pour approuver :
 
 1. Cliquez sur la candidature.
-2. Vérifiez les informations (nom, années, classes, ville, parrainages).
+2. Vérifiez les informations (nom, années, classes si renseignées, ville, parrainages).
 3. Dans la liste d'actions en haut : choisir **« Approve and create member »** → confirmer.
 4. Le système crée automatiquement le `User` + `Member` + envoie l'email de définition de mot de passe.
 
@@ -107,7 +107,7 @@ Pour ajouter un membre directement sans passer par la cooptation (par exemple : 
 5. Renseignez l'email si applicable.
 6. Sauvegardez.
 7. Allez à **Members → Members → Add member**, lié à ce User.
-8. Renseignez : nom, prénom, années, classes, ville, etc.
+8. Renseignez : nom, prénom, années, ville, etc. (classes facultatives — peut rester vide).
 9. Sauvegardez.
 
 > ⚠️ Cette méthode ne crée **pas** automatiquement la `EmailAddress` Allauth nécessaire pour la connexion par email. Préférez l'import en masse ou la cooptation publique chaque fois que possible.
@@ -226,7 +226,7 @@ Les fiches In Memoriam honorent des camarades décédés. La procédure est **pl
 2. **Contacter la famille** (par téléphone, WhatsApp ou en personne — pas par email impersonnel) en utilisant l'indication de contact donnée par le membre proposant. Expliquez le projet, écoutez leurs souhaits, demandez leur accord pour la publication.
 3. **Documenter l'accord** : nom de la personne qui a donné l'accord, date, canal (email / WhatsApp / téléphone / en personne).
 4. **Créer la fiche** : allez à **Memoriam → In memoriam entries → Add**.
-   - **Nom complet**, **surnom** (optionnel), **années au CEG**, **classes**
+   - **Nom complet**, **surnom** (optionnel), **années au CEG**, **classes** (optionnel)
    - **Année de naissance** et **année de décès** (optionnelles mais recommandées)
    - **Photo** (optionnelle)
    - **Hommage** (markdown supporté — quelques paragraphes, ton respectueux et personnel)
