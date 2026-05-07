@@ -72,18 +72,16 @@ Manual checks the audit can't do:
 
 ## Step 2 — Roster collection
 
-Collect the data needed for the CSV import from the WhatsApp group. Two approaches:
+Collect the data from the WhatsApp group. **Full procedure in a dedicated runbook:** [`roster-collection.md`](roster-collection.md).
 
-**Google Form** (recommended for ~200 members):
-- Fields: prénom, nom, surnom (optionnel), numéro WhatsApp, email (optionnel), années au CEG1 (1980-1985, sélection multiple), classes fréquentées (6e, 6eA, 5e, 5eA, 4e, 4eA, 3e, 3eA…), ville actuelle, pays, profession (optionnel)
-- Share the form link in the WhatsApp group with a 1-week deadline
-- Members without internet access for forms can DM you their info; you fill in the form on their behalf
+In short:
 
-**WhatsApp poll + DM follow-up**:
-- Less efficient but works for non-form-savvy members
-- Post a poll asking who wants to join; DM each yes-vote for their info
+- Recommended cadence: **2-week window** with a Day 7 reminder + Day 12 DM nudge to non-responders.
+- Recommended channel: a **Google Form** (template + exact French questions in `roster-collection.md` §2.1) shared via the WhatsApp group (announcement template in §2.2).
+- Members without Google accounts or who hit any friction: have them **DM you the info** instead — you transcribe it manually.
+- At the end of the 2-week window, close the form and export the responses to CSV. Move to Step 3.
 
-Either way: dedupe + sanity-check the responses manually before turning them into a CSV.
+For the current launch (May 2026): announcement posted ~2026-05-07; deadline 2026-05-21.
 
 ---
 
