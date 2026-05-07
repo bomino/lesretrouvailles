@@ -117,7 +117,7 @@
                            class="hidden md:inline-flex items-center gap-2 rounded-full bg-whatsapp-green px-4 py-2 min-h-tap text-sm font-medium text-on-whatsapp-green shadow-sm hover:opacity-95 transition">
                             <span aria-hidden="true">💬</span>
                             <span class="hidden lg:inline">{% trans "Rejoindre le groupe WhatsApp" %}</span>
-                            <span class="lg:inline">{% trans "WhatsApp" %}</span>
+                            <span class="lg:hidden">{% trans "WhatsApp" %}</span>
                         </a>
                         {% if request.user.is_authenticated %}
                             <form method="post"
