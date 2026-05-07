@@ -1,0 +1,79 @@
+{% extends "gestion/base.html" %}
+{% block gestion_title %}Lien de connexion — {{ member.full_name }}{% endblock %}
+{% block gestion_heading %}Régénérer un lien de connexion{% endblock %}
+{% block gestion_content %}
+    <section class="max-w-2xl space-y-4">
+        <p class="text-sm">
+            <strong>{{ member.full_name }}</strong> · @{{ member.user.username }}
+        </p>
+        {% if link_url %}
+            <div class="rounded-2xl border border-whatsapp-green/40 bg-whatsapp-green/10 p-5 shadow-sm">
+                <p class="text-sm font-semibold text-whatsapp-green">Lien généré (valable 7 jours)</p>
+                <p class="mt-3 break-all rounded-lg bg-white px-3 py-2 text-sm font-mono"
+                   id="magic-link-url"
+                   data-copy-url="{{ link_url }}">{{ link_url }}</p>
+                <div class="mt-4 flex flex-col gap-3 md:flex-row">
+                    <button type="button"
+                            id="copy-button"
+                            class="rounded-lg bg-tertiary px-4 py-2 min-h-tap text-sm font-medium text-on-tertiary shadow-sm hover:opacity-95 transition">
+                        Copier
+                    </button>
+                    <a href="{{ wa_me_url }}"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="rounded-lg bg-whatsapp-green px-4 py-2 min-h-tap text-center text-sm font-medium text-on-whatsapp-green shadow-sm hover:opacity-95 transition">
+                        Envoyer par WhatsApp
+                    </a>
+                </div>
+                <p class="mt-3 text-xs text-secondary">
+                    Le bouton « Envoyer par WhatsApp » ouvre WhatsApp avec un message déjà rédigé à destination du membre. Vérifiez le message puis cliquez sur Envoyer.
+                </p>
+            </div>
+            <script nonce="">
+                (function () {
+                    var btn = document.getElementById('copy-button');
+                    var src = document.getElementById('magic-link-url');
+                    if (!btn || !src) return;
+                    btn.addEventListener('click', function () {
+                        var url = src.getAttribute('data-copy-url') || src.textContent.trim();
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(url).then(function () {
+                                btn.textContent = 'Copié ✓';
+                                setTimeout(function () { btn.textContent = 'Copier'; }, 2000);
+                            });
+                        } else {
+                            // Fallback for older browsers
+                            var range = document.createRange();
+                            range.selectNode(src);
+                            window.getSelection().removeAllRanges();
+                            window.getSelection().addRange(range);
+                            try { document.execCommand('copy'); btn.textContent = 'Copié ✓'; } catch (_) {}
+                        }
+                    });
+                })();
+            </script>
+        {% else %}
+            <div class="rounded-lg border border-ceremonial-gold/40 bg-ceremonial-gold/10 px-4 py-3 text-sm text-on-ceremonial-gold">
+                <p class="font-medium">À savoir avant de générer</p>
+                <ul class="mt-2 list-disc pl-5 space-y-1">
+                    <li>
+                        Le nouveau lien est valable <strong>7 jours</strong>.
+                    </li>
+                    <li>L'ancien lien (s'il existait) reste valide jusqu'à expiration.</li>
+                    <li>À utiliser quand le membre a perdu son lien ou ne se souvient plus de son mot de passe.</li>
+                </ul>
+            </div>
+            <form method="post" class="space-y-4">
+                {% csrf_token %}
+                <button type="submit"
+                        class="w-full rounded-lg bg-tertiary px-4 py-2 min-h-tap text-sm font-medium text-on-tertiary shadow-sm hover:opacity-95 transition md:w-auto">
+                    Générer un nouveau lien
+                </button>
+            </form>
+        {% endif %}
+        <a href="{% url 'gestion:member_detail' slug=member.slug %}"
+           class="inline-block rounded-lg border border-secondary/20 px-4 py-2 min-h-tap text-sm hover:border-tertiary/40 hover:text-tertiary transition">
+            ← Retour au profil
+        </a>
+    </section>
+{% endblock %}
