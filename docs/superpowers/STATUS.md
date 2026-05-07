@@ -450,7 +450,8 @@ Small fixes and UX improvements shipped after the milestone tag, in chronologica
 | 2026-05-05 | `docs/gitattributes` | `9fdb31f` | Extend `.gitattributes` to all common text + binary types. |
 | 2026-05-05 | `feat/favicon` | `1bdce6d` | Browser tab + Google search + iOS + Android PWA icons. Generated from `static/img/logo.png` via `scripts/generate_favicons.py`. 7 PNG sizes (16/32/48/96/180/192/512) + multi-size `favicon.ico`. Manifest at `static/manifest.webmanifest` for Android home-screen install. |
 | 2026-05-05 | `docs/dark-mode-deferred` | `a0c3fe8` | Decision logged: dark mode deferred to Phase 2 (see backlog below). No code change. |
-| 2026-05-07 | `docs/roster-collection-runbook` | _this commit_ | New `docs/runbooks/roster-collection.md` capturing the operator-facing procedure for Step 2 of the launch (Google Form schema, WhatsApp announcement / reminder / DM-followup templates, edge cases, 2-week cadence). Replaces the placeholder paragraph in `launch.md` Step 2. |
+| 2026-05-07 | `docs/roster-collection-runbook` | `eb24dfd` | New `docs/runbooks/roster-collection.md` capturing the operator-facing procedure for Step 2 of the launch (Google Form schema, WhatsApp announcement / reminder / DM-followup templates, edge cases, 2-week cadence). Replaces the placeholder paragraph in `launch.md` Step 2. |
+| 2026-05-07 | `docs/2026-05-launch-playbook` | _this commit_ | New `docs/launches/2026-05-soft-launch.md` — concrete dated playbook for the May 2026 launch. Calendar (Day 0 / 7 / 12 / 14 with actual dates), ready-to-paste WhatsApp messages with the deadline baked in, day-by-day tracking grid for the 2-week window. Companion to (not replacement for) the reusable runbook. |
 
 **Test suite trajectory:** 492 (v1.0.0) → 513 (class fix) → 516 (mobile nav) → 517 (cloudinary fix) → 519 (public-search-entry UX) → 521 (admin nav link) → 522 (favicon). New tests added with each fix; no regressions introduced.
 
