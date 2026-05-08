@@ -14,6 +14,13 @@
             <p class="mx-auto mt-3 max-w-xl text-sm text-secondary leading-relaxed md:text-base">
                 {% blocktrans count counter=all_count %}{{ counter }} question fréquente sur la plateforme. Pour les détails complets, consultez le guide membre.{% plural %}{{ counter }} questions fréquentes sur la plateforme. Pour les détails complets, consultez le guide membre.{% endblocktrans %}
             </p>
+            <p class="mt-5">
+                <a href="{% url 'member_guide' %}"
+                   class="inline-flex items-center gap-2 rounded-lg border border-tertiary/40 bg-tertiary/5 px-4 py-2 min-h-tap text-sm font-medium text-tertiary hover:bg-tertiary/10 transition">
+                    <span aria-hidden="true">📖</span>
+                    {% trans "Lire le guide complet" %}
+                </a>
+            </p>
         </header>
         {# Search bar — sticky on mobile so the user can refilter without scrolling back. #}
         <form method="get"
@@ -56,7 +63,8 @@
                       aria-hidden="true">🔎</span>
                 <p class="mt-4 text-base font-medium">{% trans "Aucune question ne correspond à votre recherche." %}</p>
                 <p class="mx-auto mt-2 max-w-md text-sm text-secondary">
-                    {% blocktrans %}Pour plus de détails, consultez le <a href="https://github.com/Bomino/lesretrouvailles/blob/main/docs/guides/guide_membre.md" class="underline hover:text-tertiary">guide membre complet</a>, ou écrivez à l'administrateur via WhatsApp.{% endblocktrans %}
+                    {% blocktrans %}Pour plus de détails, consultez le <a href="{% endblocktrans %}{% url 'member_guide' %}{% blocktrans %}"
+    class="underline hover:text-tertiary">guide membre complet</a>, ou écrivez à l'administrateur via WhatsApp.{% endblocktrans %}
                 </p>
                 <p class="mt-6">
                     <a href="{% url 'aide:index' %}"

@@ -225,6 +225,7 @@ LOGIN_REQUIRED_WHITELIST = [
     "/robots.txt",
     "/retrait/",
     "/aide/",
+    "/guide/",
 ]
 
 # P4a: feature flag gating the public ghost list (Nous recherchons aussi…).

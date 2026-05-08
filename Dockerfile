@@ -71,6 +71,7 @@ COPY gestion/ ./gestion/
 COPY aide/ ./aide/
 COPY templates/ ./templates/
 COPY locale/ ./locale/
+COPY docs/guides/ ./docs/guides/
 COPY manage.py ./
 
 # Copy compiled CSS from stage 1
