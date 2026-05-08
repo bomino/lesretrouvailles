@@ -75,11 +75,13 @@ FAQ_ENTRIES: list[FAQEntry] = [
         category="Compte",
         question="Comment me connecter au quotidien ?",
         answer_md=(
-            "Allez sur la **page de connexion**. Le champ d'identification accepte deux "
+            "Allez sur la **page de connexion**. Le champ *Identifiant* accepte trois "
             "formes :\n\n"
             "- 📧 **Votre email** (si vous en avez un) ;\n"
             "- 📱 **Votre numéro WhatsApp** en chiffres uniquement, sans le `+` et sans "
-            "espaces (ex. `22790000001`).\n\n"
+            "espaces (ex. `22790000001`) ;\n"
+            "- 🔑 **L'identifiant fourni par l'administrateur** si votre compte a été "
+            "créé manuellement.\n\n"
             "Le mot de passe est celui que vous avez choisi à l'activation."
         ),
         related_links=[("Se connecter", "/accounts/login/")],
