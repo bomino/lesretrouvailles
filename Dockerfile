@@ -18,6 +18,7 @@ COPY cooptation/ ./cooptation/
 COPY memoires/ ./memoires/
 COPY memoriam/ ./memoriam/
 COPY gestion/ ./gestion/
+COPY aide/ ./aide/
 
 RUN npx tailwindcss -i ./static/css/input.css -o ./static/css/output.css --minify
 
@@ -67,6 +68,7 @@ COPY cooptation/ ./cooptation/
 COPY memoires/ ./memoires/
 COPY memoriam/ ./memoriam/
 COPY gestion/ ./gestion/
+COPY aide/ ./aide/
 COPY templates/ ./templates/
 COPY locale/ ./locale/
 COPY manage.py ./
