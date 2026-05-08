@@ -15,6 +15,70 @@ If something here contradicts what you'd reach for by default, **trust this file
 
 ---
 
+## Commands
+
+The `Makefile` is the source of truth — these are the wrappers worth knowing:
+
+| Command | What it does |
+|---|---|
+| `make dev` | `python manage.py runserver` (http://localhost:8000) |
+| `make test` | Builds CSS, then runs full pytest suite (~3 min, ~650 tests post-Gestion-v1) |
+| `make migrate` | `python manage.py migrate` |
+| `make check` | `manage.py check` + `makemigrations --dry-run --check` (pre-push sanity) |
+| `make lint` | `ruff check .` + `ruff format --check .` (read-only) |
+| `make format` | `ruff check --fix .` + `ruff format .` (writes) |
+| `make css` / `make css-watch` | Tailwind one-shot / watch — only when classes changed; CSS is committed in `static/` |
+| `make db-up` / `make db-down` | Local Postgres via `docker-compose.yml` (alumni/alumni/alumni on :5432) |
+| `make seed` | `loaddata seed_members` |
+| `make docker-run` | Builds and runs the **staging-shaped** stack at :8000 (basic-auth `admin / compose-test-pw`); useful for reproducing prod-like middleware behavior |
+
+Single-test invocations:
+
+```bash
+pytest members/tests/test_models_member.py -v             # one file
+pytest members/tests/test_models_member.py::TestX -v      # one class
+pytest members/tests/test_models_member.py::TestX::test_y # one test
+pytest -k whatsapp                                        # by keyword
+pytest --lf                                               # last failed only
+```
+
+`pyproject.toml` sets `DJANGO_SETTINGS_MODULE = "alumni.settings.dev"` for pytest, so tests don't need `--ds=...`. `addopts = "-q"` is the default; pass `-v` to override.
+
+Custom `manage.py` commands worth knowing (see `members/management/commands/` and `cooptation/management/commands/`): `reissue_login_link`, `import_whatsapp_roster`, `rgpd_purge_member`, `audit_launch_readiness`, `process_cooptation_deadlines`, `backup_media`, `seed_questions`, `smoke_test_cooptation`, `create_member`.
+
+---
+
+## Settings modules
+
+`alumni/settings/` splits four ways. Picking the wrong one accidentally is a common mistake:
+
+| Module | Used by | Notes |
+|---|---|---|
+| `base.py` | (imported by all three below) | Shared INSTALLED_APPS, allauth config, etc. Don't run directly. |
+| `dev.py` | Local `runserver`, **pytest** | Loose CSRF, `EMAIL_BACKEND=console`, `DEBUG=True`. This is what `DJANGO_SETTINGS_MODULE` resolves to in `pyproject.toml`. |
+| `staging.py` | `docker-compose.yml`, `staging.villageretrouvailles.com` | Prod-shaped middleware (security headers, basic-auth gate). Useful for reproducing prod issues locally with `make docker-run`. |
+| `prod.py` | Railway service `lesretrouvailles` | Real Resend, real Cloudinary, real Postgres. |
+
+When a bug only appears in prod, the first thing to try locally is `make docker-run`, not `make dev` — staging settings catch a class of issues `dev.py` masks.
+
+---
+
+## Django app layout
+
+The project is one Django project (`alumni/`) hosting seven apps. Knowing what owns what saves a lot of grepping:
+
+- **`alumni/`** — Django project package. Settings, root URLs, **custom `AdminSite` (`GestionAdminSite`) that gates `/admin/` to superusers**, Cloudinary client (`cloudinary.py`), object-storage client (`storage.py`), `FakeResendBackend` (`email.py`), security/basic-auth middleware.
+- **`core/`** — Cross-cutting infrastructure: landing page, `/health` endpoint, sitemap, allauth adapter (`allauth_adapter.py`), `backup_media` weekly cron command.
+- **`members/`** — The big one. `Member`, `User` extensions, `PublicSearchEntry`, **`AuditLog`** (cross-domain event log), magic-link reissue, RGPD purge engine (`services.py::rgpd_purge_member`), WhatsApp roster import, member directory views, public ghost list. Also owns `audit_launch_readiness` for go-live checks.
+- **`cooptation/`** — Public signup flow (`/inscription/`), `AdminApplication`, `CooptationRequest`, parrainage logic, daily deadlines cron (`process_cooptation_deadlines`).
+- **`gestion/`** — Co-admin console at `/gestion/` (Gestion v1, tag `v1.1.0-gestion-console`). **No models** — pure views/forms/decorators composed over the other apps. The `staff_required` decorator in `gestion/decorators.py` is the right gate for any new staff-tier view (redirects to `/accounts/login/`, 403s authenticated non-staff). See admin-tiers section below.
+- **`memoires/`** — Mur des souvenirs. `Memory` (curated photo gallery, admin-uploaded).
+- **`memoriam/`** — In Memoriam. `InMemoriamEntry` (tribute fiche) + `InMemoriamNomination` (member-submitted proposal).
+
+Models live in `members`, `cooptation`, `memoires`, `memoriam`. URL roots are wired from `alumni/urls.py`. `gestion` is a "console layer" — adding a feature there usually means adding a view that calls into another app's services, not adding a model.
+
+---
+
 ## Auth (load-bearing decision — read this before touching anything auth-adjacent)
 
 - **Username = WhatsApp digits-only**, e.g. `22790000001`. Email is optional.
