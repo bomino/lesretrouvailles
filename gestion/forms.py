@@ -36,6 +36,21 @@ class MemberAdminEditForm(forms.ModelForm):
         label="Email",
         help_text="Email du membre. Vide si le membre n'en a pas.",
     )
+    # Override the form field's max_length so a pasted "+227 90 00 01 23"
+    # (16 chars with spaces and +) reaches clean_whatsapp before being
+    # rejected by Django's CharField max-length validator. clean_whatsapp
+    # strips to digits and Member.clean enforces the canonical 8-15 digits.
+    whatsapp = forms.CharField(
+        max_length=30,
+        required=False,
+        label="Numéro WhatsApp",
+        help_text=(
+            "Numéro avec code pays, ex. <code>22790000123</code> (Niger) "
+            "ou <code>15551234567</code> (USA). Vous pouvez coller depuis "
+            "WhatsApp avec « + » et espaces — ils seront supprimés "
+            "automatiquement. Laissez vide si le membre n'a pas WhatsApp."
+        ),
+    )
 
     class Meta:
         model = Member
@@ -78,6 +93,16 @@ class MemberAdminEditForm(forms.ModelForm):
                 f"Classes invalides : {bad}. Format attendu : 6e, 6eA, 6a, etc."
             )
         return classes
+
+    def clean_whatsapp(self):
+        """Strip everything except digits so admins can paste 'WhatsApp-flavored'
+        formats like '+1 555-123-4567' or '+227 90 00 01 23'. The length check
+        (8-15 digits) still fires via Member.clean(), so a US local number
+        '5551234567' (10 digits, no country code) would pass length but
+        wa.me would 404 — operators are still responsible for including the
+        country code, just not for stripping punctuation."""
+        raw = self.cleaned_data.get("whatsapp") or ""
+        return re.sub(r"\D", "", raw)
 
     def save_with_audit(self, *, actor) -> list[str]:
         """Persist + write a single AuditLog row listing the changed fields.
@@ -126,8 +151,11 @@ class MemberUsernameChangeForm(forms.Form):
     )
     new_username = forms.CharField(
         label="Nouveau numéro WhatsApp",
-        max_length=15,
-        help_text="Chiffres uniquement, sans espaces ni « + ». Entre 8 et 15 chiffres.",
+        max_length=30,
+        help_text=(
+            "Numéro avec code pays, ex. 22790000123. Vous pouvez coller avec "
+            "« + », espaces ou tirets — ils seront supprimés automatiquement."
+        ),
     )
 
     def __init__(self, *args, member=None, **kwargs):
@@ -150,11 +178,16 @@ class MemberUsernameChangeForm(forms.Form):
         return value
 
     def clean_new_username(self):
-        value = (self.cleaned_data.get("new_username") or "").strip()
+        # Strip non-digits silently so operators can paste WhatsApp-flavored
+        # values like '+22790000123' or '+1 555-123-4567'. The 8-15 digit
+        # length check still fires below, so a US local number missing the
+        # country code is still rejected.
+        raw = self.cleaned_data.get("new_username") or ""
+        value = re.sub(r"\D", "", raw)
         if not USERNAME_DIGITS_RE.fullmatch(value):
             raise forms.ValidationError(
-                "Format invalide : chiffres uniquement, entre 8 et 15 chiffres "
-                "(sans espaces, sans « + »).",
+                "Format invalide : entre 8 et 15 chiffres après suppression "
+                "des espaces et symboles. N'oubliez pas le code pays.",
             )
         if value == self.member.user.username:
             raise forms.ValidationError(

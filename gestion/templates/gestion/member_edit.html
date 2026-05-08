@@ -72,9 +72,7 @@
             <label class="block">
                 <span class="block text-sm font-medium">Numéro WhatsApp</span>
                 {{ form.whatsapp }}
-                <span class="mt-1 block text-xs text-secondary">
-                    Chiffres uniquement, format international sans « + ». Ex. <code>22790000123</code>. Laissez vide si le membre n'a pas WhatsApp.
-                </span>
+                <span class="mt-1 block text-xs text-secondary">{{ form.whatsapp.help_text|safe }}</span>
                 {% if form.whatsapp.errors %}<p class="mt-1 text-xs text-red-700">{{ form.whatsapp.errors|join:" " }}</p>{% endif %}
             </label>
             <p class="text-xs text-secondary">

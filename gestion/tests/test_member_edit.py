@@ -172,6 +172,52 @@ def test_member_edit_rejects_bad_year(client, coadmin_user, make_member):
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        ("22790000123", "22790000123"),  # already canonical
+        ("+22790000123", "22790000123"),  # leading +
+        ("+227 90 00 01 23", "22790000123"),  # spaces
+        ("+1 555-123-4567", "15551234567"),  # USA punctuation
+        ("(555) 123-4567", "5551234567"),  # USA local — short, will hit length check
+    ],
+)
+def test_member_edit_strips_non_digits_from_whatsapp(
+    client, coadmin_user, make_member, raw, expected
+):
+    """The form normalizes WhatsApp input by stripping every non-digit so
+    operators can paste from WhatsApp's contact card without manual cleanup.
+    Length validation (8-15 digits) still fires via Member.clean()."""
+    from members.models import VALID_WHATSAPP_PATTERN
+
+    member = make_member()
+    client.force_login(coadmin_user)
+    response = client.post(
+        f"/gestion/membres/{member.slug}/modifier/",
+        {
+            "first_name": member.first_name,
+            "last_name": member.last_name,
+            "nickname": member.nickname,
+            "years_attended": ",".join(str(y) for y in member.years_attended),
+            "classes": ",".join(member.classes),
+            "city": member.city,
+            "country": member.country,
+            "profession": member.profession,
+            "email": member.user.email,
+            "whatsapp": raw,
+        },
+    )
+    member.refresh_from_db()
+    if VALID_WHATSAPP_PATTERN.fullmatch(expected):
+        assert response.status_code == 302  # saved
+        assert member.whatsapp == expected
+    else:
+        # Stripped value too short — Member.clean() rejects, form re-renders
+        assert response.status_code == 200
+        assert member.whatsapp != expected  # not saved
+
+
+@pytest.mark.django_db
 def test_member_edit_rejects_bad_class(client, coadmin_user, make_member):
     member = make_member()
     client.force_login(coadmin_user)

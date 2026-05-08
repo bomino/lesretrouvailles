@@ -98,16 +98,18 @@ def test_username_change_rejects_duplicate_new_username(
 @pytest.mark.parametrize(
     "bad_value",
     [
-        "abc",  # letters
-        "+22790000111",  # leading + (must be stripped before submission)
-        "227 90 00 01 11",  # spaces
-        "1234567",  # too short (<8)
+        "abc",  # letters strip to nothing
+        "1234567",  # too short (<8) after stripping
         "1" * 16,  # too long (>15)
     ],
 )
 def test_username_change_rejects_invalid_format(
     client, coadmin_user, make_user, make_member, bad_value
 ):
+    """Strings that are still invalid after non-digit stripping (empty, too
+    short, too long) keep being rejected. Whitespace and '+' decorators
+    are NOT in this list anymore — they're normalized by clean_new_username
+    and validated as their stripped form."""
     user = make_user(username="22790000111")
     member = make_member(user=user)
     client.force_login(coadmin_user)
@@ -121,6 +123,62 @@ def test_username_change_rejects_invalid_format(
     assert response.status_code == 200
     user.refresh_from_db()
     assert user.username == "22790000111"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "raw, normalized",
+    [
+        ("+22799887766", "22799887766"),  # leading +
+        ("+227 99 88 77 66", "22799887766"),  # spaces
+        ("+1 555-987-6543", "15559876543"),  # USA punctuation
+    ],
+)
+def test_username_change_strips_non_digits_then_saves(
+    client, coadmin_user, make_user, make_member, raw, normalized
+):
+    """Operators can paste WhatsApp-flavored values; non-digits get stripped
+    silently and the resulting digit string is what's saved."""
+    user = make_user(username="22790000111")
+    member = make_member(user=user)
+    client.force_login(coadmin_user)
+    response = client.post(
+        f"/gestion/membres/{member.slug}/identifiant/",
+        {
+            "confirm_current": "22790000111",
+            "new_username": raw,
+        },
+    )
+    assert response.status_code == 302
+    user.refresh_from_db()
+    assert user.username == normalized
+
+
+@pytest.mark.django_db
+def test_username_change_strips_then_rejects_too_short(
+    client, coadmin_user, make_user, make_member
+):
+    """A US local number without country code strips to 10 digits, which
+    is in the 8-15 range BUT fails the wa.me country-code expectation.
+    The form accepts 10 digits as 'valid format' here — the operator is
+    responsible for adding the country code. This test documents that
+    behavior so anyone reading later understands it's intentional."""
+    user = make_user(username="22790000111")
+    member = make_member(user=user)
+    client.force_login(coadmin_user)
+    response = client.post(
+        f"/gestion/membres/{member.slug}/identifiant/",
+        {
+            "confirm_current": "22790000111",
+            "new_username": "(555) 123-4567",  # 10 digits after strip
+        },
+    )
+    # 10 digits passes the 8-15 length check, so the form accepts it.
+    # If the operator forgot the country code, they'll find out only when
+    # the wa.me deeplink 404s for the wrong member.
+    assert response.status_code == 302
+    user.refresh_from_db()
+    assert user.username == "5551234567"
 
 
 @pytest.mark.django_db
