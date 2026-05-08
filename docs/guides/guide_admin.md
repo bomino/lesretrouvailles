@@ -404,9 +404,17 @@ C'est aussi le journal qui informera la décision « faut-il un chatbot ? » plu
 
 ### Un membre ne peut pas se connecter
 
-1. Vérifiez le **format de l'identifiant** : email **OU** numéro WhatsApp en chiffres seulement (sans `+`, sans espace).
-2. Vérifiez que le compte est actif : **Members → Members** → la ligne du membre → champ `Status` doit être `active`.
-3. Si vraiment oublié : générez un nouveau lien magique avec `reissue_login_link`.
+> 💡 **Avant tout, pointez le membre vers [`/aide/`](https://villageretrouvailles.com/aide/)** — la FAQ couvre l'activation, le mot de passe oublié, et le format de l'identifiant. Beaucoup de cas se résolvent là sans intervention admin.
+
+Si le membre persiste :
+
+1. Vérifiez le **format de l'identifiant**. Le champ *Identifiant* sur la page de connexion accepte **trois** formes :
+   - **Email** (membres ayant fourni un email à l'inscription) ;
+   - **Numéro WhatsApp** en chiffres seulement, sans `+` ni espaces (ex. `22790000001`) ;
+   - **Identifiant fourni par l'administrateur** (super-admin `bominomla`, comptes créés manuellement).
+2. Vérifiez que le compte est actif : **Members → Members** → la ligne du membre → champ `Status` doit être `active`. Un statut `suspended` ou `deleted` bloque la connexion.
+3. Vérifiez l'`username` exact dans la fiche — un membre peut avoir oublié qu'il utilise son email plutôt que son numéro, ou vice versa.
+4. Si vraiment oublié, générez un nouveau lien magique depuis `/gestion/` (voir §4) ou `reissue_login_link` en CLI.
 
 ### Erreur 500 sur une page admin
 
@@ -479,8 +487,19 @@ La page `/aide/` est alimentée par une liste Python typée, **`aide/faq.py`**. 
 
 1. Ouvrez `aide/faq.py` dans une branche dédiée (ex. `docs/aide-update`).
 2. Modifiez la liste `FAQ_ENTRIES`. Chaque entrée a `slug` (unique), `category` (parmi `CATEGORIES`), `question`, `answer_md` (markdown court), et `related_links` (liste de tuples `(label, url)`).
-3. Lancez `pytest aide/` — les tests structurels (`test_faq_content.py`) attrapent une catégorie inconnue, un slug en double, ou un champ vide.
+3. Lancez `pytest aide/` — les tests structurels (`test_faq_content.py`) attrapent une catégorie inconnue, un slug en double, ou un champ vide. Il y a aussi un test qui vérifie que toutes les URL internes des `related_links` se résolvent côté Django — un typo comme `/profil/edit/` (au lieu de `/profil/`) fait échouer la suite.
 4. Soumettez une pull request. Pas d'interface admin pour cette page : c'est volontaire (zéro surface d'attaque, contrôle de version par git).
+
+### Modifier le guide membre publique (`/guide/`)
+
+La page `/guide/` rend le markdown canonique **`docs/guides/guide_membre.md`** (le même fichier que vous lisez ici, version membre). Pour mettre à jour :
+
+1. Ouvrez `docs/guides/guide_membre.md` dans une branche dédiée.
+2. Modifiez le contenu en markdown standard. La syntaxe acceptée : titres `##`/`###`, listes, gras/italique, blockquotes (`>`), code inline backtick, liens. Les balises `<script>` ou attributs `onclick=` sont strippés par bleach au rendu — défense-en-profondeur.
+3. Lancez `pytest aide/tests/test_guide.py` — les tests structurels vérifient que le fichier est trouvé, qu'il a au moins 8 sections h2, et que les ancres du sommaire correspondent aux IDs du corps.
+4. Soumettez une pull request. Le déploiement régénère le HTML rendu au prochain redémarrage Railway. Pas de cache à invalider.
+
+> 💡 La page utilise l'extension `toc` du module markdown — chaque titre `##` ou `###` reçoit automatiquement un ID slug-ifié (ex. `## 5. Trouver vos camarades` → `id="5-trouver-vos-camarades"`). Vous pouvez partager des liens directs vers une section : `https://villageretrouvailles.com/guide/#5-trouver-vos-camarades`.
 
 ---
 
