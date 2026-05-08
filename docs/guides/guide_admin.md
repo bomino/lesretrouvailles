@@ -166,6 +166,7 @@ C'est le cas le plus fréquent en régime de croisière (rappelez-vous : ~80 % d
 4. Lisez l'encadré (lien valable 7 jours, l'ancien reste valide jusqu'à expiration), puis cliquez **« Générer un nouveau lien »**.
 5. Le lien apparaît dans une boîte verte. Deux options :
    - **« Envoyer par WhatsApp »** — ouvre WhatsApp Web/mobile avec un message déjà rédigé pour ce membre. Vérifiez et envoyez.
+     > 💡 Ce bouton n'apparaît que si le numéro WhatsApp du membre est renseigné (champ `Numéro WhatsApp` sur la fiche, format chiffres uniquement avec code pays). Pour les membres coopté·e·s ou les comptes admin créés manuellement, vous devrez peut-être d'abord remplir ce champ via **Modifier le profil**. Le bouton **« Copier »** marche dans tous les cas.
    - **« Copier »** — copie l'URL dans votre presse-papier ; collez-la où vous voulez (email, autre messagerie).
 6. Une entrée `gestion.login_link.reissued` est ajoutée au journal d'audit.
 
@@ -183,7 +184,20 @@ Copiez l'URL imprimée et envoyez-la au membre via WhatsApp DM avec le message d
 
 - **Le membre dit que le lien ne s'ouvre pas** → demandez-lui de le copier-coller dans son navigateur (Chrome / Safari) au lieu d'ouvrir directement depuis WhatsApp ; ça contourne d'éventuels problèmes de prévisualisation.
 - **Le numéro WhatsApp donné ne trouve pas de compte** → vérifiez le format : `/gestion/membres/` accepte la recherche partielle ; côté CLI, la commande attend les chiffres seulement, sans `+` ni espace ni tiret.
-- **Le membre a un nouveau numéro WhatsApp** → utilisez `/gestion/membres/<slug>/identifiant/` pour changer son identifiant (avec confirmation du numéro actuel) avant de regénérer un lien.
+- **Le membre a un nouveau numéro WhatsApp** → utilisez `/gestion/membres/<slug>/identifiant/` pour changer son identifiant (avec confirmation du numéro actuel), puis mettez à jour le champ `Numéro WhatsApp` sur sa fiche via **Modifier le profil**. Régénérez ensuite un lien si besoin.
+
+### Format du numéro WhatsApp (champ `Numéro WhatsApp` sur la fiche)
+
+Stocké en chiffres seulement, code pays inclus, **sans `+`**, sans espace, sans tiret. Le formulaire **supprime automatiquement** ces caractères au moment de la sauvegarde — vous pouvez coller depuis WhatsApp tel quel :
+
+| Vous tapez ou collez | Sauvegardé comme |
+|---|---|
+| `+227 90 00 01 23` | `22790000123` (Niger) |
+| `(555) 123-4567` ⚠️ | `5551234567` — accepté mais le partage WhatsApp 404era car il manque le code pays. Toujours inclure le code pays. |
+| `+1 555-123-4567` | `15551234567` (USA) |
+| `+33 6 12 34 56 78` | `33612345678` (France) |
+
+L'affichage côté membre rajoute le `+` pour la lisibilité (`+22790000123`).
 
 ---
 

@@ -77,7 +77,7 @@ Le mot de passe est celui que vous avez choisi à l'activation.
 
 ## 4. Compléter votre profil
 
-Une fois connecté·e, allez dans **« Mon profil »** depuis le menu (sur mobile, touchez le bouton ☰ en haut à droite).
+Une fois connecté·e, vous voyez votre prénom dans la barre de navigation (par exemple **« Bonjour, Idrissa »**). Cliquez sur votre prénom pour aller à votre profil. Sur mobile, touchez le bouton ☰ en haut à droite — votre prénom apparaît en haut du menu déroulant.
 
 ### Photo de profil
 
@@ -108,6 +108,8 @@ Vous décidez qui voit quoi :
 - **Afficher ma ville** — coché par défaut
 
 Si une case est décochée, l'information n'apparaît pas dans l'annuaire ni sur votre profil public — seuls les administrateurs y ont accès.
+
+> 💡 Quand **« Afficher mon numéro WhatsApp »** est coché, votre numéro apparaît sur votre profil public sous la forme `+22790000123` avec un lien cliquable qui ouvre WhatsApp pour démarrer une conversation. Si votre numéro n'est pas renseigné dans la base (cas des comptes sans WhatsApp), rien ne s'affiche, même case cochée. Pour le renseigner, contactez l'administrateur.
 
 ---
 

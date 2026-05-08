@@ -135,7 +135,7 @@ docs/
 
 Modèles principaux (Postgres) :
 
-- **`Member`** (members) — profil d'un ancien : prénom, nom, surnom, années au CEG (1980-1985), classes (6e, 6eA, 6a… ou aucune), ville, profession, photo Cloudinary.
+- **`Member`** (members) — profil d'un ancien : prénom, nom, surnom, années au CEG (1980-1985), classes (6e, 6eA, 6a… ou aucune), ville, profession, photo Cloudinary, **numéro WhatsApp** (digits-only avec code pays, distinct du `User.username` qui sert d'identifiant de connexion ; voir `Member.whatsapp` ajouté en migration 0017/0018 — décorrelé du username pour que le partage wa.me fonctionne aussi pour les membres coopté·e·s ou les admins manuels).
 - **`User`** (auth Django) — compte de connexion. Username = numéro WhatsApp digits-only ; email optionnel.
 - **`AdminApplication`** (cooptation) — candidature soumise via `/inscription/`, en attente de cooptation par 2 parrains.
 - **`CooptationRequest`** (cooptation) — une instance de parrainage demandé.
