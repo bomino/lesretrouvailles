@@ -5,18 +5,27 @@
 {% endblock %}
 {% block content %}
     <div class="mx-auto max-w-3xl">
-        {# Hero — centered icon + eyebrow + title + tagline (matches memoriam pattern). #}
-        <header class="mb-10 text-center">
-            <span class="inline-flex h-12 w-12 items-center justify-center rounded-full bg-tertiary/10 text-tertiary text-2xl"
-                  aria-hidden="true">❓</span>
-            <p class="mt-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-tertiary">{% trans "La communauté" %}</p>
-            <h1 class="mt-2 font-display text-3xl font-semibold tracking-tight md:text-4xl">{% trans "Aide" %}</h1>
-            <p class="mx-auto mt-3 max-w-xl text-sm text-secondary leading-relaxed md:text-base">
+        {% comment %}
+            Hero — centered, generous, with the platform's signature gold rule
+            below the title. Matches the memoriam-list / directory hero scale.
+        {% endcomment %}
+        <header class="relative mb-12 text-center md:mb-16">
+            <span class="inline-flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-tertiary/15 via-tertiary/5 to-ceremonial-gold/10 text-3xl shadow-sm ring-1 ring-tertiary/20"
+                  aria-hidden="true">
+                <span class="drop-shadow-sm">❓</span>
+            </span>
+            <p class="mt-5 text-[11px] font-semibold uppercase tracking-[0.22em] text-tertiary">{% trans "La communauté" %}</p>
+            <h1 class="mt-3 font-display text-4xl font-semibold tracking-tight md:text-5xl md:leading-[1.1]">
+                {% trans "Aide" %}
+            </h1>
+            <span class="mt-4 mx-auto block h-[3px] w-16 rounded-full bg-gradient-to-r from-ceremonial-gold to-tertiary"
+                  aria-hidden="true"></span>
+            <p class="mx-auto mt-5 max-w-xl text-base text-secondary leading-relaxed">
                 {% blocktrans count counter=all_count %}{{ counter }} question fréquente sur la plateforme. Pour les détails complets, consultez le guide membre.{% plural %}{{ counter }} questions fréquentes sur la plateforme. Pour les détails complets, consultez le guide membre.{% endblocktrans %}
             </p>
-            <p class="mt-5">
+            <p class="mt-6">
                 <a href="{% url 'member_guide' %}"
-                   class="inline-flex items-center gap-2 rounded-lg border border-tertiary/40 bg-tertiary/5 px-4 py-2 min-h-tap text-sm font-medium text-tertiary hover:bg-tertiary/10 transition">
+                   class="inline-flex items-center gap-2 rounded-full border border-tertiary/40 bg-tertiary/5 px-5 py-2.5 min-h-tap text-sm font-semibold text-tertiary shadow-sm hover:bg-tertiary/10 hover:shadow-md hover:-translate-y-0.5 transition">
                     <span aria-hidden="true">📖</span>
                     {% trans "Lire le guide complet" %}
                 </a>
@@ -74,41 +83,47 @@
                 </p>
             </div>
         {% else %}
-            {# Quick-jump pills — one per category present, scroll to anchor on tap. #}
+            {% comment %}
+                Quick-jump pills — one per category, anchor-scroll on tap.
+                Larger tap targets, soft shadow, hover lift for tactile feel.
+            {% endcomment %}
             {% if sections|length > 1 %}
-                <nav class="mb-8 -mx-1 flex flex-wrap justify-center gap-2"
+                <nav class="mb-10 flex flex-wrap justify-center gap-2.5"
                      aria-label="{% trans 'Catégories' %}">
                     {% for section in sections %}
                         <a href="#cat-{{ section.slug }}"
-                           class="inline-flex items-center gap-2 rounded-full border border-secondary/20 bg-surface px-3 py-1.5 min-h-tap text-xs font-medium hover:border-tertiary/40 hover:text-tertiary transition">
-                            <span aria-hidden="true">{{ section.icon }}</span>
+                           class="group inline-flex items-center gap-2 rounded-full border border-secondary/20 bg-surface px-4 py-2 min-h-tap text-sm font-medium shadow-sm hover:border-tertiary/40 hover:bg-tertiary/5 hover:text-tertiary hover:shadow-md hover:-translate-y-0.5 transition">
+                            <span class="text-base" aria-hidden="true">{{ section.icon }}</span>
                             <span>{{ section.name }}</span>
-                            <span class="rounded-full bg-base-300/60 px-1.5 text-[10px] font-semibold text-secondary"
+                            <span class="rounded-full bg-base-300/60 px-2 py-0.5 text-[10px] font-semibold text-secondary group-hover:bg-tertiary/15 group-hover:text-tertiary transition"
                                   aria-label="{% blocktrans count counter=section.items|length %}{{ counter }} question{% plural %}{{ counter }} questions{% endblocktrans %}">{{ section.items|length }}</span>
                         </a>
                     {% endfor %}
                 </nav>
             {% endif %}
-            <div class="space-y-10">
+            <div class="space-y-12">
                 {% for section in sections %}
                     <section id="cat-{{ section.slug }}"
                              aria-labelledby="cat-h-{{ forloop.counter }}"
                              class="scroll-mt-32 md:scroll-mt-24">
-                        <header class="mb-4 flex items-baseline justify-between gap-3 border-b border-secondary/10 pb-2">
-                            <h2 id="cat-h-{{ forloop.counter }}"
-                                class="font-display text-lg font-semibold tracking-tight md:text-xl">
-                                <span class="mr-2" aria-hidden="true">{{ section.icon }}</span>
-                                {{ section.name }}
-                            </h2>
-                            <span class="text-xs font-semibold uppercase tracking-[0.12em] text-secondary">
-                                {% blocktrans count counter=section.items|length %}{{ counter }} question{% plural %}{{ counter }} questions{% endblocktrans %}
-                            </span>
+                        <header class="mb-5 flex items-center gap-4 border-b border-secondary/10 pb-3">
+                            <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-tertiary/15 to-ceremonial-gold/10 text-xl ring-1 ring-tertiary/15"
+                                  aria-hidden="true">{{ section.icon }}</span>
+                            <div class="flex-1">
+                                <h2 id="cat-h-{{ forloop.counter }}"
+                                    class="font-display text-xl font-semibold tracking-tight md:text-2xl">
+                                    {{ section.name }}
+                                </h2>
+                                <p class="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-secondary">
+                                    {% blocktrans count counter=section.items|length %}{{ counter }} question{% plural %}{{ counter }} questions{% endblocktrans %}
+                                </p>
+                            </div>
                         </header>
-                        <ul class="space-y-2">
+                        <ul class="space-y-2.5">
                             {% for entry, answer_html in section.items %}
                                 <li>
-                                    <details class="group rounded-xl border border-secondary/15 bg-surface/70 shadow-sm transition open:border-tertiary/40 open:bg-surface open:shadow-md hover:border-secondary/30">
-                                        <summary class="flex cursor-pointer items-center justify-between gap-3 rounded-xl px-4 py-3 min-h-tap text-sm font-medium hover:text-tertiary md:px-5 md:py-4 md:text-base">
+                                    <details class="group overflow-hidden rounded-xl border border-secondary/15 bg-surface/70 shadow-sm transition open:border-l-[3px] open:border-l-tertiary open:border-tertiary/40 open:bg-tertiary/[0.025] open:shadow-md hover:border-secondary/30 hover:shadow-md">
+                                        <summary class="flex cursor-pointer items-center justify-between gap-3 rounded-xl px-4 py-3.5 min-h-tap text-sm font-medium hover:text-tertiary md:px-5 md:py-4 md:text-base">
                                             <span class="flex-1">{{ entry.question }}</span>
                                             <svg class="h-4 w-4 shrink-0 text-secondary transition group-open:rotate-180 group-open:text-tertiary"
                                                  viewBox="0 0 24 24"
@@ -128,7 +143,7 @@
                                                     {% for label, url in entry.related_links %}
                                                         <li>
                                                             <a href="{{ url }}"
-                                                               class="inline-flex items-center gap-1.5 rounded-lg border border-secondary/25 bg-surface px-3 py-1.5 min-h-tap text-xs font-medium hover:border-tertiary/40 hover:text-tertiary transition">
+                                                               class="inline-flex items-center gap-1.5 rounded-lg border border-secondary/25 bg-surface px-3 py-1.5 min-h-tap text-xs font-medium hover:border-tertiary/40 hover:bg-tertiary/5 hover:text-tertiary hover:shadow-sm transition">
                                                                 <svg class="h-3.5 w-3.5"
                                                                      viewBox="0 0 24 24"
                                                                      fill="none"

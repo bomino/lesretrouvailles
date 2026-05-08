@@ -3,26 +3,83 @@
 {% block title %}
     {% trans "Guide membre — Les Retrouvailles" %}
 {% endblock %}
+{% block extra_head %}
+    <style>
+        /* Drop cap on the very first paragraph of the guide article — gives the
+           page an editorial, crafted feel. Scoped to .guide-article so prose
+           elsewhere is unaffected. */
+        .guide-article > p:first-of-type::first-letter {
+            font-family: "Playfair Display", ui-serif, Georgia, serif;
+            float: left;
+            font-size: 3.75rem;
+            line-height: 0.85;
+            font-weight: 600;
+            color: #A04A2C;
+            margin: 0.25rem 0.6rem 0 0;
+        }
+        /* Refined blockquote: a subtle rotated quote-mark on the left edge of
+           every blockquote inside the guide. Pure CSS, no extra DOM. */
+        .guide-article blockquote {
+            position: relative;
+            padding-left: 1.25rem;
+        }
+        .guide-article blockquote::before {
+            content: "";
+            position: absolute;
+            left: -2px;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            border-radius: 4px;
+            background: linear-gradient(180deg, #C9A227 0%, #A04A2C 100%);
+        }
+        /* Visible rule between top-level h2 sections so the long page reads as
+           a sequence of chapters rather than one wall of text. */
+        .guide-article > h2 {
+            margin-top: 3.25rem;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(122, 59, 46, 0.12);
+        }
+        .guide-article > h2:first-of-type {
+            margin-top: 2.5rem;
+        }
+        /* Smooth scroll when a TOC anchor link jumps to a heading. */
+        html { scroll-behavior: smooth; }
+    </style>
+{% endblock %}
 {% block content %}
     <div class="mx-auto max-w-6xl">
-        {# Hero — centered icon, eyebrow, title, tagline. Mirrors /aide/. #}
-        <header class="mb-8 text-center">
-            <span class="inline-flex h-12 w-12 items-center justify-center rounded-full bg-tertiary/10 text-tertiary text-2xl"
-                  aria-hidden="true">📖</span>
-            <p class="mt-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-tertiary">{% trans "La communauté" %}</p>
-            <h1 class="mt-2 font-display text-3xl font-semibold tracking-tight md:text-4xl">{% trans "Guide membre" %}</h1>
-            <p class="mx-auto mt-3 max-w-xl text-sm text-secondary leading-relaxed md:text-base">
+        {% comment %}
+            Hero — generous, centered, signature gold rule. Mirrors /aide/.
+        {% endcomment %}
+        <header class="relative mb-12 text-center md:mb-16">
+            <span class="inline-flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-tertiary/15 via-tertiary/5 to-ceremonial-gold/10 text-3xl shadow-sm ring-1 ring-tertiary/20"
+                  aria-hidden="true">
+                <span class="drop-shadow-sm">📖</span>
+            </span>
+            <p class="mt-5 text-[11px] font-semibold uppercase tracking-[0.22em] text-tertiary">{% trans "La communauté" %}</p>
+            <h1 class="mt-3 font-display text-4xl font-semibold tracking-tight md:text-5xl md:leading-[1.1]">
+                {% trans "Guide membre" %}
+            </h1>
+            <span class="mt-4 mx-auto block h-[3px] w-16 rounded-full bg-gradient-to-r from-ceremonial-gold to-tertiary"
+                  aria-hidden="true"></span>
+            <p class="mx-auto mt-5 max-w-xl text-base text-secondary leading-relaxed">
                 {% blocktrans %}Le mode d'emploi complet de la plateforme, pas à pas. Pour des questions courtes, voir <a href="{% endblocktrans %}{% url 'aide:index' %}{% blocktrans %}"
-    class="underline hover:text-tertiary">la page d'aide</a>.{% endblocktrans %}
+    class="font-medium text-tertiary underline hover:text-tertiary/80">la page d'aide</a>.{% endblocktrans %}
             </p>
         </header>
-        <div class="md:grid md:grid-cols-[260px_1fr] md:gap-8">
-            {# Mobile TOC: collapsed accordion above the content. #}
+        <div class="md:grid md:grid-cols-[280px_1fr] md:gap-10">
             {% if toc %}
-                <details class="mb-6 rounded-2xl border border-secondary/15 bg-surface/70 shadow-sm md:hidden">
-                    <summary class="flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-4 py-3 min-h-tap text-sm font-semibold hover:text-tertiary">
-                        <span>{% trans "Sommaire" %}</span>
-                        <svg class="h-4 w-4 shrink-0 text-secondary transition group-open:rotate-180"
+                {% comment %}Mobile TOC — collapsible accordion above the body.{% endcomment %}
+                <details class="group mb-8 rounded-2xl border border-secondary/15 bg-surface/70 shadow-sm md:hidden">
+                    <summary class="flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-4 py-3.5 min-h-tap text-sm font-semibold hover:text-tertiary">
+                        <span class="flex items-center gap-2">
+                            <span aria-hidden="true">📑</span>
+                            {% trans "Sommaire" %}
+                            <span class="rounded-full bg-base-300/60 px-2 py-0.5 text-[10px] font-semibold text-secondary"
+                                  aria-hidden="true">{{ toc|length }}</span>
+                        </span>
+                        <svg class="h-4 w-4 shrink-0 text-secondary transition group-open:rotate-180 group-open:text-tertiary"
                              viewBox="0 0 24 24"
                              fill="none"
                              stroke="currentColor"
@@ -35,21 +92,31 @@
                         {% for entry in toc %}
                             <li>
                                 <a href="#{{ entry.id }}"
-                                   class="flex min-h-tap items-center rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition">{{ entry.text }}</a>
+                                   class="flex min-h-tap items-baseline gap-3 rounded-lg px-3 py-2 hover:bg-tertiary/5 hover:text-tertiary transition">
+                                    <span class="w-6 shrink-0 font-display text-xs font-semibold tabular-nums text-tertiary">{{ forloop.counter }}.</span>
+                                    <span>{{ entry.text }}</span>
+                                </a>
                             </li>
                         {% endfor %}
                     </ol>
                 </details>
-                {# Desktop TOC: sticky sidebar. top-[80px] clears the navbar header. #}
+                {% comment %}Desktop TOC — sticky sidebar with numbered entries.{% endcomment %}
                 <aside class="hidden md:block">
-                    <nav class="sticky top-[80px] rounded-2xl border border-secondary/15 bg-surface/70 p-4 shadow-sm"
+                    <nav class="sticky top-[80px] rounded-2xl border border-secondary/15 bg-surface/80 p-5 shadow-sm backdrop-blur-sm"
                          aria-label="{% trans 'Sommaire du guide' %}">
-                        <p class="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">{% trans "Sommaire" %}</p>
-                        <ol class="space-y-1 text-sm">
+                        <p class="mb-4 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-tertiary">
+                            <span class="inline-block h-[2px] w-6 rounded-full bg-gradient-to-r from-ceremonial-gold to-tertiary"
+                                  aria-hidden="true"></span>
+                            {% trans "Sommaire" %}
+                        </p>
+                        <ol class="space-y-0.5 text-sm">
                             {% for entry in toc %}
                                 <li>
                                     <a href="#{{ entry.id }}"
-                                       class="block rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition">{{ entry.text }}</a>
+                                       class="flex items-baseline gap-3 rounded-lg px-3 py-2 hover:bg-tertiary/5 hover:text-tertiary transition">
+                                        <span class="w-6 shrink-0 font-display text-xs font-semibold tabular-nums text-tertiary/70">{{ forloop.counter }}.</span>
+                                        <span class="leading-snug">{{ entry.text }}</span>
+                                    </a>
                                 </li>
                             {% endfor %}
                         </ol>
@@ -57,18 +124,24 @@
                 </aside>
             {% endif %}
             {% comment %}
-                Body content. Anchor IDs from the markdown `toc` extension are
-                rendered into headings; scroll-mt-[80px] keeps the heading clear
-                of the sticky navbar when a TOC link jumps to it.
+                Body content. The .guide-article class scopes the drop cap,
+                blockquote rule, and section divider styles defined in
+                {% block extra_head %}.
             {% endcomment %}
-            <article class="prose prose-sm md:prose-base max-w-none text-primary prose-headings:font-display prose-headings:scroll-mt-[80px] [&_a]:text-tertiary [&_a]:underline hover:[&_a]:text-tertiary/80 prose-blockquote:border-tertiary/30 prose-blockquote:bg-base-200/40 prose-blockquote:rounded-r-lg prose-blockquote:py-1 prose-code:rounded prose-code:bg-base-300/40 prose-code:px-1 prose-code:py-0.5">
+            <article class="guide-article prose prose-sm md:prose-base max-w-none text-primary prose-headings:font-display prose-headings:scroll-mt-[80px] prose-h2:text-2xl md:prose-h2:text-3xl prose-h2:font-semibold prose-h3:text-lg md:prose-h3:text-xl prose-h3:text-primary/90 [&_a]:text-tertiary [&_a]:underline hover:[&_a]:text-tertiary/80 prose-blockquote:not-italic prose-blockquote:border-l-0 prose-blockquote:bg-base-200/50 prose-blockquote:rounded-r-lg prose-blockquote:py-3 prose-blockquote:my-6 prose-code:rounded prose-code:bg-base-300/40 prose-code:px-1 prose-code:py-0.5 prose-strong:text-primary prose-li:my-1">
                 {{ guide_html|safe }}
             </article>
         </div>
-        {# Footer — link back to /aide/ + admin reminder. #}
-        <p class="mt-12 text-center text-sm text-secondary">
-            {% blocktrans %}Vous avez une question rapide ? Voir la <a href="{% endblocktrans %}{% url 'aide:index' %}{% blocktrans %}"
-    class="underline hover:text-tertiary">page d'aide</a>. Sinon, <strong>écrivez à l'administrateur</strong> via WhatsApp — il est à votre disposition.{% endblocktrans %}
-        </p>
+        {% comment %}Footer — link back to /aide/ + admin reminder.{% endcomment %}
+        <div class="mt-16 rounded-2xl border border-secondary/15 bg-gradient-to-br from-base-200/40 to-surface/70 p-6 text-center shadow-sm md:p-8">
+            <p class="text-base text-primary">
+                {% trans "Une question rapide ?" %}
+                <a href="{% url 'aide:index' %}"
+                   class="font-medium text-tertiary underline hover:text-tertiary/80">{% trans "Consultez la page d'aide" %}</a>.
+            </p>
+            <p class="mt-2 text-sm text-secondary">
+                {% blocktrans %}Sinon, <strong>écrivez à l'administrateur</strong> via WhatsApp — il est à votre disposition.{% endblocktrans %}
+            </p>
+        </div>
     </div>
 {% endblock %}
