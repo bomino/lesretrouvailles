@@ -1,0 +1,26 @@
+{% load i18n member_avatar %}
+<li class="member-card">
+    <a href="/membres/{{ member.slug }}/"
+       class="group flex h-full gap-4 rounded-2xl border border-secondary/15 bg-base-200 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-tertiary/40 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-tertiary/40">
+        <div class="shrink-0">{% member_avatar member size=64 %}</div>
+        <div class="min-w-0 flex-1">
+            {% comment %}
+                Last name in display font + tertiary tone signals it's the
+                primary sort key; first name follows in the body font. Helps
+                members visually scan an alphabetical list quickly.
+            {% endcomment %}
+            <p class="leading-tight">
+                <span class="font-display text-base font-semibold tracking-tight text-primary group-hover:text-tertiary">{{ member.last_name }}</span>
+                <span class="text-base text-primary/85">{{ member.first_name }}</span>
+                {% if member.nickname %}<span class="text-sm italic text-secondary">« {{ member.nickname }} »</span>{% endif %}
+            </p>
+            {% if member.profession %}<p class="mt-0.5 text-sm text-primary/80">{{ member.profession }}</p>{% endif %}
+            {% if member.show_city and member.city %}<p class="mt-1 text-sm text-secondary">📍 {{ member.city }}</p>{% endif %}
+            <p class="mt-2 inline-flex flex-wrap gap-1 text-xs text-secondary">
+                {% for year in member.years_attended %}
+                    <span class="rounded-full bg-base-300/60 px-2 py-0.5">{{ year }}</span>
+                {% endfor %}
+            </p>
+        </div>
+    </a>
+</li>

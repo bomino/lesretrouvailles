@@ -1,42 +1,92 @@
 {% load i18n member_avatar %}
-<ul class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-    aria-live="polite">
-    {% for member in members %}
-        <li class="member-card">
-            <a href="/membres/{{ member.slug }}/"
-               class="group flex gap-4 rounded-2xl border border-secondary/15 bg-base-200 p-4 shadow-sm transition hover:shadow-md hover:border-tertiary/40 focus:outline-none focus:ring-2 focus:ring-tertiary/40">
-                <div class="shrink-0">{% member_avatar member size=64 %}</div>
-                <div class="min-w-0 flex-1">
-                    <p class="text-base font-semibold leading-tight group-hover:text-tertiary">{{ member.full_name }}</p>
-                    {% if member.profession %}<p class="mt-0.5 text-sm text-primary/80">{{ member.profession }}</p>{% endif %}
-                    {% if member.show_city and member.city %}<p class="mt-1 text-sm text-secondary">📍 {{ member.city }}</p>{% endif %}
-                    <p class="mt-2 inline-flex flex-wrap gap-1 text-xs text-secondary">
-                        {% for year in member.years_attended %}
-                            <span class="rounded-full bg-base-300/60 px-2 py-0.5">{{ year }}</span>
-                        {% endfor %}
-                    </p>
-                </div>
-            </a>
-        </li>
-    {% empty %}
-        <li class="col-span-full rounded-2xl border border-dashed border-secondary/30 bg-base-200/50 p-8 text-center">
-            <p class="text-base font-medium text-primary">{% trans "Aucun membre trouvé." %}</p>
-            {% if empty_state_suggestions %}
-                <p class="mt-2 text-sm text-secondary">{% trans "Essayez une de ces recherches :" %}</p>
-                <ul class="mt-4 flex flex-wrap justify-center gap-2">
-                    {% for label, url in empty_state_suggestions %}
-                        <li>
-                            <a href="{{ url }}"
-                               class="inline-flex items-center rounded-lg border border-secondary/25 bg-base-200 px-3 py-1.5 min-h-tap text-xs font-medium hover:border-tertiary/40 hover:text-tertiary transition">{{ label }}</a>
-                        </li>
+{% comment %}
+    Result-meta strip + active-filter chips. Renders even when there are zero
+    results so users see WHAT they filtered before the empty state.
+{% endcomment %}
+<div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <p class="text-sm text-secondary">
+        {% if active_filters %}
+            {% blocktrans count counter=total_count with total=total_active_count %}<strong class="text-primary">{{ counter }}</strong> membre sur <strong class="text-primary">{{ total }}</strong>{% plural %}<strong class="text-primary">{{ counter }}</strong> membres sur <strong class="text-primary">{{ total }}</strong>{% endblocktrans %}
+        {% else %}
+            {% blocktrans count counter=total_count %}<strong class="text-primary">{{ counter }}</strong> membre dans la communauté{% plural %}<strong class="text-primary">{{ counter }}</strong> membres dans la communauté{% endblocktrans %}
+        {% endif %}
+    </p>
+    {% if active_filters %}
+        <div class="flex flex-wrap items-center gap-1.5">
+            <span class="text-[11px] font-semibold uppercase tracking-[0.14em] text-secondary">{% trans "Filtres :" %}</span>
+            {% for chip in active_filters %}
+                <a href="?{{ chip.remove_qs }}"
+                   hx-get="/annuaire/?{{ chip.remove_qs }}"
+                   hx-target="#directory-list"
+                   hx-push-url="true"
+                   class="inline-flex items-center gap-1.5 rounded-full border border-tertiary/30 bg-tertiary/5 px-3 py-1 text-xs font-medium text-tertiary hover:bg-tertiary/10 transition"
+                   aria-label="{% blocktrans with label=chip.label %}Retirer le filtre « {{ label }} »{% endblocktrans %}">
+                    {{ chip.label }}
+                    <span aria-hidden="true" class="text-tertiary/70">×</span>
+                </a>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>
+{% if is_alphabetical and letter_groups %}
+    {% comment %}
+        Phone-book layout — members grouped by first letter of last_name with
+        a sticky-ish letter header. Within each group the cards keep the same
+        responsive grid as before.
+    {% endcomment %}
+    <div class="space-y-8" aria-live="polite">
+        {% for group in letter_groups %}
+            <section aria-labelledby="letter-{{ group.letter|lower }}">
+                <header class="mb-3 flex items-center gap-3">
+                    <h2 id="letter-{{ group.letter|lower }}"
+                        class="font-display text-2xl font-semibold tracking-tight text-tertiary"
+                        aria-label="{% blocktrans with letter=group.letter %}Membres en {{ letter }}{% endblocktrans %}">
+                        {{ group.letter }}
+                    </h2>
+                    <span class="h-px flex-1 bg-gradient-to-r from-tertiary/30 to-transparent"
+                          aria-hidden="true"></span>
+                    <span class="text-[11px] font-semibold uppercase tracking-[0.12em] text-secondary">
+                        {% blocktrans count counter=group.members|length %}{{ counter }} membre{% plural %}{{ counter }} membres{% endblocktrans %}
+                    </span>
+                </header>
+                <ul class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {% for member in group.members %}
+                        {% include "members/_directory_card.html" %}
                     {% endfor %}
                 </ul>
-            {% endif %}
-        </li>
-    {% endfor %}
-</ul>
+            </section>
+        {% endfor %}
+    </div>
+{% else %}
+    {% comment %}
+        Fallback layout — used when the search returned trigram-similarity-
+        ranked results (no letter grouping makes sense there) OR when the
+        result is empty. Same card grid as before.
+    {% endcomment %}
+    <ul class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        aria-live="polite">
+        {% for member in members %}
+            {% include "members/_directory_card.html" %}
+        {% empty %}
+            <li class="col-span-full rounded-2xl border border-dashed border-secondary/30 bg-base-200/50 p-8 text-center">
+                <p class="text-base font-medium text-primary">{% trans "Aucun membre trouvé." %}</p>
+                {% if empty_state_suggestions %}
+                    <p class="mt-2 text-sm text-secondary">{% trans "Essayez une de ces recherches :" %}</p>
+                    <ul class="mt-4 flex flex-wrap justify-center gap-2">
+                        {% for label, url in empty_state_suggestions %}
+                            <li>
+                                <a href="{{ url }}"
+                                   class="inline-flex items-center rounded-lg border border-secondary/25 bg-base-200 px-3 py-1.5 min-h-tap text-xs font-medium hover:border-tertiary/40 hover:text-tertiary transition">{{ label }}</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+{% endif %}
 {% if page.paginator.num_pages > 1 %}
-    <nav class="mt-6 flex items-center justify-center gap-2"
+    <nav class="mt-8 flex items-center justify-center gap-2"
          aria-label="{% trans 'Pagination' %}">
         {% if page.has_previous %}
             <a href="?page={{ page.previous_page_number }}{% for k, v in request.GET.items %}{% if k != 'page' %}&{{ k }}={{ v }}{% endif %}{% endfor %}"
