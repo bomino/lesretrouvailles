@@ -285,6 +285,50 @@ def directory_view(request):
     # display when filters are applied. Single COUNT(*), negligible cost.
     total_active_count = Member.objects.filter(status="active").count()
 
+    # Promotion-year quick-pick chips. Six years (1980-1985) is small enough
+    # that a horizontal chip row beats a dropdown for tactile mobile UX.
+    # The "Toutes" chip clears the year filter; subsequent chips set it.
+    # Each chip carries an `is_active` flag so the template can highlight
+    # the selected one. Year filter resets pagination on change.
+    def _qs_with_year(year_value: str | int | None) -> str:
+        params = request.GET.copy()
+        params.pop("page", None)
+        if year_value is None or year_value == "":
+            params.pop("year", None)
+        else:
+            params["year"] = str(year_value)
+        return params.urlencode()
+
+    selected_year = ""
+    if year_raw:
+        try:
+            yr = int(year_raw)
+            if yr in range(1980, 1986):
+                selected_year = str(yr)
+        except (TypeError, ValueError):
+            pass
+
+    promotion_chips: list[dict] = [
+        {"label": "Toutes", "qs": _qs_with_year(None), "is_active": selected_year == ""}
+    ]
+    for yr in range(1980, 1986):
+        promotion_chips.append(
+            {
+                "label": str(yr),
+                "qs": _qs_with_year(yr),
+                "is_active": selected_year == str(yr),
+            }
+        )
+
+    # "Ma promotion" — for logged-in members with a Member profile, surface
+    # a dedicated chip that filters to their first year of attendance. The
+    # most common interpretation of "ma promo" in French school contexts.
+    my_promotion_year: int | None = None
+    if request.user.is_authenticated:
+        member_obj = getattr(request.user, "member", None)
+        if member_obj and member_obj.years_attended:
+            my_promotion_year = min(member_obj.years_attended)
+
     # Log empty-result queries with a meaningful filter so a future bot
     # decision is data-driven. Only fire when the user actually searched
     # (q or any facet) — empty filters returning zero just means there
@@ -318,6 +362,9 @@ def directory_view(request):
             "letter_groups": letter_groups,
             "is_alphabetical": is_alphabetical,
             "active_filters": active_filters,
+            "promotion_chips": promotion_chips,
+            "my_promotion_year": my_promotion_year,
+            "my_promotion_qs": (_qs_with_year(my_promotion_year) if my_promotion_year else ""),
             "total_count": paginator.count,
             "total_active_count": total_active_count,
             "empty_state_suggestions": (
