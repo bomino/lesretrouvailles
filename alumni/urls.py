@@ -9,5 +9,6 @@ urlpatterns = [
     path("", include("memoires.urls")),
     path("", include("memoriam.urls")),
     path("", include("members.urls")),
+    path("aide/", include("aide.urls")),
     path("", include("core.urls")),
 ]

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}
+    {% trans "Aide — Les Retrouvailles" %}
+{% endblock %}
+{% block content %}
+    <div class="mx-auto max-w-3xl">
+        <header class="mb-8 text-center">
+            <h1 class="font-display text-3xl font-semibold tracking-tight md:text-4xl">{% trans "Aide" %}</h1>
+            <p class="mx-auto mt-3 max-w-2xl text-sm text-secondary">
+                {% trans "Réponses aux questions courantes sur la plateforme. Pour les détails complets, consultez le guide membre." %}
+            </p>
+        </header>
+        <form method="get"
+              role="search"
+              action="{% url 'aide:index' %}"
+              class="sticky top-[68px] z-10 mb-6 -mx-4 bg-surface/95 px-4 py-3 backdrop-blur-md md:static md:mx-0 md:bg-transparent md:p-0 md:pb-6">
+            <label for="aide-q" class="sr-only">{% trans "Filtrer les questions" %}</label>
+            <div class="flex items-center gap-2">
+                <input id="aide-q"
+                       type="search"
+                       name="q"
+                       value="{{ q }}"
+                       placeholder="{% trans 'Filtrer (par exemple : photo, mot de passe…)' %}"
+                       class="w-full rounded-lg border border-secondary/25 bg-surface px-4 py-2 min-h-tap text-sm focus:border-tertiary/60 focus:outline-none focus:ring-2 focus:ring-tertiary/30">
+                <button type="submit"
+                        class="inline-flex items-center rounded-lg border border-secondary/25 bg-surface px-3 py-2 min-h-tap min-w-tap text-sm font-medium hover:border-tertiary/40 hover:text-tertiary transition">
+                    {% trans "Filtrer" %}
+                </button>
+                {% if q %}
+                    <a href="{% url 'aide:index' %}"
+                       class="inline-flex items-center rounded-lg px-3 py-2 min-h-tap text-sm text-secondary hover:text-tertiary transition"
+                       aria-label="{% trans 'Effacer le filtre' %}">{% trans "Effacer" %}</a>
+                {% endif %}
+            </div>
+        </form>
+        {% if total_count == 0 %}
+            <div class="rounded-2xl border border-secondary/15 bg-surface/70 p-8 text-center shadow-sm">
+                <p class="text-base font-medium">{% trans "Aucune question ne correspond à votre recherche." %}</p>
+                <p class="mt-2 text-sm text-secondary">
+                    {% blocktrans %}Pour plus de détails, consultez le <a href="https://github.com/Bomino/lesretrouvailles/blob/main/docs/guides/guide_membre.md" class="underline hover:text-tertiary">guide membre complet</a> ou écrivez à l'administrateur via WhatsApp.{% endblocktrans %}
+                </p>
+                <p class="mt-4">
+                    <a href="{% url 'aide:index' %}"
+                       class="inline-flex items-center rounded-lg border border-secondary/25 bg-surface px-4 py-2 min-h-tap text-sm font-medium hover:border-tertiary/40 hover:text-tertiary transition">
+                        {% trans "Voir toutes les questions" %}
+                    </a>
+                </p>
+            </div>
+        {% else %}
+            <div class="space-y-8">
+                {% for category, items in grouped_entries.items %}
+                    <section aria-labelledby="cat-{{ forloop.counter }}">
+                        <h2 id="cat-{{ forloop.counter }}"
+                            class="mb-3 font-display text-lg font-semibold tracking-tight">{{ category }}</h2>
+                        <ul class="space-y-2">
+                            {% for entry, answer_html in items %}
+                                <li>
+                                    <details class="group rounded-xl border border-secondary/15 bg-surface/70 shadow-sm transition open:border-tertiary/30">
+                                        <summary class="flex cursor-pointer items-center justify-between gap-3 rounded-xl px-4 py-3 min-h-tap text-sm font-medium hover:text-tertiary md:px-5 md:py-4 md:text-base">
+                                            <span>{{ entry.question }}</span>
+                                            <svg class="h-4 w-4 shrink-0 text-secondary transition group-open:rotate-180"
+                                                 viewBox="0 0 24 24"
+                                                 fill="none"
+                                                 stroke="currentColor"
+                                                 stroke-width="2"
+                                                 aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </summary>
+                                        <div class="border-t border-secondary/10 px-4 py-4 text-sm leading-relaxed md:px-5 md:py-5 md:text-[15px]">
+                                            <div class="prose prose-sm max-w-none text-primary">{{ answer_html|safe }}</div>
+                                            {% if entry.related_links %}
+                                                <ul class="mt-4 flex flex-wrap gap-2">
+                                                    {% for label, url in entry.related_links %}
+                                                        <li>
+                                                            <a href="{{ url }}"
+                                                               class="inline-flex items-center rounded-lg border border-secondary/25 bg-surface px-3 py-1.5 min-h-tap text-xs font-medium hover:border-tertiary/40 hover:text-tertiary transition">{{ label }}</a>
+                                                        </li>
+                                                    {% endfor %}
+                                                </ul>
+                                            {% endif %}
+                                        </div>
+                                    </details>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </section>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

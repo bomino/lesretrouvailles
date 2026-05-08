@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "memoires",
     "memoriam",
     "gestion",
+    "aide",
 ]
 
 MIDDLEWARE = [
@@ -223,6 +224,7 @@ LOGIN_REQUIRED_WHITELIST = [
     "/sitemap.xml",
     "/robots.txt",
     "/retrait/",
+    "/aide/",
 ]
 
 # P4a: feature flag gating the public ghost list (Nous recherchons aussi…).

@@ -462,6 +462,15 @@ Si la plateforme ne répond plus :
 - **Spécification produit** : `docs/superpowers/specs/2026-05-01-alumni-platform-design.md` — la vision et les contraintes du projet
 - **STATUS.md** : `docs/superpowers/STATUS.md` — état actuel du projet, phases livrées
 
+### Modifier la FAQ publique (`/aide/`)
+
+La page `/aide/` est alimentée par une liste Python typée, **`aide/faq.py`**. Pour ajouter, retirer, ou modifier une question :
+
+1. Ouvrez `aide/faq.py` dans une branche dédiée (ex. `docs/aide-update`).
+2. Modifiez la liste `FAQ_ENTRIES`. Chaque entrée a `slug` (unique), `category` (parmi `CATEGORIES`), `question`, `answer_md` (markdown court), et `related_links` (liste de tuples `(label, url)`).
+3. Lancez `pytest aide/` — les tests structurels (`test_faq_content.py`) attrapent une catégorie inconnue, un slug en double, ou un champ vide.
+4. Soumettez une pull request. Pas d'interface admin pour cette page : c'est volontaire (zéro surface d'attaque, contrôle de version par git).
+
 ---
 
 ## Une dernière note
