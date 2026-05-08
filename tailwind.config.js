@@ -8,6 +8,10 @@ module.exports = {
     "./core/**/*.{html,py}",
     "./members/**/*.{html,py}",
     "./cooptation/**/*.{html,py}",
+    "./gestion/**/*.{html,py}",
+    "./memoires/**/*.{html,py}",
+    "./memoriam/**/*.{html,py}",
+    "./aide/**/*.{html,py}",
   ],
   theme: {
     extend: {
