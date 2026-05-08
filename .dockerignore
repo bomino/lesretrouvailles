@@ -36,6 +36,12 @@ Screenshot*.png
 docs/
 *.md
 !DESIGN.md
+# P8.1 — the runtime stage COPYs docs/guides/ into the image so /guide/
+# can render the canonical member guide. Negations here override the
+# `docs/` and `*.md` exclusions above; order matters in .dockerignore
+# (later patterns win for the same path).
+!docs/guides/
+!docs/guides/*.md
 
 # Compiled assets we rebuild in image
 staticfiles/
