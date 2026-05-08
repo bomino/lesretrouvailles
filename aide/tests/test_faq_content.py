@@ -5,6 +5,9 @@ itself, so a content edit can't accidentally ship an entry with a missing
 field, an empty answer, or an unknown category.
 """
 
+from django.urls import resolve
+from django.urls.exceptions import Resolver404
+
 from aide.faq import CATEGORIES, CATEGORY_META, FAQ_ENTRIES, FAQEntry
 
 
@@ -72,3 +75,24 @@ def test_category_meta_entries_have_required_fields():
     for name, meta in CATEGORY_META.items():
         assert meta.get("icon"), f"Category {name!r} missing icon"
         assert meta.get("slug"), f"Category {name!r} missing slug"
+
+
+def test_internal_related_links_resolve():
+    """Every related_link starting with ``/`` must resolve through Django's
+    URL dispatcher. Catches typos like ``/profil/edit/`` (real URL is
+    ``/profil/``) or fabricated paths like ``/static/docs/guide_membre.md``.
+    External URLs (http://, https://) are skipped — those break independently
+    and are caught by manual review.
+    """
+    failures: list[str] = []
+    for entry in FAQ_ENTRIES:
+        for label, url in entry.related_links:
+            if not url.startswith("/"):
+                continue
+            try:
+                resolve(url)
+            except Resolver404:
+                failures.append(f"{entry.slug}: {label!r} -> {url!r}")
+    assert not failures, "Broken internal related_links (URL doesn't resolve):\n  " + "\n  ".join(
+        failures
+    )

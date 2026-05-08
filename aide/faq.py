@@ -68,7 +68,6 @@ FAQ_ENTRIES: list[FAQEntry] = [
         ),
         related_links=[
             ("Page de connexion", "/accounts/login/"),
-            ("Guide complet — Activation", "/static/docs/guide_membre.md"),
         ],
     ),
     FAQEntry(
@@ -157,7 +156,7 @@ FAQ_ENTRIES: list[FAQEntry] = [
             "- Photo\n\n"
             "Les modifications sont enregistrées immédiatement."
         ),
-        related_links=[("Modifier mon profil", "/profil/edit/")],
+        related_links=[("Modifier mon profil", "/profil/")],
     ),
     FAQEntry(
         slug="champs-verrouilles",
@@ -190,7 +189,7 @@ FAQ_ENTRIES: list[FAQEntry] = [
             "`+227...` avec un lien cliquable qui ouvre WhatsApp."
         ),
         related_links=[
-            ("Modifier mon profil", "/profil/edit/"),
+            ("Modifier mon profil", "/profil/"),
             ("Charte de la communauté", "/charte/"),
         ],
     ),
@@ -259,7 +258,7 @@ FAQ_ENTRIES: list[FAQEntry] = [
             "l'accord écrit de la famille proche. C'est une question de respect et de "
             "protection de la mémoire."
         ),
-        related_links=[("Aller à In Memoriam", "/memoriam/")],
+        related_links=[("Aller à In Memoriam", "/in-memoriam/")],
     ),
     # --- Cooptation ---
     FAQEntry(
