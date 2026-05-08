@@ -8,10 +8,10 @@ If something here contradicts what you'd reach for by default, **trust this file
 
 ## Project context (the 30-second version)
 
-- **What:** Private alumni platform for CEG 1 Birni (Zinder, Niger), promotions 1980-1985. Production at https://villageretrouvailles.com/. Tag `v1.0.0-soft-launch`.
+- **What:** Private alumni platform for CEG 1 Birni (Zinder, Niger), promotions 1980-1985. Production at https://villageretrouvailles.com/. Tags: `v1.0.0-soft-launch`, `v1.1.0-gestion-console`.
 - **Audience:** ~200 alumni from a WhatsApp group, ages 55-65. **~80% have no email.** Mobile-first (Android 7+ + low-end devices). The launch onboarding imports them en masse from a WhatsApp roster.
 - **Tone:** All user-facing copy is **French**. Code, comments, and commit messages are **English**.
-- **Owner:** Single bilingual operator (Bomino). One Super Admin (`bominomla`) in production.
+- **Owner:** Single bilingual super-admin (Bomino, `bominomla`). Plus 0-3 co-admins via `is_staff=True` (see admin-tiers section below).
 
 ---
 
@@ -24,6 +24,47 @@ If something here contradicts what you'd reach for by default, **trust this file
 - For email-less password resets: `python manage.py reissue_login_link <username>`. Operator copy-pastes the printed URL into a WhatsApp DM.
 
 If you're proposing a feature that "just emails the user," ask: how do the email-less ~80% experience this? They probably need an admin-mediated alternative.
+
+---
+
+## Admin tiers — `is_staff` does NOT unlock `/admin/`
+
+Since Gestion v1 (tag `v1.1.0-gestion-console`), there are two admin tiers:
+
+- **Super Admin** = `is_superuser=True`. Sees `/admin/` AND `/gestion/`. Only `bominomla` in prod.
+- **Co-admin** = `is_staff=True, is_superuser=False`. Sees `/gestion/` only. `/admin/` redirects them to the admin login form even though they "could" log in to it under default Django.
+
+**Why this matters for you:**
+- `admin.site` in this project is **NOT** the default `django.contrib.admin.site`. It's `alumni.admin.GestionAdminSite`, wired via `INSTALLED_APPS = ["alumni.admin.GestionAdminConfig", ...]`. Its `has_permission` requires `is_superuser`.
+- If you read code that calls `admin.site.register(...)` and assume any staff can use those admin views, you'll be wrong. Only superusers can.
+- `MemberAdmin.get_actions()` further gates `rgpd_purge_action` to `is_superuser` even within `/admin/` (defense-in-depth).
+- The custom `staff_required` decorator is in `gestion/decorators.py` — it redirects to `/accounts/login/` (NOT `/admin/login/`) for unauthenticated users, and 403s for authenticated-but-not-staff. Don't substitute `django.contrib.admin.views.decorators.staff_member_required` — that one redirects to admin login, which we want hidden from co-admins.
+
+If you're adding a new admin-y view: gate it with `gestion.decorators.staff_required` (works for any staff) OR by manually checking `request.user.is_superuser` (Bomino-only).
+
+---
+
+## WhatsApp number ≠ `User.username`
+
+Since `feat/member-whatsapp-field` (post-Gestion-v1), `Member.whatsapp` is the canonical messaging-channel identifier. **`User.username` is the LOGIN identity** and only happens to equal the WhatsApp number for members imported from the roster — for coopted members it's the email, and for the super-admin it's `bominomla`.
+
+**For wa.me URLs and any "send a WhatsApp message to this person" feature:**
+- Use `member.whatsapp` (CharField, digits-only, 8-15 chars, may be blank). Validate with `VALID_WHATSAPP_PATTERN` from `members/models.py`.
+- DO NOT use `member.user.username`. That generates broken URLs for half the members.
+- Hide the button / disable the feature when `member.whatsapp` is empty rather than failing silently. See `gestion.views.member_login_link_view` for the gating pattern.
+
+**For login-related code:** use `User.username` as before. Login identity and messaging identity are decoupled on purpose.
+
+**Form input convention:** the `clean_whatsapp()` / `clean_new_username()` methods on gestion forms strip every non-digit character before validating length, so operators can paste `+227 90 00 01 23` or `+1 555-987-6543` from WhatsApp's contact card. The 8-15 digit length check still fires; country-code requirement is on the operator, not the form.
+
+---
+
+## AuditLog conventions
+
+`members.models.AuditLog` is the cross-domain event log. Two conventions worth following when you write to it:
+
+- **Action string namespace:** `<domain>.<entity>.<verb>`. Currently in use: `ghost.*`, `memoriam.*`, `rgpd.*`, `gestion.*`. Always extend `AuditLog.ACTION_CHOICES` when you add a new action — the field has `choices=` so a Form-level write would otherwise reject. ORM `objects.create()` ignores choices but the `/admin/auditlog/` list filter relies on it.
+- **Metadata always includes a human-readable name** (e.g. `member_full_name`, `candidate_full_name`) so the audit log stays readable after a member is purged or renamed. Don't store raw IDs only.
 
 ---
 
@@ -159,7 +200,7 @@ The owner develops on Windows. The repo is cross-platform but:
 - Use `@pytest.mark.django_db` for DB tests.
 - Use `settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"` to avoid real sends in email-related tests.
 - Use `settings.CLOUDINARY_CLIENT_PATH = "alumni.cloudinary.FakeCloudinary"` and `settings.STORAGE_CLIENT_PATH = "alumni.storage.FakeStorage"` (call `reset_fake_client()` between tests for clean call lists).
-- Target full-suite count is `~520 passing` as of v1.0.0-soft-launch. New work should add tests; the count should grow, not shrink.
+- Target full-suite count: `~520` at v1.0.0-soft-launch, `~622` at v1.1.0-gestion-console, `~650` at the post-Gestion polish round. New work should add tests; the count should grow, not shrink.
 
 ---
 
@@ -180,12 +221,16 @@ The owner develops on Windows. The repo is cross-platform but:
 | Master spec (PRD + design) | `docs/superpowers/specs/2026-05-01-alumni-platform-design.md` |
 | Operator launch procedure | `docs/runbooks/launch.md` |
 | User-facing French guide | `docs/guides/guide_membre.md` (member) + `guide_admin.md` (admin) |
+| Frontend admin console (gestion) | `gestion/` — views, forms, decorators, templates, tests |
+| Custom AdminSite (locks /admin/ to superuser) | `alumni/admin.py` |
 | Cooptation services (approve/reject/purge) | `cooptation/services.py` |
 | Member purge (RGPD) engine | `members/services.py::rgpd_purge_member` |
 | Bulk import command | `members/management/commands/import_whatsapp_roster.py` |
+| Magic-link reissue CLI | `members/management/commands/reissue_login_link.py` |
 | Daily cron handler | `cooptation/management/commands/process_cooptation_deadlines.py` |
 | Cloudinary client (real + fake) | `alumni/cloudinary.py` |
 | Object storage client (real + fake) | `alumni/storage.py` |
+| AuditLog model + action choices | `members/models.py::AuditLog` |
 
 ---
 
@@ -212,10 +257,14 @@ When the user reports a bug:
 ## What NOT to do
 
 - **Don't** change auth settings without thinking through how the email-less ~80% are affected.
+- **Don't** assume `is_staff=True` unlocks `/admin/`. It doesn't anymore — `/admin/` requires `is_superuser`. See the admin-tiers section above.
+- **Don't** use `User.username` as the WhatsApp number for messaging features. Use `Member.whatsapp` (validated digits-only). The two are decoupled on purpose.
+- **Don't** generate `wa.me/<id>` URLs without first validating that `<id>` matches `^\d{8,15}$`. Otherwise you'll send operators to api.whatsapp.com's "phone number invalid" page.
 - **Don't** propose Cloudinary removal without acknowledging the transform pipeline.
 - **Don't** apply S3 lifecycle rules to the Railway bucket — Tigris rejects the rule shapes we'd want.
 - **Don't** remove the explicit `import cloudinary.api` / `import cloudinary.uploader` in `RealCloudinary.__init__` — there's a regression test, but more importantly there's a real production failure waiting if you do.
 - **Don't** add DB CHECK constraints for fields whose format might evolve. Use Python `clean()` instead.
+- **Don't** add a new `AuditLog.action` value without also adding it to `ACTION_CHOICES`. Forms validate against choices; ORM `create()` doesn't, but list filters in `/admin/auditlog/` rely on the enum.
 - **Don't** pull production secrets into the local environment.
 - **Don't** delete records on production without explicit user confirmation. The P6b RGPD purge engine is the right tool for member deletions; for other test artifacts, surface what you'd delete and ask.
 - **Don't** assume what the user wants. If a request has multiple interpretations or non-obvious tradeoffs, surface them in 2-3 sentences and ask before executing.
