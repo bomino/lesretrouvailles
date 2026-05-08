@@ -17,7 +17,7 @@ from django.shortcuts import render
 
 from members.models import AuditLog
 
-from .faq import CATEGORIES, FAQ_ENTRIES, FAQEntry
+from .faq import CATEGORIES, CATEGORY_META, FAQ_ENTRIES, FAQEntry
 
 Q_TRUNCATE_CHARS = 80
 
@@ -49,14 +49,25 @@ def _filter_entries(q: str) -> list[FAQEntry]:
     ]
 
 
-def _group_by_category(
-    entries: list[FAQEntry],
-) -> OrderedDict[str, list[tuple[FAQEntry, str]]]:
-    """Preserve CATEGORIES order; pair each entry with its rendered HTML; drop empty categories."""
-    grouped: OrderedDict[str, list[tuple[FAQEntry, str]]] = OrderedDict((c, []) for c in CATEGORIES)
+def _group_by_category(entries: list[FAQEntry]) -> list[dict]:
+    """Preserve CATEGORIES order; pair each entry with its rendered HTML; drop empty categories.
+
+    Returns a list shaped for template rendering, one dict per non-empty category:
+    ``{"name": str, "icon": str, "slug": str, "items": [(FAQEntry, html), ...]}``.
+    """
+    buckets: OrderedDict[str, list[tuple[FAQEntry, str]]] = OrderedDict((c, []) for c in CATEGORIES)
     for e in entries:
-        grouped[e.category].append((e, _ANSWER_HTML[e.slug]))
-    return OrderedDict((c, items) for c, items in grouped.items() if items)
+        buckets[e.category].append((e, _ANSWER_HTML[e.slug]))
+    return [
+        {
+            "name": name,
+            "icon": CATEGORY_META[name]["icon"],
+            "slug": CATEGORY_META[name]["slug"],
+            "items": items,
+        }
+        for name, items in buckets.items()
+        if items
+    ]
 
 
 def _log_no_results(request: HttpRequest, q: str) -> None:
@@ -80,14 +91,14 @@ def aide_view(request: HttpRequest) -> HttpResponse:
     entries = _filter_entries(q)
     if q and not entries:
         _log_no_results(request, q)
-    grouped = _group_by_category(entries)
+    sections = _group_by_category(entries)
     return render(
         request,
         "aide/index.html",
         {
             "q": q,
-            "grouped_entries": grouped,
+            "sections": sections,
             "total_count": len(entries),
-            "categories": CATEGORIES,
+            "all_count": len(FAQ_ENTRIES),
         },
     )

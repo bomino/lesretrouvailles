@@ -25,6 +25,21 @@ CATEGORIES = (
     "Dépannage",
 )
 
+# Visual metadata per category — emoji + slug for in-page anchor jumps.
+# Slugs are stable so the quick-jump pill links don't break when categories
+# get translated. Adding a new category requires extending both CATEGORIES
+# above and CATEGORY_META below; test_faq_content.py enforces consistency.
+CATEGORY_META: dict[str, dict[str, str]] = {
+    "Compte": {"icon": "🔐", "slug": "compte"},
+    "Profil": {"icon": "👤", "slug": "profil"},
+    "Confidentialité": {"icon": "🛡️", "slug": "confidentialite"},
+    "Annuaire": {"icon": "📇", "slug": "annuaire"},
+    "Souvenirs": {"icon": "📷", "slug": "souvenirs"},
+    "In Memoriam": {"icon": "🕊️", "slug": "memoriam"},
+    "Cooptation": {"icon": "🤝", "slug": "cooptation"},
+    "Dépannage": {"icon": "🛠️", "slug": "depannage"},
+}
+
 
 @dataclass(frozen=True)
 class FAQEntry:

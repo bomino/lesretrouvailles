@@ -5,7 +5,7 @@ itself, so a content edit can't accidentally ship an entry with a missing
 field, an empty answer, or an unknown category.
 """
 
-from aide.faq import CATEGORIES, FAQ_ENTRIES, FAQEntry
+from aide.faq import CATEGORIES, CATEGORY_META, FAQ_ENTRIES, FAQEntry
 
 
 def test_all_entries_are_faq_entry_instances():
@@ -51,3 +51,24 @@ def test_each_category_has_at_least_one_entry():
     used = {e.category for e in FAQ_ENTRIES}
     missing = set(CATEGORIES) - used
     assert not missing, f"Categories with no FAQ entry: {sorted(missing)}"
+
+
+def test_category_meta_covers_all_categories():
+    # Adding a category to CATEGORIES without adding it to CATEGORY_META is a
+    # template crash waiting to happen — the view dereferences CATEGORY_META[name]
+    # for icon and slug.
+    missing = set(CATEGORIES) - set(CATEGORY_META.keys())
+    assert not missing, f"CATEGORIES present but missing from CATEGORY_META: {sorted(missing)}"
+    extra = set(CATEGORY_META.keys()) - set(CATEGORIES)
+    assert not extra, f"CATEGORY_META has unknown categories: {sorted(extra)}"
+
+
+def test_category_meta_slugs_are_unique():
+    slugs = [meta["slug"] for meta in CATEGORY_META.values()]
+    assert len(slugs) == len(set(slugs)), "duplicate slugs in CATEGORY_META"
+
+
+def test_category_meta_entries_have_required_fields():
+    for name, meta in CATEGORY_META.items():
+        assert meta.get("icon"), f"Category {name!r} missing icon"
+        assert meta.get("slug"), f"Category {name!r} missing slug"

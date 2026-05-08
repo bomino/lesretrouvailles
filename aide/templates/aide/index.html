@@ -5,26 +5,41 @@
 {% endblock %}
 {% block content %}
     <div class="mx-auto max-w-3xl">
-        <header class="mb-8 text-center">
-            <h1 class="font-display text-3xl font-semibold tracking-tight md:text-4xl">{% trans "Aide" %}</h1>
-            <p class="mx-auto mt-3 max-w-2xl text-sm text-secondary">
-                {% trans "Réponses aux questions courantes sur la plateforme. Pour les détails complets, consultez le guide membre." %}
+        {# Hero — centered icon + eyebrow + title + tagline (matches memoriam pattern). #}
+        <header class="mb-10 text-center">
+            <span class="inline-flex h-12 w-12 items-center justify-center rounded-full bg-tertiary/10 text-tertiary text-2xl"
+                  aria-hidden="true">❓</span>
+            <p class="mt-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-tertiary">{% trans "La communauté" %}</p>
+            <h1 class="mt-2 font-display text-3xl font-semibold tracking-tight md:text-4xl">{% trans "Aide" %}</h1>
+            <p class="mx-auto mt-3 max-w-xl text-sm text-secondary leading-relaxed md:text-base">
+                {% blocktrans count counter=all_count %}{{ counter }} question fréquente sur la plateforme. Pour les détails complets, consultez le guide membre.{% plural %}{{ counter }} questions fréquentes sur la plateforme. Pour les détails complets, consultez le guide membre.{% endblocktrans %}
             </p>
         </header>
+        {# Search bar — sticky on mobile so the user can refilter without scrolling back. #}
         <form method="get"
               role="search"
               action="{% url 'aide:index' %}"
-              class="sticky top-[68px] z-10 mb-6 -mx-4 bg-surface/95 px-4 py-3 backdrop-blur-md md:static md:mx-0 md:bg-transparent md:p-0 md:pb-6">
+              class="sticky top-[68px] z-10 mb-6 -mx-4 border-y border-secondary/10 bg-surface/95 px-4 py-3 backdrop-blur-md md:static md:mx-0 md:rounded-2xl md:border md:border-secondary/15 md:bg-base-200/60 md:px-5 md:py-4 md:shadow-sm">
             <label for="aide-q" class="sr-only">{% trans "Filtrer les questions" %}</label>
             <div class="flex items-center gap-2">
+                <span class="hidden md:inline-flex h-5 w-5 items-center justify-center text-secondary"
+                      aria-hidden="true">
+                    <svg viewBox="0 0 24 24"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="2"
+                         class="h-5 w-5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.3-4.3M10 18a8 8 0 110-16 8 8 0 010 16z" />
+                    </svg>
+                </span>
                 <input id="aide-q"
                        type="search"
                        name="q"
                        value="{{ q }}"
-                       placeholder="{% trans 'Filtrer (par exemple : photo, mot de passe…)' %}"
+                       placeholder="{% trans 'photo, mot de passe, parrainage…' %}"
                        class="w-full rounded-lg border border-secondary/25 bg-surface px-4 py-2 min-h-tap text-sm focus:border-tertiary/60 focus:outline-none focus:ring-2 focus:ring-tertiary/30">
                 <button type="submit"
-                        class="inline-flex items-center rounded-lg border border-secondary/25 bg-surface px-3 py-2 min-h-tap min-w-tap text-sm font-medium hover:border-tertiary/40 hover:text-tertiary transition">
+                        class="inline-flex items-center rounded-lg border border-tertiary/40 bg-tertiary/5 px-3 py-2 min-h-tap min-w-tap text-sm font-medium text-tertiary hover:bg-tertiary/10 transition">
                     {% trans "Filtrer" %}
                 </button>
                 {% if q %}
@@ -35,31 +50,59 @@
             </div>
         </form>
         {% if total_count == 0 %}
-            <div class="rounded-2xl border border-secondary/15 bg-surface/70 p-8 text-center shadow-sm">
-                <p class="text-base font-medium">{% trans "Aucune question ne correspond à votre recherche." %}</p>
-                <p class="mt-2 text-sm text-secondary">
-                    {% blocktrans %}Pour plus de détails, consultez le <a href="https://github.com/Bomino/lesretrouvailles/blob/main/docs/guides/guide_membre.md" class="underline hover:text-tertiary">guide membre complet</a> ou écrivez à l'administrateur via WhatsApp.{% endblocktrans %}
+            {# Empty-state — friendlier copy, centered icon. #}
+            <div class="rounded-2xl border border-secondary/15 bg-surface/70 p-10 text-center shadow-sm">
+                <span class="inline-flex h-12 w-12 items-center justify-center rounded-full bg-secondary/10 text-secondary text-2xl"
+                      aria-hidden="true">🔎</span>
+                <p class="mt-4 text-base font-medium">{% trans "Aucune question ne correspond à votre recherche." %}</p>
+                <p class="mx-auto mt-2 max-w-md text-sm text-secondary">
+                    {% blocktrans %}Pour plus de détails, consultez le <a href="https://github.com/Bomino/lesretrouvailles/blob/main/docs/guides/guide_membre.md" class="underline hover:text-tertiary">guide membre complet</a>, ou écrivez à l'administrateur via WhatsApp.{% endblocktrans %}
                 </p>
-                <p class="mt-4">
+                <p class="mt-6">
                     <a href="{% url 'aide:index' %}"
-                       class="inline-flex items-center rounded-lg border border-secondary/25 bg-surface px-4 py-2 min-h-tap text-sm font-medium hover:border-tertiary/40 hover:text-tertiary transition">
+                       class="inline-flex items-center rounded-lg border border-tertiary/40 bg-tertiary/5 px-4 py-2 min-h-tap text-sm font-medium text-tertiary hover:bg-tertiary/10 transition">
                         {% trans "Voir toutes les questions" %}
                     </a>
                 </p>
             </div>
         {% else %}
-            <div class="space-y-8">
-                {% for category, items in grouped_entries.items %}
-                    <section aria-labelledby="cat-{{ forloop.counter }}">
-                        <h2 id="cat-{{ forloop.counter }}"
-                            class="mb-3 font-display text-lg font-semibold tracking-tight">{{ category }}</h2>
+            {# Quick-jump pills — one per category present, scroll to anchor on tap. #}
+            {% if sections|length > 1 %}
+                <nav class="mb-8 -mx-1 flex flex-wrap justify-center gap-2"
+                     aria-label="{% trans 'Catégories' %}">
+                    {% for section in sections %}
+                        <a href="#cat-{{ section.slug }}"
+                           class="inline-flex items-center gap-2 rounded-full border border-secondary/20 bg-surface px-3 py-1.5 min-h-tap text-xs font-medium hover:border-tertiary/40 hover:text-tertiary transition">
+                            <span aria-hidden="true">{{ section.icon }}</span>
+                            <span>{{ section.name }}</span>
+                            <span class="rounded-full bg-base-300/60 px-1.5 text-[10px] font-semibold text-secondary"
+                                  aria-label="{% blocktrans count counter=section.items|length %}{{ counter }} question{% plural %}{{ counter }} questions{% endblocktrans %}">{{ section.items|length }}</span>
+                        </a>
+                    {% endfor %}
+                </nav>
+            {% endif %}
+            <div class="space-y-10">
+                {% for section in sections %}
+                    <section id="cat-{{ section.slug }}"
+                             aria-labelledby="cat-h-{{ forloop.counter }}"
+                             class="scroll-mt-32 md:scroll-mt-24">
+                        <header class="mb-4 flex items-baseline justify-between gap-3 border-b border-secondary/10 pb-2">
+                            <h2 id="cat-h-{{ forloop.counter }}"
+                                class="font-display text-lg font-semibold tracking-tight md:text-xl">
+                                <span class="mr-2" aria-hidden="true">{{ section.icon }}</span>
+                                {{ section.name }}
+                            </h2>
+                            <span class="text-xs font-semibold uppercase tracking-[0.12em] text-secondary">
+                                {% blocktrans count counter=section.items|length %}{{ counter }} question{% plural %}{{ counter }} questions{% endblocktrans %}
+                            </span>
+                        </header>
                         <ul class="space-y-2">
-                            {% for entry, answer_html in items %}
+                            {% for entry, answer_html in section.items %}
                                 <li>
-                                    <details class="group rounded-xl border border-secondary/15 bg-surface/70 shadow-sm transition open:border-tertiary/30">
+                                    <details class="group rounded-xl border border-secondary/15 bg-surface/70 shadow-sm transition open:border-tertiary/40 open:bg-surface open:shadow-md hover:border-secondary/30">
                                         <summary class="flex cursor-pointer items-center justify-between gap-3 rounded-xl px-4 py-3 min-h-tap text-sm font-medium hover:text-tertiary md:px-5 md:py-4 md:text-base">
-                                            <span>{{ entry.question }}</span>
-                                            <svg class="h-4 w-4 shrink-0 text-secondary transition group-open:rotate-180"
+                                            <span class="flex-1">{{ entry.question }}</span>
+                                            <svg class="h-4 w-4 shrink-0 text-secondary transition group-open:rotate-180 group-open:text-tertiary"
                                                  viewBox="0 0 24 24"
                                                  fill="none"
                                                  stroke="currentColor"
@@ -69,13 +112,25 @@
                                             </svg>
                                         </summary>
                                         <div class="border-t border-secondary/10 px-4 py-4 text-sm leading-relaxed md:px-5 md:py-5 md:text-[15px]">
-                                            <div class="prose prose-sm max-w-none text-primary">{{ answer_html|safe }}</div>
+                                            <div class="prose prose-sm max-w-none text-primary [&_a]:text-tertiary [&_a]:underline hover:[&_a]:text-tertiary/80">
+                                                {{ answer_html|safe }}
+                                            </div>
                                             {% if entry.related_links %}
                                                 <ul class="mt-4 flex flex-wrap gap-2">
                                                     {% for label, url in entry.related_links %}
                                                         <li>
                                                             <a href="{{ url }}"
-                                                               class="inline-flex items-center rounded-lg border border-secondary/25 bg-surface px-3 py-1.5 min-h-tap text-xs font-medium hover:border-tertiary/40 hover:text-tertiary transition">{{ label }}</a>
+                                                               class="inline-flex items-center gap-1.5 rounded-lg border border-secondary/25 bg-surface px-3 py-1.5 min-h-tap text-xs font-medium hover:border-tertiary/40 hover:text-tertiary transition">
+                                                                <svg class="h-3.5 w-3.5"
+                                                                     viewBox="0 0 24 24"
+                                                                     fill="none"
+                                                                     stroke="currentColor"
+                                                                     stroke-width="2"
+                                                                     aria-hidden="true">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                                                </svg>
+                                                                {{ label }}
+                                                            </a>
                                                         </li>
                                                     {% endfor %}
                                                 </ul>
@@ -88,6 +143,10 @@
                     </section>
                 {% endfor %}
             </div>
+            {# Footer copy — invitation to write to the admin if FAQ wasn't enough. #}
+            <p class="mt-12 text-center text-sm text-secondary">
+                {% blocktrans %}Vous n'avez pas trouvé votre réponse ? <strong>Écrivez à l'administrateur</strong> via WhatsApp — il est à votre disposition.{% endblocktrans %}
+            </p>
         {% endif %}
     </div>
 {% endblock %}
