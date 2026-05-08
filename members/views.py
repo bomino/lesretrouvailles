@@ -6,10 +6,7 @@ import markdown as _markdown
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.contrib.postgres.lookups import Unaccent
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import F, Q, Value
-from django.db.models.functions import Lower
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
@@ -21,7 +18,18 @@ from alumni.cloudinary import get_client, now_timestamp
 
 from .charters import CHARTER_CURRENT_VERSION, get_charter_text
 from .forms import NotificationPreferenceForm, ProfileEditForm
-from .models import ConsentRecord, Member
+from .models import AuditLog, ConsentRecord, Member
+from .search import search_members
+
+# Hardcoded suggestion chips rendered in the empty-state when /annuaire/
+# returns zero results post-fallback. Tuneable; a future enhancement
+# could derive these from top-N city/year counts in real data.
+DIRECTORY_EMPTY_STATE_SUGGESTIONS: list[tuple[str, str]] = [
+    ("Niamey", "/annuaire/?city=Niamey"),
+    ("Zinder", "/annuaire/?city=Zinder"),
+    ("Promotion 1983", "/annuaire/?year=1983"),
+    ("Tous les membres", "/annuaire/"),
+]
 
 
 def _client_ip(request) -> str:
@@ -163,22 +171,7 @@ def directory_view(request):
     profession = (request.GET.get("profession") or "").strip()
 
     if q:
-        needle = Lower(Unaccent(Value(q)))
-        qs = qs.annotate(
-            first_lc=Lower(Unaccent(F("first_name"))),
-            last_lc=Lower(Unaccent(F("last_name"))),
-            nick_lc=Lower(Unaccent(F("nickname"))),
-            city_lc=Lower(Unaccent(F("city"))),
-            country_lc=Lower(Unaccent(F("country"))),
-            prof_lc=Lower(Unaccent(F("profession"))),
-        ).filter(
-            Q(first_lc__contains=needle)
-            | Q(last_lc__contains=needle)
-            | Q(nick_lc__contains=needle)
-            | Q(city_lc__contains=needle)
-            | Q(country_lc__contains=needle)
-            | Q(prof_lc__contains=needle)
-        )
+        qs = search_members(qs, q)
 
     if year_raw:
         try:
@@ -194,7 +187,11 @@ def directory_view(request):
     if profession:
         qs = qs.filter(profession__icontains=profession)
 
-    qs = qs.order_by("last_name", "first_name")
+    # Preserve last_name/first_name ordering UNLESS the search already
+    # ranked by trigram similarity (search_members applies its own order
+    # in that branch and we don't want to clobber it).
+    if not qs.query.order_by:
+        qs = qs.order_by("last_name", "first_name")
 
     paginator = Paginator(qs, 20)
     raw_page = request.GET.get("page", "1")
@@ -207,6 +204,25 @@ def directory_view(request):
     except (EmptyPage, PageNotAnInteger):
         page = paginator.page(paginator.num_pages or 1)
 
+    # Log empty-result queries with a meaningful filter so a future bot
+    # decision is data-driven. Only fire when the user actually searched
+    # (q or any facet) — empty filters returning zero just means there
+    # are no active members yet.
+    if paginator.count == 0 and (q or year_raw or city or profession):
+        AuditLog.objects.create(
+            actor=request.user,
+            action="directory.query.no_results",
+            target_type="members.Directory",
+            target_id="-",
+            metadata={
+                "q": q,
+                "year": year_raw or "",
+                "city": city,
+                "profession": profession,
+                "actor_username": request.user.username,
+            },
+        )
+
     template = (
         "members/directory_list_partial.html"
         if request.headers.get("Hx-Request")
@@ -215,7 +231,13 @@ def directory_view(request):
     return render(
         request,
         template,
-        {"page": page, "members": page.object_list},
+        {
+            "page": page,
+            "members": page.object_list,
+            "empty_state_suggestions": (
+                DIRECTORY_EMPTY_STATE_SUGGESTIONS if paginator.count == 0 else []
+            ),
+        },
     )
 
 

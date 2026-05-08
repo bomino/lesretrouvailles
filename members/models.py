@@ -313,6 +313,8 @@ class AuditLog(models.Model):
         ("gestion.login_link.reissued", "Lien de connexion régénéré (gestion)"),
         ("gestion.application.approved", "Candidature approuvée (gestion)"),
         ("gestion.application.rejected", "Candidature rejetée (gestion)"),
+        ("aide.query.no_results", "Recherche aide sans résultat"),
+        ("directory.query.no_results", "Recherche annuaire sans résultat"),
     ]
 
     actor = models.ForeignKey(

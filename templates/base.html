@@ -77,6 +77,8 @@
                            class="rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "Souvenirs" %}</a>
                         <a href="{% url 'memoriam:list' %}"
                            class="rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "In Memoriam" %} 🕊️</a>
+                        <a href="{% url 'aide:index' %}"
+                           class="rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "Aide" %}</a>
                         <a href="/cooptations-a-valider/"
                            class="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition">
                             {% trans "Cooptations à valider" %}
@@ -167,7 +169,12 @@
                                 </svg>
                             </button>
                         {% else %}
-                            {# Anonymous mobile: show WhatsApp icon-only + Connexion link inline (no hamburger needed for 2 items). #}
+                            {# Anonymous: Aide link is visible at all sizes (desktop nav above only renders for authenticated users). #}
+                            <a href="{% url 'aide:index' %}"
+                               class="hidden sm:inline-flex items-center rounded-lg px-3 py-2 min-h-tap text-sm font-medium hover:text-tertiary transition">
+                                {% trans "Aide" %}
+                            </a>
+                            {# Anonymous mobile: WhatsApp icon-only + Connexion link inline. #}
                             <a href="https://chat.whatsapp.com/"
                                rel="noopener noreferrer"
                                target="_blank"
@@ -210,6 +217,10 @@
                         <li>
                             <a href="{% url 'memoriam:list' %}"
                                class="flex items-center min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "In Memoriam" %} 🕊️</a>
+                        </li>
+                        <li>
+                            <a href="{% url 'aide:index' %}"
+                               class="flex items-center min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "Aide" %}</a>
                         </li>
                         <li>
                             <a href="/cooptations-a-valider/"

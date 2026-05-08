@@ -19,8 +19,19 @@
             </a>
         </li>
     {% empty %}
-        <li class="col-span-full rounded-2xl border border-dashed border-secondary/30 bg-base-200/50 p-8 text-center text-secondary">
-            {% trans "Aucun membre trouvé." %}
+        <li class="col-span-full rounded-2xl border border-dashed border-secondary/30 bg-base-200/50 p-8 text-center">
+            <p class="text-base font-medium text-primary">{% trans "Aucun membre trouvé." %}</p>
+            {% if empty_state_suggestions %}
+                <p class="mt-2 text-sm text-secondary">{% trans "Essayez une de ces recherches :" %}</p>
+                <ul class="mt-4 flex flex-wrap justify-center gap-2">
+                    {% for label, url in empty_state_suggestions %}
+                        <li>
+                            <a href="{{ url }}"
+                               class="inline-flex items-center rounded-lg border border-secondary/25 bg-base-200 px-3 py-1.5 min-h-tap text-xs font-medium hover:border-tertiary/40 hover:text-tertiary transition">{{ label }}</a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
         </li>
     {% endfor %}
 </ul>

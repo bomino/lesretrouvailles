@@ -26,6 +26,7 @@ Single dashboard for tracking phase and task completion across all plans. Update
 | P6c | Ops — DMARC monitoring + AuditLog retention | Complete (2026-05-05) | [spec](specs/2026-05-05-p6c-dmarc-retention-design.md) |
 | P6 | Ops & RGPD | Complete (P6a + P6b + P6c shipped 2026-05-05) | — |
 | P7 | Soft launch (auth flip + bulk-import tooling + launch runbooks) | Complete (tag `v1.0.0-soft-launch`, 2026-05-05) | [spec](specs/2026-05-05-p7-soft-launch-design.md) |
+| P8 | Self-service help — public `/aide/` FAQ + smarter `/annuaire/` (multi-token AND + pg_trgm trigram fallback + empty-state suggestions + no-results AuditLog) | Complete (tag `v1.2.0-self-service-help`, 2026-05-08) | [spec](specs/2026-05-08-self-service-help-design.md) |
 
 ---
 
