@@ -56,9 +56,11 @@
                     </nav>
                 </aside>
             {% endif %}
-            {# Body content. Anchor IDs from the markdown ``toc`` extension are
-               rendered into headings; scroll-mt-[80px] keeps the heading clear of
-               the sticky navbar when a TOC link jumps to it. #}
+            {% comment %}
+                Body content. Anchor IDs from the markdown `toc` extension are
+                rendered into headings; scroll-mt-[80px] keeps the heading clear
+                of the sticky navbar when a TOC link jumps to it.
+            {% endcomment %}
             <article class="prose prose-sm md:prose-base max-w-none text-primary prose-headings:font-display prose-headings:scroll-mt-[80px] [&_a]:text-tertiary [&_a]:underline hover:[&_a]:text-tertiary/80 prose-blockquote:border-tertiary/30 prose-blockquote:bg-base-200/40 prose-blockquote:rounded-r-lg prose-blockquote:py-1 prose-code:rounded prose-code:bg-base-300/40 prose-code:px-1 prose-code:py-0.5">
                 {{ guide_html|safe }}
             </article>
