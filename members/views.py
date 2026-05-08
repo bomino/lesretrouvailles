@@ -189,8 +189,12 @@ def directory_view(request):
 
     # Preserve last_name/first_name ordering UNLESS the search already
     # ranked by trigram similarity (search_members applies its own order
-    # in that branch and we don't want to clobber it).
-    if not qs.query.order_by:
+    # in that branch and we don't want to clobber it). Capture the result
+    # so the template knows whether to render alphabetical letter section
+    # headers (yes when we ordered alphabetically; no when trigram ranked
+    # by similarity — the section headers would be misleading there).
+    is_alphabetical = not bool(qs.query.order_by)
+    if is_alphabetical:
         qs = qs.order_by("last_name", "first_name")
 
     paginator = Paginator(qs, 20)
@@ -203,6 +207,83 @@ def directory_view(request):
         page = paginator.page(page_number)
     except (EmptyPage, PageNotAnInteger):
         page = paginator.page(paginator.num_pages or 1)
+
+    # Letter groups for the current page — only meaningful when the result
+    # is alphabetically sorted. Each group is {"letter": str, "members": [...]}
+    # in document order, with letters derived from last_name's first
+    # character (uppercased, accent-stripped via a lightweight map). Members
+    # without a last_name fall under "—".
+    letter_groups: list[dict] = []
+    if is_alphabetical:
+        current: dict | None = None
+        for member in page.object_list:
+            letter = (member.last_name[:1] or "—").upper()
+            # Strip common French accents from grouping letter so "Émile"
+            # groups under "E" (visual + sort consistency).
+            letter = {
+                "À": "A",
+                "Â": "A",
+                "Ä": "A",
+                "É": "E",
+                "È": "E",
+                "Ê": "E",
+                "Ë": "E",
+                "Î": "I",
+                "Ï": "I",
+                "Ô": "O",
+                "Ö": "O",
+                "Ù": "U",
+                "Û": "U",
+                "Ü": "U",
+                "Ç": "C",
+            }.get(letter, letter)
+            if current is None or current["letter"] != letter:
+                current = {"letter": letter, "members": []}
+                letter_groups.append(current)
+            current["members"].append(member)
+
+    # Active-filter chips: each chip carries a label and a removal URL
+    # (the current querystring with that one filter dropped). Empty chips
+    # are skipped so the chip strip only shows what's actually applied.
+    def _qs_without(*keys_to_drop: str) -> str:
+        """Return the current GET querystring with the listed keys removed.
+        Used for the chip remove (×) links."""
+        params = request.GET.copy()
+        for k in keys_to_drop:
+            params.pop(k, None)
+        params.pop("page", None)  # always reset pagination on filter change
+        return params.urlencode()
+
+    active_filters: list[dict] = []
+    if q:
+        active_filters.append({"label": q, "remove_qs": _qs_without("q"), "kind": "q"})
+    if year_raw:
+        try:
+            year_int = int(year_raw)
+            if year_int in range(1980, 1986):
+                active_filters.append(
+                    {
+                        "label": f"Promotion {year_int}",
+                        "remove_qs": _qs_without("year"),
+                        "kind": "year",
+                    }
+                )
+        except (TypeError, ValueError):
+            pass
+    if city:
+        active_filters.append({"label": city, "remove_qs": _qs_without("city"), "kind": "city"})
+    if profession:
+        active_filters.append(
+            {
+                "label": profession,
+                "remove_qs": _qs_without("profession"),
+                "kind": "profession",
+            }
+        )
+
+    # Total active members in the platform — used in the "X sur Y membres"
+    # display when filters are applied. Single COUNT(*), negligible cost.
+    total_active_count = Member.objects.filter(status="active").count()
 
     # Log empty-result queries with a meaningful filter so a future bot
     # decision is data-driven. Only fire when the user actually searched
@@ -234,6 +315,11 @@ def directory_view(request):
         {
             "page": page,
             "members": page.object_list,
+            "letter_groups": letter_groups,
+            "is_alphabetical": is_alphabetical,
+            "active_filters": active_filters,
+            "total_count": paginator.count,
+            "total_active_count": total_active_count,
             "empty_state_suggestions": (
                 DIRECTORY_EMPTY_STATE_SUGGESTIONS if paginator.count == 0 else []
             ),

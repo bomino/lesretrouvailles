@@ -6,11 +6,24 @@
 {% endblock %}
 {% block content %}
     <section class="mx-auto max-w-6xl">
-        <header class="mb-8">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-tertiary">{% trans "La communauté" %}</p>
-            <h1 class="mt-2 font-display text-4xl font-semibold tracking-tight hero-rule">{% trans "Annuaire" %}</h1>
-            <p class="mt-4 max-w-2xl text-base text-secondary leading-relaxed">
-                {% trans "Anciens élèves du CEG 1 Birni — Zinder, promotions 1980 à 1985. Recherchez par nom, surnom, ville ou profession." %}
+        {% comment %}
+            Hero — centered, generous, with the platform's signature gold rule
+            below the title. Matches /aide/ and /guide/ for visual consistency
+            across the help+community surfaces.
+        {% endcomment %}
+        <header class="relative mb-12 text-center md:mb-14">
+            <span class="inline-flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-tertiary/15 via-tertiary/5 to-ceremonial-gold/10 text-3xl shadow-sm ring-1 ring-tertiary/20"
+                  aria-hidden="true">
+                <span class="drop-shadow-sm">📇</span>
+            </span>
+            <p class="mt-5 text-[11px] font-semibold uppercase tracking-[0.22em] text-tertiary">{% trans "La communauté" %}</p>
+            <h1 class="mt-3 font-display text-4xl font-semibold tracking-tight md:text-5xl md:leading-[1.1]">
+                {% trans "Annuaire" %}
+            </h1>
+            <span class="mt-4 mx-auto block h-[3px] w-16 rounded-full bg-gradient-to-r from-ceremonial-gold to-tertiary"
+                  aria-hidden="true"></span>
+            <p class="mx-auto mt-5 max-w-2xl text-base text-secondary leading-relaxed">
+                {% blocktrans %}Anciens élèves du CEG 1 Birni — Zinder, promotions 1980 à 1985. Recherchez par nom, surnom, ville ou profession — les résultats s'affichent par ordre alphabétique.{% endblocktrans %}
             </p>
         </header>
         <form method="get"
