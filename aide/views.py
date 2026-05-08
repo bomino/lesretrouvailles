@@ -18,6 +18,7 @@ from django.shortcuts import render
 from members.models import AuditLog
 
 from .faq import CATEGORIES, CATEGORY_META, FAQ_ENTRIES, FAQEntry
+from .guide import GUIDE_HTML, GUIDE_TOC
 
 Q_TRUNCATE_CHARS = 80
 
@@ -83,6 +84,20 @@ def _log_no_results(request: HttpRequest, q: str) -> None:
                 request.user.username if request.user.is_authenticated else "anonymous"
             ),
         },
+    )
+
+
+def guide_view(request: HttpRequest) -> HttpResponse:
+    """Render the canonical member guide as a public page at /guide/.
+
+    Public, no auth — same posture as /aide/. The HTML and TOC are built once
+    at module load (see aide/guide.py); per-request cost is just template
+    rendering.
+    """
+    return render(
+        request,
+        "aide/guide.html",
+        {"guide_html": GUIDE_HTML, "toc": GUIDE_TOC},
     )
 
 

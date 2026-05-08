@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}
+    {% trans "Guide membre — Les Retrouvailles" %}
+{% endblock %}
+{% block content %}
+    <div class="mx-auto max-w-6xl">
+        {# Hero — centered icon, eyebrow, title, tagline. Mirrors /aide/. #}
+        <header class="mb-8 text-center">
+            <span class="inline-flex h-12 w-12 items-center justify-center rounded-full bg-tertiary/10 text-tertiary text-2xl"
+                  aria-hidden="true">📖</span>
+            <p class="mt-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-tertiary">{% trans "La communauté" %}</p>
+            <h1 class="mt-2 font-display text-3xl font-semibold tracking-tight md:text-4xl">{% trans "Guide membre" %}</h1>
+            <p class="mx-auto mt-3 max-w-xl text-sm text-secondary leading-relaxed md:text-base">
+                {% blocktrans %}Le mode d'emploi complet de la plateforme, pas à pas. Pour des questions courtes, voir <a href="{% endblocktrans %}{% url 'aide:index' %}{% blocktrans %}"
+    class="underline hover:text-tertiary">la page d'aide</a>.{% endblocktrans %}
+            </p>
+        </header>
+        <div class="md:grid md:grid-cols-[260px_1fr] md:gap-8">
+            {# Mobile TOC: collapsed accordion above the content. #}
+            {% if toc %}
+                <details class="mb-6 rounded-2xl border border-secondary/15 bg-surface/70 shadow-sm md:hidden">
+                    <summary class="flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-4 py-3 min-h-tap text-sm font-semibold hover:text-tertiary">
+                        <span>{% trans "Sommaire" %}</span>
+                        <svg class="h-4 w-4 shrink-0 text-secondary transition group-open:rotate-180"
+                             viewBox="0 0 24 24"
+                             fill="none"
+                             stroke="currentColor"
+                             stroke-width="2"
+                             aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </summary>
+                    <ol class="space-y-1 border-t border-secondary/10 px-3 py-3 text-sm">
+                        {% for entry in toc %}
+                            <li>
+                                <a href="#{{ entry.id }}"
+                                   class="flex min-h-tap items-center rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition">{{ entry.text }}</a>
+                            </li>
+                        {% endfor %}
+                    </ol>
+                </details>
+                {# Desktop TOC: sticky sidebar. top-[80px] clears the navbar header. #}
+                <aside class="hidden md:block">
+                    <nav class="sticky top-[80px] rounded-2xl border border-secondary/15 bg-surface/70 p-4 shadow-sm"
+                         aria-label="{% trans 'Sommaire du guide' %}">
+                        <p class="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">{% trans "Sommaire" %}</p>
+                        <ol class="space-y-1 text-sm">
+                            {% for entry in toc %}
+                                <li>
+                                    <a href="#{{ entry.id }}"
+                                       class="block rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition">{{ entry.text }}</a>
+                                </li>
+                            {% endfor %}
+                        </ol>
+                    </nav>
+                </aside>
+            {% endif %}
+            {# Body content. Anchor IDs from the markdown ``toc`` extension are
+               rendered into headings; scroll-mt-[80px] keeps the heading clear of
+               the sticky navbar when a TOC link jumps to it. #}
+            <article class="prose prose-sm md:prose-base max-w-none text-primary prose-headings:font-display prose-headings:scroll-mt-[80px] [&_a]:text-tertiary [&_a]:underline hover:[&_a]:text-tertiary/80 prose-blockquote:border-tertiary/30 prose-blockquote:bg-base-200/40 prose-blockquote:rounded-r-lg prose-blockquote:py-1 prose-code:rounded prose-code:bg-base-300/40 prose-code:px-1 prose-code:py-0.5">
+                {{ guide_html|safe }}
+            </article>
+        </div>
+        {# Footer — link back to /aide/ + admin reminder. #}
+        <p class="mt-12 text-center text-sm text-secondary">
+            {% blocktrans %}Vous avez une question rapide ? Voir la <a href="{% endblocktrans %}{% url 'aide:index' %}{% blocktrans %}"
+    class="underline hover:text-tertiary">page d'aide</a>. Sinon, <strong>écrivez à l'administrateur</strong> via WhatsApp — il est à votre disposition.{% endblocktrans %}
+        </p>
+    </div>
+{% endblock %}

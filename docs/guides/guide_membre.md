@@ -2,7 +2,9 @@
 
 Bienvenue dans la communauté privée des anciens du **CEG 1 Birni — Zinder (1980-1985)**. Ce guide vous accompagne pas à pas pour activer votre compte, retrouver vos camarades, et tirer le meilleur de la plateforme.
 
-> 💡 **Pour des questions courtes** (« comment changer ma photo ? », « j'ai oublié mon mot de passe »…), consultez la page **[`/aide/`](https://villageretrouvailles.com/aide/)** — accessible sans connexion. Pour les détails complets, ce guide reste la référence.
+> 💡 **Pour des questions courtes** (« comment changer ma photo ? », « j'ai oublié mon mot de passe »…), consultez la page **[`/aide/`](https://villageretrouvailles.com/aide/)** — accessible sans connexion.
+>
+> 📖 **Ce guide est aussi disponible en ligne** à **[`/guide/`](https://villageretrouvailles.com/guide/)**, avec un sommaire interactif et la même mise en forme.
 
 > 📱 La plateforme fonctionne aussi bien sur téléphone (Android, iPhone) que sur ordinateur. Les instructions ci-dessous mentionnent les particularités mobiles quand c'est utile.
 

@@ -334,6 +334,13 @@
                                 </li>
                             {% endif %}
                             <li>
+                                <a href="{% url 'aide:index' %}" class="hover:text-tertiary transition">{% trans "Aide" %}</a>
+                            </li>
+                            <li>
+                                <a href="{% url 'member_guide' %}"
+                                   class="hover:text-tertiary transition">{% trans "Guide membre" %}</a>
+                            </li>
+                            <li>
                                 <a href="https://chat.whatsapp.com/"
                                    target="_blank"
                                    rel="noopener noreferrer"
