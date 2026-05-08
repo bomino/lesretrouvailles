@@ -169,9 +169,9 @@
                                 </svg>
                             </button>
                         {% else %}
-                            {# Anonymous: Aide link is visible at all sizes (desktop nav above only renders for authenticated users). #}
+                            {# Anonymous: Aide link is visible at all sizes — including mobile. The desktop authenticated nav doesn't apply here (anon never has it). #}
                             <a href="{% url 'aide:index' %}"
-                               class="hidden sm:inline-flex items-center rounded-lg px-3 py-2 min-h-tap text-sm font-medium hover:text-tertiary transition">
+                               class="inline-flex items-center rounded-lg px-2 py-2 min-h-tap text-sm font-medium hover:bg-base-200 hover:text-tertiary transition md:px-3">
                                 {% trans "Aide" %}
                             </a>
                             {# Anonymous mobile: WhatsApp icon-only + Connexion link inline. #}
