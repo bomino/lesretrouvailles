@@ -4,13 +4,13 @@
 >
 > Un espace pour reconstituer ce que la vie a dispersé : un annuaire, une mémoire collective, un In Memoriam, et un pont vers le groupe WhatsApp existant.
 
-[![v1.2.0-self-service-help](https://img.shields.io/badge/release-v1.2.0--self--service--help-blue)](https://github.com/Bomino/lesretrouvailles/releases/tag/v1.2.0-self-service-help)
+[![v1.2.1-member-guide](https://img.shields.io/badge/release-v1.2.1--member--guide-blue)](https://github.com/Bomino/lesretrouvailles/releases/tag/v1.2.1-member-guide)
 
 ---
 
 ## Statut
 
-**v1.2.0-self-service-help** — feature-complete, en production sur https://villageretrouvailles.com/. Au programme depuis le soft launch : console de gestion mobile-first pour les co-administrateurs (Gestion v1, `v1.1.0-gestion-console`) et une page d'aide publique avec recherche d'annuaire améliorée (P8, `v1.2.0-self-service-help`).
+**v1.2.1-member-guide** — feature-complete, en production sur https://villageretrouvailles.com/. Au programme depuis le soft launch : console de gestion mobile-first pour les co-administrateurs (Gestion v1, `v1.1.0-gestion-console`), page d'aide publique avec recherche d'annuaire améliorée (P8, `v1.2.0-self-service-help`), et page guide membre publique rendue en HTML stylisé depuis le markdown canonique (P8.1, `v1.2.1-member-guide`).
 
 | Phase | Description | Statut |
 |---|---|---|
@@ -26,6 +26,7 @@
 | **P7** | Soft launch (auth téléphone-ou-email, import en masse) | ✅ |
 | **Gestion v1** | Console `/gestion/` pour co-administrateurs (annuaire, magic-links, cooptation) | ✅ |
 | **P8** | Self-service help (page `/aide/` publique + annuaire multi-mots et tolérance aux fautes) | ✅ |
+| **P8.1** | Guide membre en HTML (page `/guide/` publique avec sommaire interactif, rendu depuis `docs/guides/guide_membre.md`) | ✅ |
 
 Suite (Phase 2 — backlog dans [`docs/superpowers/STATUS.md`](docs/superpowers/STATUS.md)) : mode sombre, galerie ouverte aux membres, carte géographique, In Memoriam ouvert, traduction Hausa, flow RGPD self-service.
 
@@ -38,7 +39,7 @@ Suite (Phase 2 — backlog dans [`docs/superpowers/STATUS.md`](docs/superpowers/
 - **Médias** : Cloudinary (upload signé direct + transforms), bucket Railway/Tigris S3-compatible (sauvegarde hebdomadaire)
 - **Email** : [Resend](https://resend.com/) avec SPF/DKIM/DMARC sur villageretrouvailles.com
 - **Hébergement** : Railway (app, Postgres, cron services, bucket)
-- **Tests** : pytest + pytest-django (~683 tests passants)
+- **Tests** : pytest + pytest-django (~697 tests passants)
 - **Lint/format** : ruff (Python), djLint (templates Django), pre-commit hooks
 
 ---
