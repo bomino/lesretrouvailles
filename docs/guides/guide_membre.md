@@ -123,7 +123,13 @@ Vous voyez tous les membres inscrits, avec leur nom, leur photo, leurs années a
 
 ### Recherche
 
-Tapez un nom (ou un morceau de nom) dans la barre de recherche. La recherche est **insensible aux accents** (taper « malam » trouvera aussi « Mâlâm »).
+Tapez un nom (ou un morceau de nom) dans la barre de recherche. La recherche est :
+
+- **Insensible aux accents** — taper « malam » trouvera aussi « Mâlâm ».
+- **Multi-mots** — tapez `1983 Niamey` pour ne voir que les camarades de la promotion 1983 qui sont à Niamey. Chaque mot doit correspondre quelque part (nom, surnom, ville, profession, ou année).
+- **Tolérante aux fautes de frappe** — si rien ne correspond exactement à votre recherche, la plateforme propose les meilleurs candidats par similarité. Par exemple, taper `Naimey` (faute de frappe pour Niamey) suggère quand même les camarades à Niamey.
+
+Si la recherche ne donne rien, des suggestions rapides s'affichent (Niamey, Zinder, Promotion 1983, Tous les membres) — touchez l'une d'elles pour repartir.
 
 ### Filtres
 

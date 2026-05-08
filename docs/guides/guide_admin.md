@@ -380,6 +380,17 @@ Filtrez sur erreurs : ajoutez `| grep -iE "error|traceback"`.
 railway run --service lesretrouvailles python manage.py audit_launch_readiness
 ```
 
+### Recherches sans résultat (signal pour le futur)
+
+Depuis P8, deux actions `AuditLog` capturent les recherches qui n'ont rien trouvé :
+
+- **`directory.query.no_results`** — un membre a fait une recherche dans `/annuaire/` qui n'a rien retourné, même après le repli par similarité (pg_trgm). Métadonnées : `q`, `year`, `city`, `profession`, `actor_username`.
+- **`aide.query.no_results`** — un visiteur (anonyme ou connecté) a fait une recherche `?q=` dans `/aide/` qui n'a matché aucune entrée. Métadonnées : `q` tronqué à 80 caractères, `actor_username` (ou `"anonymous"`).
+
+Filtrer ces actions dans `/admin/auditlog/` toutes les 4-6 semaines permet de voir ce que les membres cherchent sans le trouver. Si un même thème revient, c'est le signal pour ajouter une entrée FAQ (édition de `aide/faq.py` + PR — voir §12) ou pour enrichir les données de l'annuaire.
+
+C'est aussi le journal qui informera la décision « faut-il un chatbot ? » plus tard. Décision déférée explicitement à `STATUS.md` § Phase 2 backlog : si après 60 jours d'usage les recherches sans résultat se concentrent sur des questions qu'une FAQ statique ne peut pas résoudre, on rouvre la spec d'un assistant IA. Sinon, le statu quo est suffisant.
+
 ---
 
 ## 10. Dépannage courant

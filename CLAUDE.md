@@ -8,7 +8,7 @@ If something here contradicts what you'd reach for by default, **trust this file
 
 ## Project context (the 30-second version)
 
-- **What:** Private alumni platform for CEG 1 Birni (Zinder, Niger), promotions 1980-1985. Production at https://villageretrouvailles.com/. Tags: `v1.0.0-soft-launch`, `v1.1.0-gestion-console`.
+- **What:** Private alumni platform for CEG 1 Birni (Zinder, Niger), promotions 1980-1985. Production at https://villageretrouvailles.com/. Tags: `v1.0.0-soft-launch`, `v1.1.0-gestion-console`, `v1.2.0-self-service-help`.
 - **Audience:** ~200 alumni from a WhatsApp group, ages 55-65. **~80% have no email.** Mobile-first (Android 7+ + low-end devices). The launch onboarding imports them en masse from a WhatsApp roster.
 - **Tone:** All user-facing copy is **French**. Code, comments, and commit messages are **English**.
 - **Owner:** Single bilingual super-admin (Bomino, `bominomla`). Plus 0-3 co-admins via `is_staff=True` (see admin-tiers section below).
@@ -65,17 +65,18 @@ When a bug only appears in prod, the first thing to try locally is `make docker-
 
 ## Django app layout
 
-The project is one Django project (`alumni/`) hosting seven apps. Knowing what owns what saves a lot of grepping:
+The project is one Django project (`alumni/`) hosting eight apps. Knowing what owns what saves a lot of grepping:
 
 - **`alumni/`** — Django project package. Settings, root URLs, **custom `AdminSite` (`GestionAdminSite`) that gates `/admin/` to superusers**, Cloudinary client (`cloudinary.py`), object-storage client (`storage.py`), `FakeResendBackend` (`email.py`), security/basic-auth middleware.
 - **`core/`** — Cross-cutting infrastructure: landing page, `/health` endpoint, sitemap, allauth adapter (`allauth_adapter.py`), `backup_media` weekly cron command.
-- **`members/`** — The big one. `Member`, `User` extensions, `PublicSearchEntry`, **`AuditLog`** (cross-domain event log), magic-link reissue, RGPD purge engine (`services.py::rgpd_purge_member`), WhatsApp roster import, member directory views, public ghost list. Also owns `audit_launch_readiness` for go-live checks.
+- **`members/`** — The big one. `Member`, `User` extensions, `PublicSearchEntry`, **`AuditLog`** (cross-domain event log), magic-link reissue, RGPD purge engine (`services.py::rgpd_purge_member`), WhatsApp roster import, member directory views, public ghost list. Search composition extracted into `members/search.py` (multi-token AND + pg_trgm trigram fallback). Also owns `audit_launch_readiness` for go-live checks.
 - **`cooptation/`** — Public signup flow (`/inscription/`), `AdminApplication`, `CooptationRequest`, parrainage logic, daily deadlines cron (`process_cooptation_deadlines`).
 - **`gestion/`** — Co-admin console at `/gestion/` (Gestion v1, tag `v1.1.0-gestion-console`). **No models** — pure views/forms/decorators composed over the other apps. The `staff_required` decorator in `gestion/decorators.py` is the right gate for any new staff-tier view (redirects to `/accounts/login/`, 403s authenticated non-staff). See admin-tiers section below.
 - **`memoires/`** — Mur des souvenirs. `Memory` (curated photo gallery, admin-uploaded).
 - **`memoriam/`** — In Memoriam. `InMemoriamEntry` (tribute fiche) + `InMemoriamNomination` (member-submitted proposal).
+- **`aide/`** — Public FAQ at `/aide/` (P8, tag `v1.2.0-self-service-help`). **No models** — `aide/faq.py::FAQ_ENTRIES` is a typed Python list rendered through the existing markdown + bleach pipeline, grouped by category with deterministic icons + anchor slugs from `CATEGORY_META`. To edit content, edit `faq.py` and submit a PR; structural tests in `aide/tests/test_faq_content.py` lock `CATEGORIES` and `CATEGORY_META` in sync. **Public-by-default** via `LOGIN_REQUIRED_WHITELIST` because the FAQ has to be reachable to members who don't have a session yet (activation, password reset). No-result `?q=` queries are logged via `AuditLog.aide.query.no_results` for the future-bot-decision data trail.
 
-Models live in `members`, `cooptation`, `memoires`, `memoriam`. URL roots are wired from `alumni/urls.py`. `gestion` is a "console layer" — adding a feature there usually means adding a view that calls into another app's services, not adding a model.
+Models live in `members`, `cooptation`, `memoires`, `memoriam`. URL roots are wired from `alumni/urls.py`. `gestion` and `aide` are model-less "composition layers" — adding a feature there usually means adding a view that calls into another app's services (gestion) or extending a typed Python list (aide), not adding a model.
 
 ---
 
@@ -264,7 +265,7 @@ The owner develops on Windows. The repo is cross-platform but:
 - Use `@pytest.mark.django_db` for DB tests.
 - Use `settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"` to avoid real sends in email-related tests.
 - Use `settings.CLOUDINARY_CLIENT_PATH = "alumni.cloudinary.FakeCloudinary"` and `settings.STORAGE_CLIENT_PATH = "alumni.storage.FakeStorage"` (call `reset_fake_client()` between tests for clean call lists).
-- Target full-suite count: `~520` at v1.0.0-soft-launch, `~622` at v1.1.0-gestion-console, `~650` at the post-Gestion polish round. New work should add tests; the count should grow, not shrink.
+- Target full-suite count: `~520` at v1.0.0-soft-launch, `~622` at v1.1.0-gestion-console, `~650` at the post-Gestion polish round, `~683` at v1.2.0-self-service-help. New work should add tests; the count should grow, not shrink.
 
 ---
 
@@ -286,6 +287,8 @@ The owner develops on Windows. The repo is cross-platform but:
 | Operator launch procedure | `docs/runbooks/launch.md` |
 | User-facing French guide | `docs/guides/guide_membre.md` (member) + `guide_admin.md` (admin) |
 | Frontend admin console (gestion) | `gestion/` — views, forms, decorators, templates, tests |
+| Public FAQ (`/aide/`) | `aide/` — `faq.py` (typed entries), `views.py`, single accordion template |
+| Member directory search composition | `members/search.py` — multi-token AND + pg_trgm trigram fallback |
 | Custom AdminSite (locks /admin/ to superuser) | `alumni/admin.py` |
 | Cooptation services (approve/reject/purge) | `cooptation/services.py` |
 | Member purge (RGPD) engine | `members/services.py::rgpd_purge_member` |
@@ -331,6 +334,7 @@ When the user reports a bug:
 - **Don't** add a new `AuditLog.action` value without also adding it to `ACTION_CHOICES`. Forms validate against choices; ORM `create()` doesn't, but list filters in `/admin/auditlog/` rely on the enum.
 - **Don't** pull production secrets into the local environment.
 - **Don't** delete records on production without explicit user confirmation. The P6b RGPD purge engine is the right tool for member deletions; for other test artifacts, surface what you'd delete and ask.
+- **Don't** add a new Django app without updating BOTH stages of the `Dockerfile` to `COPY <app>/ ./<app>/`. The Dockerfile copies each app explicitly (not `COPY . .`), so a new app needs `COPY` lines in both the runtime stage (for `django.setup()` to discover the `AppConfig` at `compilemessages` / `collectstatic` time) and the css-builder stage (for Tailwind to scan its templates). Caught the first time at deploy of `aide/` (P8): `ModuleNotFoundError: No module named 'aide'` during the prod build. Pattern: search for an existing `COPY core/ ./core/` line, add yours next to it in each stage.
 - **Don't** assume what the user wants. If a request has multiple interpretations or non-obvious tradeoffs, surface them in 2-3 sentences and ask before executing.
 
 ---

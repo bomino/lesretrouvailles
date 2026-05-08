@@ -1,8 +1,8 @@
 # P8 — Self-service help (`/aide/` FAQ + smarter `/annuaire/`)
 
-**Status:** Spec + plan combined doc, per CLAUDE.md guidance for small features (precedent: P6c, P7).
-**Branch:** `feat/self-service-help`
-**Target tag:** `v1.2.0-self-service-help`
+**Status:** ✅ Shipped 2026-05-08, tag `v1.2.0-self-service-help`. See [`docs/superpowers/STATUS.md`](../STATUS.md#p8--self-service-help-aide-faq--smarter-annuaire) for the closing task table, commits, and notable design decisions captured during execution.
+**Branch:** `feat/self-service-help` (merged to `main` via `e61a209`)
+**Tag:** `v1.2.0-self-service-help`
 
 ## A. Origin
 

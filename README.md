@@ -4,13 +4,13 @@
 >
 > Un espace pour reconstituer ce que la vie a dispersé : un annuaire, une mémoire collective, un In Memoriam, et un pont vers le groupe WhatsApp existant.
 
-[![v1.0.0-soft-launch](https://img.shields.io/badge/release-v1.0.0--soft--launch-blue)](https://github.com/Bomino/lesretrouvailles/releases/tag/v1.0.0-soft-launch)
+[![v1.2.0-self-service-help](https://img.shields.io/badge/release-v1.2.0--self--service--help-blue)](https://github.com/Bomino/lesretrouvailles/releases/tag/v1.2.0-self-service-help)
 
 ---
 
 ## Statut
 
-**v1.0.0-soft-launch** — feature-complete, en production sur https://villageretrouvailles.com/, prête à accueillir les ~200 membres du groupe WhatsApp existant via la procédure d'onboarding documentée.
+**v1.2.0-self-service-help** — feature-complete, en production sur https://villageretrouvailles.com/. Au programme depuis le soft launch : console de gestion mobile-first pour les co-administrateurs (Gestion v1, `v1.1.0-gestion-console`) et une page d'aide publique avec recherche d'annuaire améliorée (P8, `v1.2.0-self-service-help`).
 
 | Phase | Description | Statut |
 |---|---|---|
@@ -24,8 +24,10 @@
 | **P6b** | Ops — purge RGPD admin | ✅ |
 | **P6c** | Ops — DMARC + rétention AuditLog | ✅ |
 | **P7** | Soft launch (auth téléphone-ou-email, import en masse) | ✅ |
+| **Gestion v1** | Console `/gestion/` pour co-administrateurs (annuaire, magic-links, cooptation) | ✅ |
+| **P8** | Self-service help (page `/aide/` publique + annuaire multi-mots et tolérance aux fautes) | ✅ |
 
-Suite (Phase 2 — backlog dans [`docs/superpowers/STATUS.md`](docs/superpowers/STATUS.md)) : mode sombre, galerie ouverte aux membres, carte géographique, In Memoriam ouvert, traduction Hausa, flow RGPD self-service, route `/aide/` en application.
+Suite (Phase 2 — backlog dans [`docs/superpowers/STATUS.md`](docs/superpowers/STATUS.md)) : mode sombre, galerie ouverte aux membres, carte géographique, In Memoriam ouvert, traduction Hausa, flow RGPD self-service.
 
 ---
 
@@ -36,7 +38,7 @@ Suite (Phase 2 — backlog dans [`docs/superpowers/STATUS.md`](docs/superpowers/
 - **Médias** : Cloudinary (upload signé direct + transforms), bucket Railway/Tigris S3-compatible (sauvegarde hebdomadaire)
 - **Email** : [Resend](https://resend.com/) avec SPF/DKIM/DMARC sur villageretrouvailles.com
 - **Hébergement** : Railway (app, Postgres, cron services, bucket)
-- **Tests** : pytest + pytest-django (~520 tests passants)
+- **Tests** : pytest + pytest-django (~683 tests passants)
 - **Lint/format** : ruff (Python), djLint (templates Django), pre-commit hooks
 
 ---
