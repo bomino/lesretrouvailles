@@ -28,6 +28,10 @@ Single dashboard for tracking phase and task completion across all plans. Update
 | P7 | Soft launch (auth flip + bulk-import tooling + launch runbooks) | Complete (tag `v1.0.0-soft-launch`, 2026-05-05) | [spec](specs/2026-05-05-p7-soft-launch-design.md) |
 | P8 | Self-service help — public `/aide/` FAQ + smarter `/annuaire/` (multi-token AND + pg_trgm trigram fallback + empty-state suggestions + no-results AuditLog) | Complete (tag `v1.2.0-self-service-help`, 2026-05-08) | [spec](specs/2026-05-08-self-service-help-design.md) |
 | P8.1 | Member guide page — `/guide/` renders the canonical `docs/guides/guide_membre.md` server-side with sticky-TOC desktop layout / accordion-TOC mobile layout. CTA from `/aide/`, footer link, empty-state retargeted from GitHub. | Complete (tag `v1.2.1-member-guide`, 2026-05-08) | logged in post-launch polish below |
+| **P9** | **Engagement loop (milestone — hymne + offline PWA + WhatsApp Phase A)** | Planned (sub-phases P9.1 → P9.2 → P9.3) | tag target: `v1.3.0-engagement-loop` |
+| P9.1 | Hymne du groupe (audio asset on Cloudinary, `/hymne/` page, homepage card) + WhatsApp paperwork prep (Meta business account, dedicated number, display-name + auth template approvals — runs in parallel) | Planned (spec stub written) | [spec](specs/2026-05-08-p9-1-hymne-design.md) |
+| P9.2 | Offline-first PWA — service worker, app-shell cache, `/api/annuaire.json` directory data endpoint, install prompt, data-saver respect, offline banner + fallback page | Planned (spec stub written) | [spec](specs/2026-05-08-p9-2-pwa-design.md) |
+| P9.3 | WhatsApp Phase A — outbound auth (magic-link auto-DM + cooptation activation DM via Meta Cloud API), django-q worker, webhook for delivery receipts, Gestion cost dashboard tile. Depends on P9.1's paperwork side-task. | Planned (spec stub written) | [spec](specs/2026-05-08-p9-3-whatsapp-auth-design.md) |
 
 ---
 
@@ -497,6 +501,38 @@ Small fixes and UX improvements shipped after the milestone tag, in chronologica
 - **Empty-result queries are logged to `AuditLog`.** Two new actions added to `ACTION_CHOICES` per the CLAUDE.md rule: `aide.query.no_results` and `directory.query.no_results`. Metadata captures the truncated (80-char) query text + facet values + `actor_username` (anonymous allowed for `/aide/`). The retention sweep from P6c (12 months) covers it. **This is the data trail for a future bot decision.** If after 60 days the no-result queries cluster around questions a static FAQ genuinely can't answer, the bot becomes informed not speculative.
 - **Visual refresh (last commit before merge)** matches existing patterns: memoriam-style centered-icon hero, landing-style eyebrow chip, directory-style `font-display` typography. Quick-jump pill row (icon + name + count) below the search lets users skip to a category. Each section has the emoji prefix in its h2 + count chip. Accordion cards turn warmer (tertiary border + shadow lift) on open, chevron rotates and tints. No new deps, no new Tailwind classes outside the existing design tokens, `min-h-tap` on every interactive element.
 - **Dockerfile gotcha caught at first deploy.** The Dockerfile copies each Django app explicitly (rather than `COPY . .`), so adding a new app needs `COPY aide/ ./aide/` in both the runtime stage (for `django.setup()` to find the AppConfig at `compilemessages`/`collectstatic` time) and the css-builder stage (for Tailwind to scan templates). Build at `e61a209` failed with `ModuleNotFoundError: No module named 'aide'` during compilemessages; fix in `5d5853f`. Captured in CLAUDE.md "What NOT to do" so it doesn't bite the next new app.
+
+---
+
+## P9 — Engagement loop (`v1.3.0-engagement-loop`, planned)
+
+**Status:** 📝 Spec stubs written 2026-05-08. Build not yet started.
+**Theme:** three additive features that make the platform work harder for members between explicit visits — hymne (emotional re-engagement at every landing), offline PWA (low-friction return visits on patchy bandwidth), WhatsApp Phase A (proactive operational contact, replaces operator-as-typist).
+
+| Sub-phase | Title | Spec | Branch (planned) | Estimated effort |
+|---|---|---|---|---|
+| P9.1 | Hymne du groupe + WhatsApp paperwork prep | [spec](specs/2026-05-08-p9-1-hymne-design.md) | `feat/hymne` | ~2 days build + ~1 week WA approvals running in parallel (non-blocking) |
+| P9.2 | Offline-first PWA | [spec](specs/2026-05-08-p9-2-pwa-design.md) | `feat/offline-pwa` | ~3-4 days |
+| P9.3 | WhatsApp Phase A — outbound auth | [spec](specs/2026-05-08-p9-3-whatsapp-auth-design.md) | `feat/whatsapp-phase-a` | ~5-7 days (after WA approvals back from P9.1 side-task) |
+
+**Total:** ~10-13 days build, ~3-4 weeks calendar.
+
+**Order rationale:** P9.1 first because it's the smallest ship and **kicks off the WA paperwork side-task** that P9.3 depends on. P9.2 second because it's independent of WA approvals — runs while paperwork waits. P9.3 last, building on the now-approved Meta credentials. Tag `v1.3.0-engagement-loop` lands when P9.3 ships.
+
+**Locked decisions across the milestone:**
+
+- **Background worker stack:** django-q2 (Postgres-backed; one new Railway `q-cluster` service; no Redis). Decision rationale in P9.3 §F.2.
+- **WhatsApp number:** dedicated Niger SIM owned by the operator (not super-admin's personal number). Confirmed at scoping.
+- **Hymn page scope:** richer (audio + lyrics + composer/year/origin story). Member-anecdote submission deferred. Decision in P9.1 §F.6 + §J.
+- **Audio format:** Opus 64 kbps mono primary (~1.5 MB for 3:09), AAC + MP3 fallback for older Android WebViews.
+- **PWA scope:** read-only offline (no offline-write sync queue, no push notifications). Decision rationale in P9.2 §C.
+- **WA Phase A scope:** outbound only (no inbound bot, no media upload). Phases B and C deferred. Decision in P9.3 §J.
+
+**Open scoping items** (resolved before each sub-phase's plan is written, not blockers for the milestone):
+
+- P9.1: lyrics text (transcribe vs. owner-provided), origin story authoring, composer attribution, display-name fallback if Meta rejects "Les Retrouvailles".
+- P9.2: profile-detail caching strategy, storage budget cap.
+- P9.3: single-template vs. split, member-with-both-email-and-WA default, bot-identity labeling in audit log UI.
 
 ---
 
