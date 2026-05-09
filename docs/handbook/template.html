@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="fr">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>{{ title }}</title>
+        <style>
+      :root {
+        --ink: #1a1a1a;
+        --muted: #4a4a4a;
+        --rule: #d8c98a;     /* ceremonial gold */
+        --accent: #176353;   /* tertiary teal */
+        --soft: #f5f1e6;
+        --code-bg: #f6f6f4;
+      }
+      * { box-sizing: border-box; }
+      html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      body {
+        margin: 0;
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+                     Roboto, "Helvetica Neue", Arial, sans-serif;
+        font-size: 11pt;
+        line-height: 1.55;
+        color: var(--ink);
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 32px;
+      }
+      h1, h2, h3, h4 {
+        font-family: "Source Serif Pro", Georgia, serif;
+        line-height: 1.25;
+        color: var(--ink);
+      }
+      h1 { font-size: 30pt; margin: 0 0 .3em; }
+      h2 { font-size: 22pt; margin: 1.4em 0 .4em; }
+      h3 { font-size: 15pt; margin: 1.2em 0 .3em; color: var(--accent); }
+      h4 { font-size: 12pt; margin: 1em 0 .3em; }
+      p, li { font-size: 11pt; }
+      a { color: var(--accent); }
+      code, pre {
+        font-family: "JetBrains Mono", "Consolas", monospace;
+        background: var(--code-bg);
+        padding: 1px 4px;
+        border-radius: 3px;
+      }
+      pre { padding: 12px; border-radius: 6px; overflow-x: auto; }
+      .rule {
+        height: 3px;
+        width: 80px;
+        background: linear-gradient(90deg, var(--rule), var(--accent));
+        border-radius: 2px;
+        margin: 14px 0 28px;
+      }
+      .cover {
+        text-align: center;
+        padding: 120px 0 60px;
+        page-break-after: always;
+      }
+      .cover h1 {
+        font-size: 38pt;
+        margin-bottom: .2em;
+      }
+      .cover .subtitle {
+        font-size: 14pt;
+        color: var(--muted);
+        margin-top: .8em;
+      }
+      .cover .meta {
+        margin-top: 60px;
+        color: var(--muted);
+        font-size: 10pt;
+      }
+      .cover .crest {
+        font-size: 60pt;
+        line-height: 1;
+        margin-bottom: 16px;
+      }
+      .toc { page-break-after: always; }
+      .toc ol { padding-left: 20px; }
+      .toc li { margin: 4px 0; }
+      .chapter { page-break-before: always; }
+      .chapter-intro {
+        background: var(--soft);
+        padding: 14px 18px;
+        border-left: 3px solid var(--rule);
+        border-radius: 4px;
+        font-size: 10.5pt;
+      }
+      .flow {
+        margin-top: 28px;
+        page-break-inside: avoid;
+      }
+      .flow-source {
+        font-size: 9pt;
+        color: var(--muted);
+        font-style: italic;
+        margin-bottom: 12px;
+      }
+      .step {
+        display: flex;
+        gap: 18px;
+        margin: 18px 0;
+        align-items: flex-start;
+        page-break-inside: avoid;
+      }
+      .step-number {
+        flex: 0 0 auto;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 10pt;
+      }
+      .step-body { flex: 1; min-width: 0; }
+      .step-shot {
+        margin-top: 10px;
+        max-width: 100%;
+        max-height: 480px;
+        border: 1px solid #e0e0d8;
+        border-radius: 6px;
+        box-shadow: 0 2px 6px rgba(0,0,0,.06);
+      }
+      .step-shot.mobile {
+        max-width: 320px;
+      }
+      .appendix { page-break-before: always; }
+      .appendix h2::before { content: "Annexe — "; color: var(--muted); font-weight: 400; }
+      .faq-category {
+        margin-top: 28px;
+      }
+      .faq-q {
+        font-weight: 600;
+        margin-top: 18px;
+      }
+      details summary {
+        cursor: pointer;
+        font-weight: 600;
+        padding: 8px 0;
+      }
+      @media print {
+        body { padding: 0; }
+        .cover { padding: 80px 24px 40px; }
+        a { color: var(--ink); text-decoration: none; }
+      }
+        </style>
+    </head>
+    <body>
+        {# ----- Cover ----- #}
+        <section class="cover">
+            <div class="crest">📘</div>
+            <h1>{{ title }}</h1>
+            <div class="rule" style="margin: 24px auto;"></div>
+            <p class="subtitle">Plateforme alumni — CEG 1 Birni, Zinder</p>
+            <p class="subtitle">Promotions 1980 — 1985</p>
+            <p class="meta">Édition générée le {{ build_date }}</p>
+        </section>
+        {# ----- Table of contents ----- #}
+        <section class="toc">
+            <h2>Sommaire</h2>
+            <div class="rule"></div>
+            <ol>
+                {% for chapter in chapters %}
+                    <li>
+                        <a href="#{{ chapter.id }}">{{ chapter.title }}</a>
+                    </li>
+                {% endfor %}
+                <li>
+                    <a href="#annexe-membres">Annexe A — Guide du membre (texte intégral)</a>
+                </li>
+                <li>
+                    <a href="#annexe-admins">Annexe B — Guide administrateur (texte intégral)</a>
+                </li>
+                <li>
+                    <a href="#annexe-faq">Annexe C — Foire aux questions</a>
+                </li>
+            </ol>
+        </section>
+        {# ----- Audience chapters ----- #}
+        {% for chapter in chapters %}
+            <section class="chapter" id="{{ chapter.id }}">
+                <h2>{{ chapter.title }}</h2>
+                <div class="rule"></div>
+                <p class="chapter-intro">{{ chapter.intro }}</p>
+                {% if not chapter.flows %}
+                    <p>
+                        <em>Aucun parcours capturé pour cette audience dans cette édition.</em>
+                    </p>
+                {% endif %}
+                {% for flow in chapter.flows %}
+                    <article class="flow">
+                        <h3>{{ flow.title }}</h3>
+                        <p class="flow-source">
+                            Source : {{ flow.source_doc }} · viewport
+                            {{ flow.viewport.width }} × {{ flow.viewport.height }}
+                        </p>
+                        {% for step in flow.steps %}
+                            <div class="step">
+                                <div class="step-number">{{ loop.index }}</div>
+                                <div class="step-body">
+                                    <p>{{ step.caption }}</p>
+                                    <img class="step-shot {% if chapter.id == 'ch-member-mobile' %}mobile{% endif %}"
+                                         src="{{ step.screenshot }}"
+                                         alt="{{ step.caption }}">
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </article>
+                {% endfor %}
+            </section>
+        {% endfor %}
+        {# ----- Appendix A: full guide_membre ----- #}
+        <section class="appendix" id="annexe-membres">
+            <h2>Guide du membre (texte intégral)</h2>
+            <div class="rule"></div>
+            {{ guide_membre_html|safe }}
+        </section>
+        {# ----- Appendix B: full guide_admin ----- #}
+        <section class="appendix" id="annexe-admins">
+            <h2>Guide administrateur (texte intégral)</h2>
+            <div class="rule"></div>
+            {{ guide_admin_html|safe }}
+        </section>
+        {# ----- Appendix C: FAQ ----- #}
+        <section class="appendix" id="annexe-faq">
+            <h2>Foire aux questions</h2>
+            <div class="rule"></div>
+            {% for category, meta in faq_categories.items() %}
+                <div class="faq-category">
+                    <h3>{{ meta.icon }} {{ category }}</h3>
+                    {% for entry in faq_by_category[category] %}
+                        <div id="faq-{{ entry.anchor }}">
+                            <p class="faq-q">{{ entry.question }}</p>
+                            {{ entry.answer_html|safe }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+        </section>
+    </body>
+</html>
