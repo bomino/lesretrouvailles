@@ -34,6 +34,11 @@ dev = [
     "beautifulsoup4>=4.12",
     "freezegun>=1.5",
 ]
+handbook = [
+    "playwright>=1.45",
+    "pytest-playwright>=0.5",
+    "jinja2>=3.1",
+]
 
 [tool.setuptools]
 packages = ["alumni", "core", "members", "cooptation"]
