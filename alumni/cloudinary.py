@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 _STRIPPABLE_MIME_TYPES = frozenset({"image/jpeg", "image/png", "image/webp"})
 
 
-def _strip_exif_metadata(file_obj, *, content_type: str) -> BytesIO:
+def _strip_exif_metadata(file_obj: Any, *, content_type: str) -> BytesIO:
     """Re-encode the image via Pillow to drop EXIF/XMP/IPTC from the bytes.
 
     Pillow's .save() does not preserve metadata unless you pass the exif=
@@ -48,7 +48,7 @@ def _strip_exif_metadata(file_obj, *, content_type: str) -> BytesIO:
         img = Image.open(source)
         img.load()  # force-decode now so errors fire here, not later
     except (UnidentifiedImageError, OSError, ValueError) as exc:
-        logger.warning("EXIF strip failed (Pillow open): %s", exc)
+        logger.warning("EXIF strip failed (Pillow open): %s", exc, exc_info=True)
         source.seek(0)
         return source
 
@@ -70,7 +70,7 @@ def _strip_exif_metadata(file_obj, *, content_type: str) -> BytesIO:
             save_kwargs["optimize"] = True
         img.save(out, **save_kwargs)
     except (OSError, ValueError) as exc:
-        logger.warning("EXIF strip failed (Pillow save): %s", exc)
+        logger.warning("EXIF strip failed (Pillow save): %s", exc, exc_info=True)
         source.seek(0)
         return source
 
@@ -252,7 +252,7 @@ def memory_thumbnail_url(public_id: str, size: int = 400) -> str:
     if not public_id:
         return ""
     cloud_name = getattr(settings, "CLOUDINARY_CLOUD_NAME", "fake-cloud")
-    transform = f"f_auto,q_auto:eco,c_fill,g_auto,fl_strip_profile,w_{size},h_{size}"
+    transform = f"f_auto,q_auto:eco,fl_strip_profile,c_fill,g_auto,w_{size},h_{size}"
     return f"https://res.cloudinary.com/{cloud_name}/image/upload/{transform}/{public_id}"
 
 
@@ -265,5 +265,5 @@ def memory_full_url(public_id: str, max_width: int = 1200) -> str:
     if not public_id:
         return ""
     cloud_name = getattr(settings, "CLOUDINARY_CLOUD_NAME", "fake-cloud")
-    transform = f"f_auto,q_auto:eco,c_limit,fl_strip_profile,w_{max_width}"
+    transform = f"f_auto,q_auto:eco,fl_strip_profile,c_limit,w_{max_width}"
     return f"https://res.cloudinary.com/{cloud_name}/image/upload/{transform}/{public_id}"

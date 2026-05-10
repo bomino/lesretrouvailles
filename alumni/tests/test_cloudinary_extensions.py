@@ -53,6 +53,12 @@ class TestStripExifMetadata:
         assert result.read() == b"not-an-image-at-all"
         assert "EXIF strip failed" in caplog.text
 
+    def test_strip_passes_through_unsupported_content_type(self):
+        # image/gif is not in _STRIPPABLE_MIME_TYPES — should return bytes unchanged.
+        data = b"some-gif-bytes"
+        result = _strip_exif_metadata(BytesIO(data), content_type="image/gif")
+        assert result.read() == data
+
 
 class TestMemoryUrlExifStripFlag:
     def test_thumbnail_url_contains_fl_strip_profile(self):
@@ -106,7 +112,7 @@ def test_memory_thumbnail_url_uses_correct_transform(settings):
 
     assert url == (
         "https://res.cloudinary.com/test-cloud/image/upload/"
-        "f_auto,q_auto:eco,c_fill,g_auto,fl_strip_profile,w_400,h_400/memoires/abc123"
+        "f_auto,q_auto:eco,fl_strip_profile,c_fill,g_auto,w_400,h_400/memoires/abc123"
     )
 
 
@@ -124,7 +130,7 @@ def test_memory_full_url_uses_limit_fit_no_crop(settings):
 
     assert url == (
         "https://res.cloudinary.com/test-cloud/image/upload/"
-        "f_auto,q_auto:eco,c_limit,fl_strip_profile,w_1200/memoires/abc123"
+        "f_auto,q_auto:eco,fl_strip_profile,c_limit,w_1200/memoires/abc123"
     )
 
 
