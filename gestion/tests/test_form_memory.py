@@ -82,6 +82,7 @@ class TestGestionMemoryFormCreate:
         )
         assert not form.is_valid()
         assert "upload" in form.errors
+        assert "JPEG" in str(form.errors["upload"]) or "WebP" in str(form.errors["upload"])
 
     def test_jpeg_png_webp_all_accepted(self):
         from gestion.forms import GestionMemoryForm

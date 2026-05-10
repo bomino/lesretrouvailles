@@ -9,6 +9,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.postgres.forms import SimpleArrayField
 
 from members.models import VALID_CLASS_PATTERN, VALID_YEARS, AuditLog, Member
+from memoires.models import Memory
 
 User = get_user_model()
 
@@ -268,8 +269,6 @@ class GestionMemoryForm(forms.ModelForm):
     )
 
     class Meta:
-        from memoires.models import Memory  # avoid circular import at module load
-
         model = Memory
         fields = ("caption", "taken_at", "location", "status")
         widgets = {
@@ -287,8 +286,7 @@ class GestionMemoryForm(forms.ModelForm):
         for name, field in self.fields.items():
             if name == "upload":
                 continue
-            existing = field.widget.attrs.get("class", "")
-            field.widget.attrs["class"] = (existing + " " + input_class).strip()
+            field.widget.attrs.setdefault("class", input_class)
 
     def clean_upload(self):
         upload = self.cleaned_data.get("upload")
