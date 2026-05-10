@@ -15,7 +15,7 @@ from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db import transaction
 from django.db.models import F, Q, Value
 from django.db.models.functions import Lower
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
@@ -422,6 +422,8 @@ PAGE_SIZE_MEMORY = 12  # photo grid — distinct from PAGE_SIZE = 20 for text-he
 
 MEMORY_STATUS_FILTERS = ("all", "published", "draft")
 
+MEMORY_VALID_TARGETS = ("draft", "published")
+
 # Fields watched by memory_edit_view's pre/post snapshot for no-op detection
 # and audit-event emission. Includes photo_public_id so a photo replace
 # counts as a change even when caption/etc. are untouched.
@@ -654,6 +656,38 @@ def memory_edit_view(request, pk):
 
 
 @staff_required
+@require_http_methods(["POST"])
 def memory_status_view(request, pk):
-    """Stub — fleshed out in Task 7 (memory_status_view)."""
-    return HttpResponse(status=501)
+    """Toggle Memory.status between 'draft' and 'published'.
+    Mirrors member_status_view's noop / bad_status branches."""
+    target = request.POST.get("target_status", "").strip()
+    if target not in MEMORY_VALID_TARGETS:
+        return HttpResponseRedirect(reverse("gestion:memory_list") + "?flash=bad_status")
+
+    memory = get_object_or_404(Memory, pk=pk)
+
+    with transaction.atomic():
+        locked = Memory.objects.select_for_update().get(pk=memory.pk)
+        if locked.status == target:
+            return HttpResponseRedirect(reverse("gestion:memory_list") + "?flash=noop")
+        previous = locked.status
+        locked.status = target
+        locked.save(update_fields=["status", "updated_at"])
+
+        action = (
+            "memoires.memory.published" if target == "published" else "memoires.memory.unpublished"
+        )
+        AuditLog.objects.create(
+            actor=request.user,
+            action=action,
+            target_type="memoires.Memory",
+            target_id=str(locked.pk),
+            metadata={
+                "caption_preview": locked.caption[:60],
+                "public_id": locked.photo_public_id,
+                "previous_status": previous,
+            },
+        )
+
+    flash = "published" if target == "published" else "unpublished"
+    return HttpResponseRedirect(reverse("gestion:memory_list") + f"?flash={flash}")
