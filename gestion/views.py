@@ -664,14 +664,14 @@ def memory_status_view(request, pk):
     if target not in MEMORY_VALID_TARGETS:
         return HttpResponseRedirect(reverse("gestion:memory_list") + "?flash=bad_status")
 
-    memory = get_object_or_404(Memory, pk=pk)
-
     with transaction.atomic():
-        locked = Memory.objects.select_for_update().get(pk=memory.pk)
+        locked = get_object_or_404(Memory.objects.select_for_update(), pk=pk)
         if locked.status == target:
             return HttpResponseRedirect(reverse("gestion:memory_list") + "?flash=noop")
         previous = locked.status
         locked.status = target
+        # updated_at must be listed explicitly here — auto_now only fires when
+        # the field is named in update_fields (or update_fields is omitted).
         locked.save(update_fields=["status", "updated_at"])
 
         action = (
