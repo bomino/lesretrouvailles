@@ -3,6 +3,7 @@
     {% block gestion_title %}Gestion{% endblock %}
     · Les Retrouvailles
 {% endblock %}
+{% load active_link %}
 {% block content %}
     <div class="mb-6 flex flex-col gap-3 border-b border-secondary/15 pb-4 md:flex-row md:items-center md:justify-between">
         <div>
@@ -13,15 +14,17 @@
         </div>
         <nav class="flex flex-wrap gap-1 text-sm" aria-label="Navigation Gestion">
             <a href="{% url 'gestion:dashboard' %}"
-               class="rounded-lg px-3 py-2 min-h-tap hover:bg-base-200 hover:text-tertiary transition {% if request.resolver_match.url_name == 'dashboard' %}bg-base-200 text-tertiary{% endif %}">
-                Tableau de bord
-            </a>
+               class="rounded-lg px-3 py-2 min-h-tap hover:bg-base-200 hover:text-tertiary transition {% active_class '/gestion/' exact=True %}"
+               {% active_aria '/gestion/' exact=True %}>Tableau de bord</a>
             <a href="/gestion/membres/"
-               class="rounded-lg px-3 py-2 min-h-tap hover:bg-base-200 hover:text-tertiary transition">Membres</a>
+               class="rounded-lg px-3 py-2 min-h-tap hover:bg-base-200 hover:text-tertiary transition {% active_class '/gestion/membres/' %}"
+               {% active_aria '/gestion/membres/' %}>Membres</a>
             <a href="/gestion/cooptations/"
-               class="rounded-lg px-3 py-2 min-h-tap hover:bg-base-200 hover:text-tertiary transition">Cooptations</a>
+               class="rounded-lg px-3 py-2 min-h-tap hover:bg-base-200 hover:text-tertiary transition {% active_class '/gestion/cooptations/' %}"
+               {% active_aria '/gestion/cooptations/' %}>Cooptations</a>
             <a href="/gestion/souvenirs/"
-               class="rounded-lg px-3 py-2 min-h-tap hover:bg-base-200 hover:text-tertiary transition">Souvenirs</a>
+               class="rounded-lg px-3 py-2 min-h-tap hover:bg-base-200 hover:text-tertiary transition {% active_class '/gestion/souvenirs/' %}"
+               {% active_aria '/gestion/souvenirs/' %}>Souvenirs</a>
             {% if request.user.is_superuser %}
                 <a href="/admin/"
                    class="ml-2 inline-flex items-center gap-1.5 rounded-lg border border-secondary/20 px-3 py-2 min-h-tap text-sm hover:border-tertiary/40 hover:bg-base-200 hover:text-tertiary transition"

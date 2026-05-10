@@ -69,18 +69,24 @@
                     </div>
                 </a>
                 {% if request.user.is_authenticated %}
+                    {% load active_link %}
                     <nav class="hidden md:flex items-center gap-1 text-sm"
                          aria-label="{% trans 'Navigation principale' %}">
                         <a href="/annuaire/"
-                           class="rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "Annuaire" %}</a>
+                           class="rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition {% active_class '/annuaire/' %}"
+                           {% active_aria '/annuaire/' %}>{% trans "Annuaire" %}</a>
                         <a href="/souvenirs/"
-                           class="rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "Souvenirs" %}</a>
+                           class="rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition {% active_class '/souvenirs/' %}"
+                           {% active_aria '/souvenirs/' %}>{% trans "Souvenirs" %}</a>
                         <a href="{% url 'memoriam:list' %}"
-                           class="rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "In Memoriam" %} 🕊️</a>
+                           class="rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition {% active_class '/in-memoriam/' %}"
+                           {% active_aria '/in-memoriam/' %}>{% trans "In Memoriam" %} 🕊️</a>
                         <a href="{% url 'aide:index' %}"
-                           class="rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "Aide" %}</a>
+                           class="rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition {% active_class '/aide/' %}"
+                           {% active_aria '/aide/' %}>{% trans "Aide" %}</a>
                         <a href="/cooptations-a-valider/"
-                           class="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition">
+                           class="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-base-200 hover:text-tertiary transition {% active_class '/cooptations-a-valider/' %}"
+                           {% active_aria '/cooptations-a-valider/' %}>
                             {% trans "Cooptations à valider" %}
                             {% if pending_vouches_count %}
                                 <span class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-tertiary px-1.5 text-xs font-semibold text-on-tertiary"
@@ -91,7 +97,8 @@
                         </a>
                         {% if request.user.is_staff %}
                             <a href="/gestion/"
-                               class="inline-flex items-center gap-1.5 rounded-lg border border-secondary/20 px-3 py-2 hover:border-tertiary/40 hover:bg-base-200 hover:text-tertiary transition"
+                               class="inline-flex items-center gap-1.5 rounded-lg border border-secondary/20 px-3 py-2 hover:border-tertiary/40 hover:bg-base-200 hover:text-tertiary transition {% active_class '/gestion/' %}"
+                               {% active_aria '/gestion/' %}
                                title="{% trans 'Console de gestion' %}">
                                 <svg class="h-4 w-4"
                                      viewBox="0 0 24 24"
@@ -208,23 +215,28 @@
                     <ul class="container mx-auto flex flex-col gap-0.5 px-2 py-2 text-base">
                         <li>
                             <a href="/annuaire/"
-                               class="flex items-center min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "Annuaire" %}</a>
+                               class="flex items-center min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition {% active_class '/annuaire/' %}"
+                               {% active_aria '/annuaire/' %}>{% trans "Annuaire" %}</a>
                         </li>
                         <li>
                             <a href="/souvenirs/"
-                               class="flex items-center min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "Souvenirs" %}</a>
+                               class="flex items-center min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition {% active_class '/souvenirs/' %}"
+                               {% active_aria '/souvenirs/' %}>{% trans "Souvenirs" %}</a>
                         </li>
                         <li>
                             <a href="{% url 'memoriam:list' %}"
-                               class="flex items-center min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "In Memoriam" %} 🕊️</a>
+                               class="flex items-center min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition {% active_class '/in-memoriam/' %}"
+                               {% active_aria '/in-memoriam/' %}>{% trans "In Memoriam" %} 🕊️</a>
                         </li>
                         <li>
                             <a href="{% url 'aide:index' %}"
-                               class="flex items-center min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "Aide" %}</a>
+                               class="flex items-center min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition {% active_class '/aide/' %}"
+                               {% active_aria '/aide/' %}>{% trans "Aide" %}</a>
                         </li>
                         <li>
                             <a href="/cooptations-a-valider/"
-                               class="flex items-center justify-between min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition">
+                               class="flex items-center justify-between min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition {% active_class '/cooptations-a-valider/' %}"
+                               {% active_aria '/cooptations-a-valider/' %}>
                                 <span>{% trans "Cooptations à valider" %}</span>
                                 {% if pending_vouches_count %}
                                     <span class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-tertiary px-1.5 text-xs font-semibold text-on-tertiary"
@@ -236,12 +248,14 @@
                         </li>
                         <li>
                             <a href="/profil/"
-                               class="flex items-center min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition">{% trans "Mon profil" %}</a>
+                               class="flex items-center min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition {% active_class '/profil/' %}"
+                               {% active_aria '/profil/' %}>{% trans "Mon profil" %}</a>
                         </li>
                         {% if request.user.is_staff %}
                             <li class="border-t border-secondary/10 mt-1 pt-1">
                                 <a href="/gestion/"
-                                   class="flex items-center gap-2 min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition">
+                                   class="flex items-center gap-2 min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition {% active_class '/gestion/' %}"
+                                   {% active_aria '/gestion/' %}>
                                     <svg class="h-5 w-5"
                                          viewBox="0 0 24 24"
                                          fill="none"
