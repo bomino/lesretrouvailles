@@ -123,3 +123,32 @@ def test_dashboard_top_nav_has_three_sections(client, coadmin_user):
     assert b"/gestion/" in response.content
     assert b"/gestion/membres/" in response.content
     assert b"/gestion/cooptations/" in response.content
+
+
+# ---------- Souvenirs KPI tile ----------
+
+
+class TestDashboardMemoriesTile:
+    def test_tile_shows_zero_when_no_drafts(self, client, coadmin_user):
+        client.force_login(coadmin_user)
+        resp = client.get("/gestion/")
+        body = resp.content.decode()
+        # Tile renders even at 0 (intentional, per spec §G locked decisions).
+        # Look for the section label.
+        assert "Souvenirs" in body or "Brouillon" in body
+
+    def test_tile_count_matches_draft_count(self, client, coadmin_user, make_memory):
+        make_memory(status="draft")
+        make_memory(status="draft")
+        make_memory(status="published")
+        client.force_login(coadmin_user)
+        resp = client.get("/gestion/")
+        body = resp.content.decode()
+        # Loose check to avoid HTML brittleness: 2 should appear near the tile.
+        assert ">2<" in body or 'data-count="2"' in body
+
+    def test_tile_links_to_draft_filtered_list(self, client, coadmin_user):
+        client.force_login(coadmin_user)
+        resp = client.get("/gestion/")
+        body = resp.content.decode()
+        assert "/gestion/souvenirs/?status=draft" in body

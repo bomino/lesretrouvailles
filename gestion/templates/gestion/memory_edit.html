@@ -1,0 +1,121 @@
+{% extends "gestion/base.html" %}
+{% load memory_photo %}
+{% block gestion_title %}
+    {% if memory %}
+        Modifier
+    {% else %}
+        Nouvelle photo
+    {% endif %}
+{% endblock %}
+{% block gestion_heading %}
+    {% if memory %}
+        Modifier la photo
+    {% else %}
+        Ajouter une photo
+    {% endif %}
+{% endblock %}
+{% block gestion_content %}
+    {% if memory %}
+        <figure class="mb-6 rounded-2xl overflow-hidden border border-secondary/15 bg-base-200">
+            <img src="{% memory_thumb memory.photo_public_id size=400 %}"
+                 alt="{{ memory.caption }}"
+                 class="w-full h-auto max-h-[500px] object-contain bg-base-200">
+            <figcaption class="px-4 py-2 text-xs text-secondary border-t border-secondary/15">
+                {% if memory.status == "draft" %}
+                    Brouillon
+                {% else %}
+                    Publiée
+                {% endif %}
+                · ajoutée le {{ memory.created_at|date:"d F Y" }}
+                {% if memory.location %}· {{ memory.location }}{% endif %}
+            </figcaption>
+        </figure>
+    {% endif %}
+    <form method="post"
+          enctype="multipart/form-data"
+          class="space-y-4"
+          novalidate>
+        {% csrf_token %}
+        <div>
+            <label for="id_upload" class="block text-sm font-medium text-primary">
+                {% if memory %}
+                    Remplacer la photo
+                {% else %}
+                    Photo
+                {% endif %}
+            </label>
+            {{ form.upload }}
+            <p class="mt-1 text-xs text-secondary">
+                {% if memory %}
+                    Choisir une photo (JPEG, PNG ou WebP, ≤ 8 Mo). Laisser vide pour conserver l'image existante.
+                {% else %}
+                    Choisir une photo (JPEG, PNG ou WebP, ≤ 8 Mo). Une photo est obligatoire.
+                {% endif %}
+            </p>
+            {% if form.upload.errors %}<p class="mt-1 text-sm text-error">{{ form.upload.errors|join:" " }}</p>{% endif %}
+        </div>
+        <div>
+            <label for="id_caption" class="block text-sm font-medium text-primary">Légende</label>
+            {{ form.caption }}
+            {% if form.caption.errors %}<p class="mt-1 text-sm text-error">{{ form.caption.errors|join:" " }}</p>{% endif %}
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label for="id_taken_at" class="block text-sm font-medium text-primary">Date approximative</label>
+                {{ form.taken_at }}
+                <p class="mt-1 text-xs text-secondary">Laissez vide si vous ne savez pas.</p>
+                {% if form.taken_at.errors %}<p class="mt-1 text-sm text-error">{{ form.taken_at.errors|join:" " }}</p>{% endif %}
+            </div>
+            <div>
+                <label for="id_location" class="block text-sm font-medium text-primary">Lieu</label>
+                {{ form.location }}
+                {% if form.location.errors %}<p class="mt-1 text-sm text-error">{{ form.location.errors|join:" " }}</p>{% endif %}
+            </div>
+        </div>
+        <div>
+            <label for="id_status" class="block text-sm font-medium text-primary">Statut</label>
+            {{ form.status }}
+            {% if form.status.errors %}<p class="mt-1 text-sm text-error">{{ form.status.errors|join:" " }}</p>{% endif %}
+        </div>
+        {% if form.non_field_errors %}<p class="text-sm text-error">{{ form.non_field_errors|join:" " }}</p>{% endif %}
+        <div class="flex flex-wrap gap-3 pt-4">
+            <button type="submit"
+                    class="rounded-lg bg-tertiary px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-tertiary/90 min-h-tap">
+                {% if memory %}
+                    Enregistrer
+                {% else %}
+                    Créer
+                {% endif %}
+            </button>
+            <a href="{% url 'gestion:memory_list' %}"
+               class="rounded-lg border border-secondary/20 bg-base-200 px-5 py-2.5 text-sm text-primary hover:bg-base-300 min-h-tap inline-flex items-center">
+                Annuler
+            </a>
+        </div>
+    </form>
+    {% if memory %}
+        <section class="mt-8 pt-6 border-t border-secondary/15">
+            <h2 class="text-lg font-medium text-primary mb-3">Statut</h2>
+            <form method="post"
+                  action="{% url 'gestion:memory_status' pk=memory.pk %}"
+                  class="flex flex-wrap gap-3">
+                {% csrf_token %}
+                {% if memory.status == "draft" %}
+                    <button type="submit"
+                            name="target_status"
+                            value="published"
+                            class="rounded-lg bg-tertiary px-4 py-2 text-sm font-medium text-white hover:bg-tertiary/90 min-h-tap">
+                        Publier
+                    </button>
+                {% else %}
+                    <button type="submit"
+                            name="target_status"
+                            value="draft"
+                            class="rounded-lg border border-secondary/20 bg-base-200 px-4 py-2 text-sm text-primary hover:bg-base-300 min-h-tap">
+                        Dépublier
+                    </button>
+                {% endif %}
+            </form>
+        </section>
+    {% endif %}
+{% endblock %}

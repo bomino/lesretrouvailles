@@ -9,6 +9,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.postgres.forms import SimpleArrayField
 
 from members.models import VALID_CLASS_PATTERN, VALID_YEARS, AuditLog, Member
+from memoires.models import Memory
 
 User = get_user_model()
 
@@ -242,3 +243,66 @@ class ApplicationRejectForm(forms.Form):
             " text-base shadow-sm focus:border-tertiary focus:outline-none"
             " focus:ring-2 focus:ring-tertiary/30",
         )
+
+
+class GestionMemoryForm(forms.ModelForm):
+    """Memory create/edit form for /gestion/souvenirs/.
+
+    Lifted from memoires.forms.MemoryAdminForm + hardened with the
+    upload size/MIME guards the admin form doesn't enforce. Tailwind-
+    styled inputs to fit the /gestion/ visual language.
+    """
+
+    ALLOWED_MIME_TYPES = ("image/jpeg", "image/png", "image/webp")
+    MAX_UPLOAD_SIZE = 8 * 1024 * 1024  # 8 MB
+
+    upload = forms.FileField(
+        required=False,
+        widget=forms.FileInput(
+            attrs={
+                "accept": "image/jpeg,image/png,image/webp",
+                "class": "block w-full text-base min-h-tap",
+            }
+        ),
+        help_text="Choisir une photo (JPEG, PNG ou WebP, ≤ 8 Mo). "
+        "Laisser vide pour conserver l'image existante.",
+    )
+
+    class Meta:
+        model = Memory
+        fields = ("caption", "taken_at", "location", "status")
+        widgets = {
+            "caption": forms.Textarea(attrs={"rows": 4}),
+            "taken_at": forms.DateInput(attrs={"type": "date"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        input_class = (
+            "block w-full rounded-lg border border-secondary/20 bg-white "
+            "px-3 py-2.5 text-base shadow-sm focus:border-tertiary "
+            "focus:outline-none focus:ring-2 focus:ring-tertiary/30 min-h-tap"
+        )
+        for name, field in self.fields.items():
+            if name == "upload":
+                continue
+            field.widget.attrs.setdefault("class", input_class)
+
+    def clean_upload(self):
+        upload = self.cleaned_data.get("upload")
+        if not upload:
+            return upload  # may be empty on edit; whole-form clean re-checks create case
+        if upload.size == 0:
+            raise forms.ValidationError("Le fichier est vide.")
+        if upload.size > self.MAX_UPLOAD_SIZE:
+            raise forms.ValidationError("Photo trop volumineuse : 8 Mo maximum.")
+        if upload.content_type not in self.ALLOWED_MIME_TYPES:
+            raise forms.ValidationError("Format non pris en charge. Utilisez JPEG, PNG ou WebP.")
+        return upload
+
+    def clean(self):
+        cleaned = super().clean()
+        # On CREATE, upload is required.
+        if not self.instance.pk and not cleaned.get("upload"):
+            raise forms.ValidationError("Une photo est obligatoire pour créer une nouvelle entrée.")
+        return cleaned

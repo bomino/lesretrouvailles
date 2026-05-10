@@ -6,11 +6,13 @@ will add the cooptation queue."""
 
 from __future__ import annotations
 
+import logging
 import re
 from urllib.parse import quote
 
 from django.contrib.postgres.lookups import Unaccent
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.db import transaction
 from django.db.models import F, Q, Value
 from django.db.models.functions import Lower
 from django.http import HttpResponseRedirect
@@ -18,6 +20,7 @@ from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
+from alumni.cloudinary import get_client
 from cooptation.models import AdminApplication, CooptationRequest, QuestionnaireResponse
 from cooptation.services import (
     _build_password_set_url,
@@ -25,13 +28,17 @@ from cooptation.services import (
     reject_application,
 )
 from members.models import AuditLog, Member
+from memoires.models import Memory
 
 from .decorators import staff_required
 from .forms import (
     ApplicationRejectForm,
+    GestionMemoryForm,
     MemberAdminEditForm,
     MemberUsernameChangeForm,
 )
+
+logger = logging.getLogger(__name__)
 
 PAGE_SIZE = 20
 STATUS_FILTERS = ("active", "suspended", "all")
@@ -51,6 +58,7 @@ def dashboard_view(request):
         "pending_cooptations": AdminApplication.objects.filter(
             status__in=("cooptation_pending", "awaiting_admin")
         ).count(),
+        "draft_memories": Memory.objects.filter(status="draft").count(),
     }
     return render(request, "gestion/dashboard.html", {"kpis": kpis})
 
@@ -409,3 +417,278 @@ def _redirect_to_detail(member, flash: str, changed: list | None = None):
     if changed:
         parts.append("changed=" + ",".join(changed))
     return HttpResponseRedirect(f"{url}{sep}{'&'.join(parts)}")
+
+
+PAGE_SIZE_MEMORY = 12  # photo grid — distinct from PAGE_SIZE = 20 for text-heavy lists
+
+MEMORY_STATUS_FILTERS = ("all", "published", "draft")
+
+MEMORY_VALID_TARGETS = ("draft", "published")
+
+# Fields watched by memory_edit_view's pre/post snapshot for no-op detection
+# and audit-event emission. Includes photo_public_id so a photo replace
+# counts as a change even when caption/etc. are untouched.
+WATCH_FIELDS = ("caption", "taken_at", "location", "status", "photo_public_id")
+
+
+@staff_required
+@require_http_methods(["GET"])
+def memory_list_view(request):
+    """Grid of memories with status filter, q search, pagination."""
+    status = request.GET.get("status", "all")
+    if status not in MEMORY_STATUS_FILTERS:
+        status = "all"
+
+    qs = Memory.objects.all()
+    if status != "all":
+        qs = qs.filter(status=status)
+
+    q = (request.GET.get("q") or "").strip()[:80]
+    if q:
+        needle = Lower(Unaccent(Value(q)))
+        qs = qs.annotate(
+            caption_lc=Lower(Unaccent(F("caption"))),
+            location_lc=Lower(Unaccent(F("location"))),
+        ).filter(Q(caption_lc__contains=needle) | Q(location_lc__contains=needle))
+
+    # Curation-recency-first ordering: gestion admins want to see what was
+    # just uploaded (-created_at), THEN by photo era (taken_at DESC NULLS LAST).
+    # This deliberately diverges from Memory.Meta.ordering — the public
+    # /souvenirs/ gallery keeps the era-first storytelling order; /gestion/
+    # curation uses recency-first per spec §G locked decisions.
+    qs = qs.order_by("-created_at", F("taken_at").desc(nulls_last=True))
+
+    paginator = Paginator(qs, PAGE_SIZE_MEMORY)
+    raw_page = request.GET.get("page", "1")
+    try:
+        page_number = max(1, int(raw_page))
+    except (TypeError, ValueError):
+        page_number = 1
+    try:
+        page = paginator.page(page_number)
+    except (EmptyPage, PageNotAnInteger):
+        page = paginator.page(paginator.num_pages or 1)
+
+    return render(
+        request,
+        "gestion/memory_list.html",
+        {
+            "page": page,
+            "memories": page.object_list,
+            "q": q,
+            "status": status,
+            "filter_chips": [
+                ("all", "Toutes"),
+                ("published", "Publiées"),
+                ("draft", "Brouillons"),
+            ],
+        },
+    )
+
+
+@staff_required
+@require_http_methods(["GET", "POST"])
+def memory_create_view(request):
+    """Create a new Memory. Upload goes through Cloudinary first; DB write +
+    AuditLog are atomic. Redirects to list with ?flash=created on success."""
+    if request.method == "POST":
+        form = GestionMemoryForm(request.POST, request.FILES)
+        if form.is_valid():
+            upload = form.cleaned_data["upload"]
+            client = get_client()
+            try:
+                new_public_id = client.upload_file(upload, folder="memoires")
+            except Exception:  # noqa: BLE001
+                form.add_error(
+                    "upload",
+                    "Échec du téléversement. Vérifiez votre connexion et réessayez.",
+                )
+                logger.warning("memory_create_view: Cloudinary upload failed", exc_info=True)
+            else:
+                if not new_public_id:
+                    raise RuntimeError("Cloudinary returned empty public_id; refusing to write")
+                with transaction.atomic():
+                    memory = Memory.objects.create(
+                        photo_public_id=new_public_id,
+                        caption=form.cleaned_data["caption"],
+                        taken_at=form.cleaned_data["taken_at"] or None,
+                        location=form.cleaned_data["location"] or "",
+                        status=form.cleaned_data["status"],
+                        created_by=request.user,
+                    )
+                    AuditLog.objects.create(
+                        actor=request.user,
+                        action="memoires.memory.created",
+                        target_type="memoires.Memory",
+                        target_id=str(memory.pk),
+                        metadata={
+                            "caption_preview": memory.caption[:60],
+                            "location": memory.location,
+                            "taken_at": memory.taken_at.isoformat() if memory.taken_at else None,
+                            "public_id": memory.photo_public_id,
+                            "initial_status": memory.status,
+                        },
+                    )
+                return HttpResponseRedirect(reverse("gestion:memory_list") + "?flash=created")
+    else:
+        form = GestionMemoryForm()
+
+    return render(
+        request,
+        "gestion/memory_edit.html",
+        {
+            "form": form,
+            "memory": None,  # signals create mode to the template
+        },
+    )
+
+
+@staff_required
+@require_http_methods(["GET", "POST"])
+def memory_edit_view(request, pk):
+    """Edit an existing Memory. Photo replace optional. Detects no-op edits;
+    emits 1 row per logical event (edited + optional status transition)."""
+    memory = get_object_or_404(Memory, pk=pk)
+
+    if request.method == "POST":
+        form = GestionMemoryForm(request.POST, request.FILES, instance=memory)
+        if form.is_valid():
+            upload = form.cleaned_data.get("upload")
+            new_public_id = None
+            if upload:
+                client = get_client()
+                try:
+                    new_public_id = client.upload_file(upload, folder="memoires")
+                except Exception:  # noqa: BLE001
+                    form.add_error(
+                        "upload",
+                        "Échec du téléversement. Vérifiez votre connexion et réessayez.",
+                    )
+                    logger.warning("memory_edit_view: Cloudinary upload failed", exc_info=True)
+                else:
+                    if not new_public_id:
+                        raise RuntimeError("Cloudinary returned empty public_id; refusing to write")
+
+            if form.is_valid():  # re-check after the optional add_error above
+                with transaction.atomic():
+                    locked = Memory.objects.select_for_update().get(pk=memory.pk)
+                    old_id = locked.photo_public_id
+                    pre = {f: getattr(locked, f) for f in WATCH_FIELDS}
+
+                    # Apply form changes onto the locked instance.
+                    if new_public_id:
+                        locked.photo_public_id = new_public_id
+                    for field_name in form.changed_data:
+                        if field_name == "upload":
+                            continue
+                        setattr(locked, field_name, form.cleaned_data[field_name])
+
+                    post = {f: getattr(locked, f) for f in WATCH_FIELDS}
+
+                    if pre == post and not new_public_id:
+                        # Return inside atomic: select_for_update lock is held until exit, then
+                        # released. We need the locked state to compute pre==post accurately;
+                        # bailing out without the lock would race with concurrent writers.
+                        return HttpResponseRedirect(reverse("gestion:memory_list") + "?flash=noop")
+
+                    locked.save()
+
+                    changed_fields = [f for f in form.changed_data if f not in ("upload", "status")]
+                    photo_replaced = bool(new_public_id)
+                    fields_changed = bool(changed_fields) or photo_replaced
+                    status_changed = pre["status"] != post["status"]
+
+                    if fields_changed:
+                        AuditLog.objects.create(
+                            actor=request.user,
+                            action="memoires.memory.edited",
+                            target_type="memoires.Memory",
+                            target_id=str(locked.pk),
+                            metadata={
+                                "caption_preview": locked.caption[:60],
+                                "public_id": locked.photo_public_id,
+                                "changed_fields": changed_fields,
+                                "photo_replaced": photo_replaced,
+                            },
+                        )
+
+                    if status_changed:
+                        action = (
+                            "memoires.memory.published"
+                            if post["status"] == "published"
+                            else "memoires.memory.unpublished"
+                        )
+                        AuditLog.objects.create(
+                            actor=request.user,
+                            action=action,
+                            target_type="memoires.Memory",
+                            target_id=str(locked.pk),
+                            metadata={
+                                "caption_preview": locked.caption[:60],
+                                "public_id": locked.photo_public_id,
+                                "previous_status": pre["status"],
+                            },
+                        )
+
+                    if new_public_id and old_id:
+                        # Default-arg captures old_id NOW (at definition), not at on_commit
+                        # callback time — avoids late-binding to a mutated outer variable.
+                        def _delete_old(old=old_id):
+                            try:
+                                get_client().delete(old)
+                            except Exception:  # noqa: BLE001
+                                logger.warning(
+                                    "memory_edit_view: post-commit delete of %s failed",
+                                    old,
+                                    exc_info=True,
+                                )
+
+                        transaction.on_commit(_delete_old)
+
+                return HttpResponseRedirect(reverse("gestion:memory_list") + "?flash=updated")
+    else:
+        form = GestionMemoryForm(instance=memory)
+
+    return render(
+        request,
+        "gestion/memory_edit.html",
+        {"form": form, "memory": memory},
+    )
+
+
+@staff_required
+@require_http_methods(["POST"])
+def memory_status_view(request, pk):
+    """Toggle Memory.status between 'draft' and 'published'.
+    Mirrors member_status_view's noop / bad_status branches."""
+    target = request.POST.get("target_status", "").strip()
+    if target not in MEMORY_VALID_TARGETS:
+        return HttpResponseRedirect(reverse("gestion:memory_list") + "?flash=bad_status")
+
+    with transaction.atomic():
+        locked = get_object_or_404(Memory.objects.select_for_update(), pk=pk)
+        if locked.status == target:
+            return HttpResponseRedirect(reverse("gestion:memory_list") + "?flash=noop")
+        previous = locked.status
+        locked.status = target
+        # updated_at must be listed explicitly here — auto_now only fires when
+        # the field is named in update_fields (or update_fields is omitted).
+        locked.save(update_fields=["status", "updated_at"])
+
+        action = (
+            "memoires.memory.published" if target == "published" else "memoires.memory.unpublished"
+        )
+        AuditLog.objects.create(
+            actor=request.user,
+            action=action,
+            target_type="memoires.Memory",
+            target_id=str(locked.pk),
+            metadata={
+                "caption_preview": locked.caption[:60],
+                "public_id": locked.photo_public_id,
+                "previous_status": previous,
+            },
+        )
+
+    flash = "published" if target == "published" else "unpublished"
+    return HttpResponseRedirect(reverse("gestion:memory_list") + f"?flash={flash}")

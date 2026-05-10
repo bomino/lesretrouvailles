@@ -315,6 +315,10 @@ class AuditLog(models.Model):
         ("gestion.application.rejected", "Candidature rejetée (gestion)"),
         ("aide.query.no_results", "Recherche aide sans résultat"),
         ("directory.query.no_results", "Recherche annuaire sans résultat"),
+        ("memoires.memory.created", "Souvenir créé"),
+        ("memoires.memory.edited", "Souvenir modifié"),
+        ("memoires.memory.published", "Souvenir publié"),
+        ("memoires.memory.unpublished", "Souvenir dépublié"),
     ]
 
     actor = models.ForeignKey(

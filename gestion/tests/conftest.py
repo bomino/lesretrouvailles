@@ -169,3 +169,31 @@ def regular_member_user(db):
         is_staff=False,
         is_superuser=False,
     )
+
+
+@pytest.fixture
+def make_memory(db, make_user):
+    """Factory for Memory rows. Defaults: status=published, seed public_id.
+    Pass status="draft" to build a draft. Pass created_by=user to override
+    the auto-created uploader."""
+    from memoires.models import Memory
+
+    counter = {"i": 0}
+
+    def _make(**kwargs):
+        counter["i"] += 1
+        created_by = kwargs.pop("created_by", None) or make_user(
+            username=f"memory_owner_{counter['i']}",
+            email=f"memory_owner_{counter['i']}@example.test",
+            is_staff=True,
+        )
+        defaults = {
+            "photo_public_id": f"seed/test-photo-{counter['i']}",
+            "caption": f"Test memory {counter['i']}",
+            "status": "published",
+            "created_by": created_by,
+        }
+        defaults.update(kwargs)
+        return Memory.objects.create(**defaults)
+
+    return _make

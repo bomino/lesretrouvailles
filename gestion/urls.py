@@ -48,4 +48,24 @@ urlpatterns = [
         views.application_reject_view,
         name="application_reject",
     ),
+    path(
+        "souvenirs/",
+        views.memory_list_view,
+        name="memory_list",
+    ),
+    path(
+        "souvenirs/nouveau/",
+        views.memory_create_view,
+        name="memory_create",
+    ),
+    path(
+        "souvenirs/<int:pk>/modifier/",
+        views.memory_edit_view,
+        name="memory_edit",
+    ),
+    path(
+        "souvenirs/<int:pk>/statut/",
+        views.memory_status_view,
+        name="memory_status",
+    ),
 ]

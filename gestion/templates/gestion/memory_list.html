@@ -1,0 +1,94 @@
+{% extends "gestion/base.html" %}
+{% load memory_photo %}
+{% block gestion_title %}Souvenirs{% endblock %}
+{% block gestion_heading %}Mur des souvenirs — curation{% endblock %}
+{% block gestion_content %}
+    <section aria-labelledby="filters-heading" class="mb-6">
+        <h2 id="filters-heading" class="sr-only">Filtres</h2>
+        <div role="group"
+             aria-label="Filtrer par statut"
+             class="mb-4 flex flex-wrap gap-2">
+            {% for filter_value, filter_label in filter_chips %}
+                <a href="?status={{ filter_value }}{% if q %}&q={{ q }}{% endif %}"
+                   class="rounded-full px-3 py-1.5 text-sm border min-h-tap inline-flex items-center {% if status == filter_value %}border-tertiary bg-tertiary/10 text-tertiary font-medium{% else %}border-secondary/20 bg-base-200 text-primary hover:bg-base-300{% endif %}"
+                   {% if status == filter_value %}aria-current="true"{% endif %}>{{ filter_label }}</a>
+            {% endfor %}
+        </div>
+        <form method="get" class="mb-4">
+            {% if status != "all" %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+            <input type="search"
+                   name="q"
+                   value="{{ q }}"
+                   placeholder="Rechercher (légende ou lieu)"
+                   class="block w-full md:w-96 rounded-lg border border-secondary/20 bg-white px-3 py-2 text-base shadow-sm focus:border-tertiary focus:outline-none focus:ring-2 focus:ring-tertiary/30 min-h-tap"
+                   aria-label="Rechercher une photo">
+        </form>
+        <div class="mb-4 flex items-center justify-between">
+            <p class="text-sm text-secondary">{{ page.paginator.count }} photo{{ page.paginator.count|pluralize }}</p>
+            <a href="{% url 'gestion:memory_create' %}"
+               class="rounded-lg bg-tertiary px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-tertiary/90 min-h-tap inline-flex items-center">
+                Ajouter une photo
+            </a>
+        </div>
+    </section>
+    {% if memories %}
+        <ul class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+            role="list">
+            {% for memory in memories %}
+                <li>
+                    <a href="{% url 'gestion:memory_edit' pk=memory.pk %}"
+                       class="block rounded-2xl border border-secondary/15 bg-surface shadow-sm hover:border-tertiary/40 hover:shadow-md transition overflow-hidden min-h-tap">
+                        <figure class="aspect-square bg-base-200">
+                            <img src="{% memory_thumb memory.photo_public_id size=200 %}"
+                                 alt="{{ memory.caption|truncatechars:80 }}"
+                                 loading="lazy"
+                                 class="h-full w-full object-cover">
+                        </figure>
+                        <div class="p-3">
+                            <p class="text-sm font-medium text-primary line-clamp-2">{{ memory.caption|truncatechars:80 }}</p>
+                            <p class="mt-1 text-xs text-secondary">
+                                {% if memory.status == "draft" %}
+                                    <span class="inline-flex items-center rounded-full bg-base-300 px-2 py-0.5 text-xs">Brouillon</span>
+                                {% else %}
+                                    <span class="inline-flex items-center rounded-full bg-tertiary/10 px-2 py-0.5 text-xs text-tertiary">Publiée</span>
+                                {% endif %}
+                                {% if memory.location %}<span class="ml-2">{{ memory.location }}</span>{% endif %}
+                                {% if memory.taken_at %}<span class="ml-2">{{ memory.taken_at|date:"d F Y" }}</span>{% endif %}
+                            </p>
+                        </div>
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+        {% if page.has_other_pages %}
+            <nav aria-label="Pagination"
+                 class="mt-6 flex items-center justify-center gap-2">
+                {% if page.has_previous %}
+                    <a href="?page={{ page.previous_page_number }}{% if status != 'all' %}&status={{ status }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+                       class="rounded-lg border border-secondary/20 px-3 py-1.5 text-sm min-h-tap inline-flex items-center"
+                       aria-label="Page précédente">Précédent</a>
+                {% endif %}
+                <span class="text-sm text-secondary" aria-current="page">Page {{ page.number }} sur {{ page.paginator.num_pages }}</span>
+                {% if page.has_next %}
+                    <a href="?page={{ page.next_page_number }}{% if status != 'all' %}&status={{ status }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+                       class="rounded-lg border border-secondary/20 px-3 py-1.5 text-sm min-h-tap inline-flex items-center"
+                       aria-label="Page suivante">Suivant</a>
+                {% endif %}
+            </nav>
+        {% endif %}
+    {% else %}
+        <div class="rounded-2xl border border-dashed border-secondary/30 p-8 text-center">
+            <p class="text-base text-primary">
+                {% if status == "draft" %}
+                    Aucune photo en brouillon.
+                {% elif status == "published" %}
+                    Aucune photo publiée.
+                {% else %}
+                    Aucune photo.
+                {% endif %}
+                <a href="{% url 'gestion:memory_create' %}"
+                   class="text-tertiary underline hover:no-underline">Ajouter une photo</a> pour en créer une.
+            </p>
+        </div>
+    {% endif %}
+{% endblock %}

@@ -100,6 +100,11 @@ STORAGES = {
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 
+# Allow up to 10 MB POST payloads (accommodates 8 MB photo upload + headers).
+# Files >2.5 MB still stream to disk (FILE_UPLOAD_MAX_MEMORY_SIZE default)
+# rather than buffer in RAM.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")

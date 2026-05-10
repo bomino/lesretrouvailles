@@ -5,6 +5,69 @@
 from __future__ import annotations
 
 import io
+from io import BytesIO
+
+from PIL import Image
+
+from alumni.cloudinary import (
+    _strip_exif_metadata,
+    memory_full_url,
+    memory_thumbnail_url,
+)
+
+
+class TestStripExifMetadata:
+    def _make_jpeg_with_exif(self) -> BytesIO:
+        """Build a tiny in-memory JPEG that has a recognisable EXIF tag."""
+        img = Image.new("RGB", (10, 10), color="red")
+        exif = img.getexif()
+        # 0x010E is the standard ImageDescription tag — easy to assert against.
+        exif[0x010E] = "test exif description"
+        buf = BytesIO()
+        img.save(buf, format="JPEG", exif=exif)
+        buf.seek(0)
+        return buf
+
+    def test_exif_present_in_unstripped_baseline(self):
+        # Sanity: confirm our fixture actually carries EXIF.
+        buf = self._make_jpeg_with_exif()
+        roundtrip = Image.open(buf)
+        assert roundtrip.getexif().get(0x010E) == "test exif description"
+
+    def test_strip_removes_exif_from_jpeg(self):
+        buf = self._make_jpeg_with_exif()
+        stripped = _strip_exif_metadata(buf, content_type="image/jpeg")
+        stripped_img = Image.open(stripped)
+        assert dict(stripped_img.getexif()) == {}
+
+    def test_strip_preserves_image_dimensions(self):
+        buf = self._make_jpeg_with_exif()
+        stripped = _strip_exif_metadata(buf, content_type="image/jpeg")
+        stripped_img = Image.open(stripped)
+        assert stripped_img.size == (10, 10)
+
+    def test_strip_falls_back_to_original_on_pillow_failure(self, caplog):
+        # Random bytes Pillow cannot decode → fall back to original.
+        bogus = BytesIO(b"not-an-image-at-all")
+        result = _strip_exif_metadata(bogus, content_type="image/jpeg")
+        assert result.read() == b"not-an-image-at-all"
+        assert "EXIF strip failed" in caplog.text
+
+    def test_strip_passes_through_unsupported_content_type(self):
+        # image/gif is not in _STRIPPABLE_MIME_TYPES — should return bytes unchanged.
+        data = b"some-gif-bytes"
+        result = _strip_exif_metadata(BytesIO(data), content_type="image/gif")
+        assert result.read() == data
+
+
+class TestMemoryUrlExifStripFlag:
+    def test_thumbnail_url_contains_fl_strip_profile(self):
+        url = memory_thumbnail_url("memoires/sample", size=200)
+        assert "fl_strip_profile" in url
+
+    def test_full_url_contains_fl_strip_profile(self):
+        url = memory_full_url("memoires/sample", max_width=1200)
+        assert "fl_strip_profile" in url
 
 
 def test_fake_cloudinary_upload_file_returns_deterministic_public_id():
@@ -49,7 +112,7 @@ def test_memory_thumbnail_url_uses_correct_transform(settings):
 
     assert url == (
         "https://res.cloudinary.com/test-cloud/image/upload/"
-        "f_auto,q_auto:eco,c_fill,g_auto,w_400,h_400/memoires/abc123"
+        "f_auto,q_auto:eco,fl_strip_profile,c_fill,g_auto,w_400,h_400/memoires/abc123"
     )
 
 
@@ -67,7 +130,7 @@ def test_memory_full_url_uses_limit_fit_no_crop(settings):
 
     assert url == (
         "https://res.cloudinary.com/test-cloud/image/upload/"
-        "f_auto,q_auto:eco,c_limit,w_1200/memoires/abc123"
+        "f_auto,q_auto:eco,fl_strip_profile,c_limit,w_1200/memoires/abc123"
     )
 
 

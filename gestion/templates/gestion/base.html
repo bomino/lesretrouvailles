@@ -20,6 +20,8 @@
                class="rounded-lg px-3 py-2 min-h-tap hover:bg-base-200 hover:text-tertiary transition">Membres</a>
             <a href="/gestion/cooptations/"
                class="rounded-lg px-3 py-2 min-h-tap hover:bg-base-200 hover:text-tertiary transition">Cooptations</a>
+            <a href="/gestion/souvenirs/"
+               class="rounded-lg px-3 py-2 min-h-tap hover:bg-base-200 hover:text-tertiary transition">Souvenirs</a>
             {% if request.user.is_superuser %}
                 <a href="/admin/"
                    class="ml-2 inline-flex items-center gap-1.5 rounded-lg border border-secondary/20 px-3 py-2 min-h-tap text-sm hover:border-tertiary/40 hover:bg-base-200 hover:text-tertiary transition"
@@ -30,5 +32,28 @@
             {% endif %}
         </nav>
     </div>
+    {% with flash=request.GET.flash %}
+        {% if flash %}
+            <div class="mb-4 rounded-lg border border-tertiary/30 bg-tertiary/5 px-4 py-2.5 text-sm text-tertiary"
+                 role="status"
+                 aria-live="polite">
+                {% if flash == "created" %}
+                    Photo créée.
+                {% elif flash == "updated" %}
+                    Photo mise à jour.
+                {% elif flash == "published" %}
+                    Photo publiée.
+                {% elif flash == "unpublished" %}
+                    Photo dépubliée.
+                {% elif flash == "noop" %}
+                    Aucune modification.
+                {% elif flash == "bad_status" %}
+                    Statut invalide.
+                {% else %}
+                    {{ flash }}
+                {% endif %}
+            </div>
+        {% endif %}
+    {% endwith %}
     {% block gestion_content %}{% endblock %}
 {% endblock %}
