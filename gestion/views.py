@@ -422,6 +422,9 @@ PAGE_SIZE_MEMORY = 12  # photo grid — distinct from PAGE_SIZE = 20 for text-he
 
 MEMORY_STATUS_FILTERS = ("all", "published", "draft")
 
+# Fields watched by memory_edit_view's pre/post snapshot for no-op detection
+# and audit-event emission. Includes photo_public_id so a photo replace
+# counts as a change even when caption/etc. are untouched.
 WATCH_FIELDS = ("caption", "taken_at", "location", "status", "photo_public_id")
 
 
@@ -559,7 +562,6 @@ def memory_edit_view(request, pk):
                         "Échec du téléversement. Vérifiez votre connexion et réessayez.",
                     )
                     logger.warning("memory_edit_view: Cloudinary upload failed", exc_info=True)
-                    new_public_id = None
                 else:
                     if not new_public_id:
                         raise RuntimeError("Cloudinary returned empty public_id; refusing to write")
@@ -581,7 +583,9 @@ def memory_edit_view(request, pk):
                     post = {f: getattr(locked, f) for f in WATCH_FIELDS}
 
                     if pre == post and not new_public_id:
-                        # True no-op — bail without DB writes or audit rows.
+                        # Return inside atomic: select_for_update lock is held until exit, then
+                        # released. We need the locked state to compute pre==post accurately;
+                        # bailing out without the lock would race with concurrent writers.
                         return HttpResponseRedirect(reverse("gestion:memory_list") + "?flash=noop")
 
                     locked.save()
@@ -624,7 +628,8 @@ def memory_edit_view(request, pk):
                         )
 
                     if new_public_id and old_id:
-
+                        # Default-arg captures old_id NOW (at definition), not at on_commit
+                        # callback time — avoids late-binding to a mutated outer variable.
                         def _delete_old(old=old_id):
                             try:
                                 get_client().delete(old)
