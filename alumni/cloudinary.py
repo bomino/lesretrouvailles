@@ -3,11 +3,79 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import time
 from importlib import import_module
+from io import BytesIO
 from typing import Any, Protocol
 
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
+
+# MIME types we know how to strip via Pillow's resave.
+_STRIPPABLE_MIME_TYPES = frozenset({"image/jpeg", "image/png", "image/webp"})
+
+
+def _strip_exif_metadata(file_obj, *, content_type: str) -> BytesIO:
+    """Re-encode the image via Pillow to drop EXIF/XMP/IPTC from the bytes.
+
+    Pillow's .save() does not preserve metadata unless you pass the exif=
+    kwarg explicitly. Calling it without exif= produces a clean copy.
+
+    On any Pillow failure (corrupt file, unsupported format, etc.) we log a
+    warning and return the original bytes unchanged. This trades EXIF
+    protection on the failing upload for keeping the user-visible upload
+    flow working — the photo lands on the wall; the operator can manually
+    re-upload if they suspect a problem. The §I Risk #14 residual.
+    """
+    from PIL import Image, UnidentifiedImageError
+
+    # Pillow needs a seekable stream. Read into memory once and rewind.
+    raw = file_obj.read() if hasattr(file_obj, "read") else file_obj
+    if isinstance(raw, bytes):
+        source = BytesIO(raw)
+    else:
+        source = BytesIO(bytes(raw))
+    source.seek(0)
+
+    if content_type not in _STRIPPABLE_MIME_TYPES:
+        # Trust the validation layer; this branch is defensive only.
+        source.seek(0)
+        return source
+
+    try:
+        img = Image.open(source)
+        img.load()  # force-decode now so errors fire here, not later
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        logger.warning("EXIF strip failed (Pillow open): %s", exc)
+        source.seek(0)
+        return source
+
+    out = BytesIO()
+    fmt_map = {
+        "image/jpeg": "JPEG",
+        "image/png": "PNG",
+        "image/webp": "WEBP",
+    }
+    pil_format = fmt_map[content_type]
+
+    try:
+        # Note: NOT passing exif= drops the EXIF chunk on JPEG.
+        # PNG/WebP: Pillow drops ancillary chunks (incl. metadata) by default.
+        save_kwargs = {"format": pil_format}
+        if pil_format == "JPEG":
+            # Preserve original quality reasonably; 95 matches Pillow's "good".
+            save_kwargs["quality"] = 95
+            save_kwargs["optimize"] = True
+        img.save(out, **save_kwargs)
+    except (OSError, ValueError) as exc:
+        logger.warning("EXIF strip failed (Pillow save): %s", exc)
+        source.seek(0)
+        return source
+
+    out.seek(0)
+    return out
 
 
 class CloudinaryClient(Protocol):
@@ -54,9 +122,17 @@ class RealCloudinary:
         }
 
     def upload_file(self, file_obj: Any, *, folder: str) -> str:
-        """Server-side upload via Cloudinary's REST API. Returns the public_id."""
+        """Server-side upload via Cloudinary's REST API. Returns the public_id.
+
+        Strips EXIF/XMP/IPTC metadata server-side before passing to Cloudinary
+        (see alumni.cloudinary._strip_exif_metadata). On Pillow failure the
+        original bytes flow through unchanged — a logged residual, not a
+        user-visible error.
+        """
+        content_type = getattr(file_obj, "content_type", "image/jpeg")
+        stripped = _strip_exif_metadata(file_obj, content_type=content_type)
         result = self._cloudinary.uploader.upload(
-            file_obj,
+            stripped,
             folder=folder,
             resource_type="image",
             use_filename=False,
@@ -168,18 +244,26 @@ def member_thumbnail_url(public_id: str, size: int = 240) -> str:
 
 
 def memory_thumbnail_url(public_id: str, size: int = 400) -> str:
-    """Square thumbnail for the gallery grid. Auto crop with subject focus."""
+    """Square thumbnail for the gallery grid. Auto crop with subject focus.
+
+    fl_strip_profile drops EXIF/IPTC from the delivered URL — defense in
+    depth alongside the server-side strip in RealCloudinary.upload_file.
+    """
     if not public_id:
         return ""
     cloud_name = getattr(settings, "CLOUDINARY_CLOUD_NAME", "fake-cloud")
-    transform = f"f_auto,q_auto:eco,c_fill,g_auto,w_{size},h_{size}"
+    transform = f"f_auto,q_auto:eco,c_fill,g_auto,fl_strip_profile,w_{size},h_{size}"
     return f"https://res.cloudinary.com/{cloud_name}/image/upload/{transform}/{public_id}"
 
 
 def memory_full_url(public_id: str, max_width: int = 1200) -> str:
-    """Limit-fit version for the detail page. No crop; preserves aspect ratio."""
+    """Limit-fit version for the detail page. No crop; preserves aspect ratio.
+
+    fl_strip_profile drops EXIF/IPTC from the delivered URL — defense in
+    depth alongside the server-side strip in RealCloudinary.upload_file.
+    """
     if not public_id:
         return ""
     cloud_name = getattr(settings, "CLOUDINARY_CLOUD_NAME", "fake-cloud")
-    transform = f"f_auto,q_auto:eco,c_limit,w_{max_width}"
+    transform = f"f_auto,q_auto:eco,c_limit,fl_strip_profile,w_{max_width}"
     return f"https://res.cloudinary.com/{cloud_name}/image/upload/{transform}/{public_id}"
