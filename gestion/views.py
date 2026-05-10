@@ -58,6 +58,7 @@ def dashboard_view(request):
         "pending_cooptations": AdminApplication.objects.filter(
             status__in=("cooptation_pending", "awaiting_admin")
         ).count(),
+        "draft_memories": Memory.objects.filter(status="draft").count(),
     }
     return render(request, "gestion/dashboard.html", {"kpis": kpis})
 
