@@ -302,10 +302,6 @@ class AuditLog(models.Model):
         ("ghost.removal.executed", "Retrait exécuté"),
         ("ghost.removal.cancelled", "Demande de retrait annulée par admin"),
         ("ghost.entry.purged", "Fiche purgée"),
-        ("memoires.memory.created", "Photo Souvenirs créée"),
-        ("memoires.memory.edited", "Photo Souvenirs modifiée"),
-        ("memoires.memory.published", "Photo Souvenirs publiée"),
-        ("memoires.memory.unpublished", "Photo Souvenirs dépubliée"),
         ("memoriam.entry.published", "Fiche In Memoriam publiée"),
         ("memoriam.entry.archived", "Fiche In Memoriam archivée"),
         ("memoriam.nomination.created", "Nomination In Memoriam soumise"),
@@ -319,6 +315,10 @@ class AuditLog(models.Model):
         ("gestion.application.rejected", "Candidature rejetée (gestion)"),
         ("aide.query.no_results", "Recherche aide sans résultat"),
         ("directory.query.no_results", "Recherche annuaire sans résultat"),
+        ("memoires.memory.created", "Souvenir créé"),
+        ("memoires.memory.edited", "Souvenir modifié"),
+        ("memoires.memory.published", "Souvenir publié"),
+        ("memoires.memory.unpublished", "Souvenir dépublié"),
     ]
 
     actor = models.ForeignKey(

@@ -283,10 +283,10 @@ Default `status` filter when query param absent: `"all"`.
 **Action additions** to `members/models.py::AuditLog.ACTION_CHOICES` (Python-level, no migration):
 
 ```python
-("memoires.memory.created", "Photo Souvenirs créée"),
-("memoires.memory.edited", "Photo Souvenirs modifiée"),
-("memoires.memory.published", "Photo Souvenirs publiée"),
-("memoires.memory.unpublished", "Photo Souvenirs dépubliée"),
+("memoires.memory.created", "Souvenir créé"),
+("memoires.memory.edited", "Souvenir modifié"),
+("memoires.memory.published", "Souvenir publié"),
+("memoires.memory.unpublished", "Souvenir dépublié"),
 ```
 
 **`target_type` / `target_id`:**
