@@ -14,7 +14,8 @@ from django.contrib.auth import get_user_model
 from django.core.management import call_command
 
 from cooptation.models import AdminApplication, CooptationRequest
-from members.models import Member
+from members.charters import CHARTER_CURRENT_VERSION
+from members.models import ConsentRecord, Member
 from memoires.models import Memory
 from memoriam.models import InMemoriamEntry
 
@@ -88,6 +89,21 @@ class TestSeedHandbookDemo:
         # must show up at least once so the directory-search flow can
         # exercise year filters meaningfully.
         assert years_seen == {1980, 1981, 1982, 1983, 1984, 1985}
+
+    def test_demo_members_have_charter_consent(self):
+        # Without a ConsentRecord at the current charter version,
+        # ConsentRequiredMiddleware redirects every URL to /charte/, which
+        # breaks every handbook flow that depends on a logged-in member
+        # actually landing on the page they navigated to.
+        call_command("seed_handbook_demo")
+
+        members = Member.objects.filter(user__username__startswith="demo_member_")
+        assert members.count() == EXPECTED_DEMO_MEMBERS
+        for member in members:
+            assert ConsentRecord.objects.filter(
+                member=member,
+                charter_version=CHARTER_CURRENT_VERSION,
+            ).exists(), f"missing consent for {member.user.username}"
 
     def test_command_does_not_touch_bominomla(self):
         user_model = get_user_model()

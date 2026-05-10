@@ -26,7 +26,8 @@ from django.db import transaction
 from django.utils import timezone
 
 from cooptation.models import AdminApplication, CooptationRequest
-from members.models import Member
+from members.charters import CHARTER_CURRENT_VERSION
+from members.models import ConsentRecord, Member
 from memoires.models import Memory
 from memoriam.models import InMemoriamEntry
 
@@ -293,6 +294,11 @@ class Command(BaseCommand):
                     "whatsapp": spec["whatsapp"],
                     "status": "active",
                 },
+            )
+            ConsentRecord.objects.get_or_create(
+                member=member,
+                charter_version=CHARTER_CURRENT_VERSION,
+                defaults={"ip_address": "127.0.0.1"},
             )
             members.append(member)
         return members
