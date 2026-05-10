@@ -411,10 +411,61 @@ def _redirect_to_detail(member, flash: str, changed: list | None = None):
     return HttpResponseRedirect(f"{url}{sep}{'&'.join(parts)}")
 
 
+PAGE_SIZE_MEMORY = 12  # photo grid — distinct from PAGE_SIZE = 20 for text-heavy lists
+
+MEMORY_STATUS_FILTERS = ("all", "published", "draft")
+
+
 @staff_required
+@require_http_methods(["GET"])
 def memory_list_view(request):
-    """Stub — fleshed out in Task 4 (memory_list_view)."""
-    return HttpResponse(status=501)
+    """Grid of memories with status filter, q search, pagination."""
+    from memoires.models import Memory
+
+    status = request.GET.get("status", "all")
+    if status not in MEMORY_STATUS_FILTERS:
+        status = "all"
+
+    qs = Memory.objects.all()
+    if status != "all":
+        qs = qs.filter(status=status)
+
+    q = (request.GET.get("q") or "").strip()[:80]
+    if q:
+        needle = Lower(Unaccent(Value(q)))
+        qs = qs.annotate(
+            caption_lc=Lower(Unaccent(F("caption"))),
+            location_lc=Lower(Unaccent(F("location"))),
+        ).filter(Q(caption_lc__contains=needle) | Q(location_lc__contains=needle))
+
+    qs = qs.order_by("-created_at", F("taken_at").desc(nulls_last=True))
+
+    paginator = Paginator(qs, PAGE_SIZE_MEMORY)
+    raw_page = request.GET.get("page", "1")
+    try:
+        page_number = max(1, int(raw_page))
+    except (TypeError, ValueError):
+        page_number = 1
+    try:
+        page = paginator.page(page_number)
+    except (EmptyPage, PageNotAnInteger):
+        page = paginator.page(paginator.num_pages or 1)
+
+    return render(
+        request,
+        "gestion/memory_list.html",
+        {
+            "page": page,
+            "memories": page.object_list,
+            "q": q,
+            "status": status,
+            "filter_chips": [
+                ("all", "Toutes"),
+                ("published", "Publiées"),
+                ("draft", "Brouillons"),
+            ],
+        },
+    )
 
 
 @staff_required
