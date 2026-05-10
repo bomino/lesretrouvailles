@@ -422,6 +422,8 @@ PAGE_SIZE_MEMORY = 12  # photo grid — distinct from PAGE_SIZE = 20 for text-he
 
 MEMORY_STATUS_FILTERS = ("all", "published", "draft")
 
+WATCH_FIELDS = ("caption", "taken_at", "location", "status", "photo_public_id")
+
 
 @staff_required
 @require_http_methods(["GET"])
@@ -536,9 +538,114 @@ def memory_create_view(request):
 
 
 @staff_required
+@require_http_methods(["GET", "POST"])
 def memory_edit_view(request, pk):
-    """Stub — fleshed out in Task 6 (memory_edit_view)."""
-    return HttpResponse(status=501)
+    """Edit an existing Memory. Photo replace optional. Detects no-op edits;
+    emits 1 row per logical event (edited + optional status transition)."""
+    memory = get_object_or_404(Memory, pk=pk)
+
+    if request.method == "POST":
+        form = GestionMemoryForm(request.POST, request.FILES, instance=memory)
+        if form.is_valid():
+            upload = form.cleaned_data.get("upload")
+            new_public_id = None
+            if upload:
+                client = get_client()
+                try:
+                    new_public_id = client.upload_file(upload, folder="memoires")
+                except Exception:  # noqa: BLE001
+                    form.add_error(
+                        "upload",
+                        "Échec du téléversement. Vérifiez votre connexion et réessayez.",
+                    )
+                    logger.warning("memory_edit_view: Cloudinary upload failed", exc_info=True)
+                    new_public_id = None
+                else:
+                    if not new_public_id:
+                        raise RuntimeError("Cloudinary returned empty public_id; refusing to write")
+
+            if form.is_valid():  # re-check after the optional add_error above
+                with transaction.atomic():
+                    locked = Memory.objects.select_for_update().get(pk=memory.pk)
+                    old_id = locked.photo_public_id
+                    pre = {f: getattr(locked, f) for f in WATCH_FIELDS}
+
+                    # Apply form changes onto the locked instance.
+                    if new_public_id:
+                        locked.photo_public_id = new_public_id
+                    for field_name in form.changed_data:
+                        if field_name == "upload":
+                            continue
+                        setattr(locked, field_name, form.cleaned_data[field_name])
+
+                    post = {f: getattr(locked, f) for f in WATCH_FIELDS}
+
+                    if pre == post and not new_public_id:
+                        # True no-op — bail without DB writes or audit rows.
+                        return HttpResponseRedirect(reverse("gestion:memory_list") + "?flash=noop")
+
+                    locked.save()
+
+                    changed_fields = [f for f in form.changed_data if f not in ("upload", "status")]
+                    photo_replaced = bool(new_public_id)
+                    fields_changed = bool(changed_fields) or photo_replaced
+                    status_changed = pre["status"] != post["status"]
+
+                    if fields_changed:
+                        AuditLog.objects.create(
+                            actor=request.user,
+                            action="memoires.memory.edited",
+                            target_type="memoires.Memory",
+                            target_id=str(locked.pk),
+                            metadata={
+                                "caption_preview": locked.caption[:60],
+                                "public_id": locked.photo_public_id,
+                                "changed_fields": changed_fields,
+                                "photo_replaced": photo_replaced,
+                            },
+                        )
+
+                    if status_changed:
+                        action = (
+                            "memoires.memory.published"
+                            if post["status"] == "published"
+                            else "memoires.memory.unpublished"
+                        )
+                        AuditLog.objects.create(
+                            actor=request.user,
+                            action=action,
+                            target_type="memoires.Memory",
+                            target_id=str(locked.pk),
+                            metadata={
+                                "caption_preview": locked.caption[:60],
+                                "public_id": locked.photo_public_id,
+                                "previous_status": pre["status"],
+                            },
+                        )
+
+                    if new_public_id and old_id:
+
+                        def _delete_old(old=old_id):
+                            try:
+                                get_client().delete(old)
+                            except Exception:  # noqa: BLE001
+                                logger.warning(
+                                    "memory_edit_view: post-commit delete of %s failed",
+                                    old,
+                                    exc_info=True,
+                                )
+
+                        transaction.on_commit(_delete_old)
+
+                return HttpResponseRedirect(reverse("gestion:memory_list") + "?flash=updated")
+    else:
+        form = GestionMemoryForm(instance=memory)
+
+    return render(
+        request,
+        "gestion/memory_edit.html",
+        {"form": form, "memory": memory},
+    )
 
 
 @staff_required
