@@ -13,7 +13,7 @@ from django.contrib.postgres.lookups import Unaccent
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import F, Q, Value
 from django.db.models.functions import Lower
-from django.http import HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
@@ -409,3 +409,27 @@ def _redirect_to_detail(member, flash: str, changed: list | None = None):
     if changed:
         parts.append("changed=" + ",".join(changed))
     return HttpResponseRedirect(f"{url}{sep}{'&'.join(parts)}")
+
+
+@staff_required
+def memory_list_view(request):
+    """Stub — fleshed out in Task 4 (memory_list_view)."""
+    return HttpResponse(status=501)
+
+
+@staff_required
+def memory_create_view(request):
+    """Stub — fleshed out in Task 5 (memory_create_view)."""
+    return HttpResponse(status=501)
+
+
+@staff_required
+def memory_edit_view(request, pk):
+    """Stub — fleshed out in Task 6 (memory_edit_view)."""
+    return HttpResponse(status=501)
+
+
+@staff_required
+def memory_status_view(request, pk):
+    """Stub — fleshed out in Task 7 (memory_status_view)."""
+    return HttpResponse(status=501)
