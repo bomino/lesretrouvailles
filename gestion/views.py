@@ -25,6 +25,7 @@ from cooptation.services import (
     reject_application,
 )
 from members.models import AuditLog, Member
+from memoires.models import Memory
 
 from .decorators import staff_required
 from .forms import (
@@ -420,8 +421,6 @@ MEMORY_STATUS_FILTERS = ("all", "published", "draft")
 @require_http_methods(["GET"])
 def memory_list_view(request):
     """Grid of memories with status filter, q search, pagination."""
-    from memoires.models import Memory
-
     status = request.GET.get("status", "all")
     if status not in MEMORY_STATUS_FILTERS:
         status = "all"
@@ -438,6 +437,11 @@ def memory_list_view(request):
             location_lc=Lower(Unaccent(F("location"))),
         ).filter(Q(caption_lc__contains=needle) | Q(location_lc__contains=needle))
 
+    # Curation-recency-first ordering: gestion admins want to see what was
+    # just uploaded (-created_at), THEN by photo era (taken_at DESC NULLS LAST).
+    # This deliberately diverges from Memory.Meta.ordering — the public
+    # /souvenirs/ gallery keeps the era-first storytelling order; /gestion/
+    # curation uses recency-first per spec §G locked decisions.
     qs = qs.order_by("-created_at", F("taken_at").desc(nulls_last=True))
 
     paginator = Paginator(qs, PAGE_SIZE_MEMORY)
