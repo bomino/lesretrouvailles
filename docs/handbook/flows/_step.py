@@ -87,7 +87,10 @@ def flow_recorder(
         yield manifest
     finally:
         out = MANIFEST_DIR / f"{flow_id}.json"
-        out.write_text(json.dumps(manifest.to_dict(), indent=2, ensure_ascii=False))
+        out.write_text(
+            json.dumps(manifest.to_dict(), indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
 
 
 def step(
