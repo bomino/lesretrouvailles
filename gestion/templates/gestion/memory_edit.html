@@ -45,7 +45,13 @@
                 {% endif %}
             </label>
             {{ form.upload }}
-            {% if form.upload.help_text %}<p class="mt-1 text-xs text-secondary">{{ form.upload.help_text }}</p>{% endif %}
+            <p class="mt-1 text-xs text-secondary">
+                {% if memory %}
+                    Choisir une photo (JPEG, PNG ou WebP, ≤ 8 Mo). Laisser vide pour conserver l'image existante.
+                {% else %}
+                    Choisir une photo (JPEG, PNG ou WebP, ≤ 8 Mo). Une photo est obligatoire.
+                {% endif %}
+            </p>
             {% if form.upload.errors %}<p class="mt-1 text-sm text-error">{{ form.upload.errors|join:" " }}</p>{% endif %}
         </div>
         <div>

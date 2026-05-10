@@ -12,6 +12,7 @@ from urllib.parse import quote
 
 from django.contrib.postgres.lookups import Unaccent
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.db import transaction
 from django.db.models import F, Q, Value
 from django.db.models.functions import Lower
 from django.http import HttpResponse, HttpResponseRedirect
@@ -19,6 +20,7 @@ from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
+from alumni.cloudinary import get_client
 from cooptation.models import AdminApplication, CooptationRequest, QuestionnaireResponse
 from cooptation.services import (
     _build_password_set_url,
@@ -481,10 +483,6 @@ def memory_list_view(request):
 def memory_create_view(request):
     """Create a new Memory. Upload goes through Cloudinary first; DB write +
     AuditLog are atomic. Redirects to list with ?flash=created on success."""
-    from django.db import transaction
-
-    from alumni.cloudinary import get_client
-
     if request.method == "POST":
         form = GestionMemoryForm(request.POST, request.FILES)
         if form.is_valid():
@@ -492,14 +490,12 @@ def memory_create_view(request):
             client = get_client()
             try:
                 new_public_id = client.upload_file(upload, folder="memoires")
-            except Exception as exc:  # noqa: BLE001
+            except Exception:  # noqa: BLE001
                 form.add_error(
                     "upload",
                     "Échec du téléversement. Vérifiez votre connexion et réessayez.",
                 )
-                logger.warning(
-                    "memory_create_view: Cloudinary upload failed: %s", exc, exc_info=True
-                )
+                logger.warning("memory_create_view: Cloudinary upload failed", exc_info=True)
             else:
                 if not new_public_id:
                     raise RuntimeError("Cloudinary returned empty public_id; refusing to write")
@@ -525,7 +521,7 @@ def memory_create_view(request):
                             "initial_status": memory.status,
                         },
                     )
-                return HttpResponseRedirect("/gestion/souvenirs/?flash=created")
+                return HttpResponseRedirect(reverse("gestion:memory_list") + "?flash=created")
     else:
         form = GestionMemoryForm()
 
