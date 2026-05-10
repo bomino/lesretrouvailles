@@ -6,6 +6,7 @@ will add the cooptation queue."""
 
 from __future__ import annotations
 
+import logging
 import re
 from urllib.parse import quote
 
@@ -30,9 +31,12 @@ from memoires.models import Memory
 from .decorators import staff_required
 from .forms import (
     ApplicationRejectForm,
+    GestionMemoryForm,
     MemberAdminEditForm,
     MemberUsernameChangeForm,
 )
+
+logger = logging.getLogger(__name__)
 
 PAGE_SIZE = 20
 STATUS_FILTERS = ("active", "suspended", "all")
@@ -473,9 +477,66 @@ def memory_list_view(request):
 
 
 @staff_required
+@require_http_methods(["GET", "POST"])
 def memory_create_view(request):
-    """Stub — fleshed out in Task 5 (memory_create_view)."""
-    return HttpResponse(status=501)
+    """Create a new Memory. Upload goes through Cloudinary first; DB write +
+    AuditLog are atomic. Redirects to list with ?flash=created on success."""
+    from django.db import transaction
+
+    from alumni.cloudinary import get_client
+
+    if request.method == "POST":
+        form = GestionMemoryForm(request.POST, request.FILES)
+        if form.is_valid():
+            upload = form.cleaned_data["upload"]
+            client = get_client()
+            try:
+                new_public_id = client.upload_file(upload, folder="memoires")
+            except Exception as exc:  # noqa: BLE001
+                form.add_error(
+                    "upload",
+                    "Échec du téléversement. Vérifiez votre connexion et réessayez.",
+                )
+                logger.warning(
+                    "memory_create_view: Cloudinary upload failed: %s", exc, exc_info=True
+                )
+            else:
+                if not new_public_id:
+                    raise RuntimeError("Cloudinary returned empty public_id; refusing to write")
+                with transaction.atomic():
+                    memory = Memory.objects.create(
+                        photo_public_id=new_public_id,
+                        caption=form.cleaned_data["caption"],
+                        taken_at=form.cleaned_data["taken_at"] or None,
+                        location=form.cleaned_data["location"] or "",
+                        status=form.cleaned_data["status"],
+                        created_by=request.user,
+                    )
+                    AuditLog.objects.create(
+                        actor=request.user,
+                        action="memoires.memory.created",
+                        target_type="memoires.Memory",
+                        target_id=str(memory.pk),
+                        metadata={
+                            "caption_preview": memory.caption[:60],
+                            "location": memory.location,
+                            "taken_at": memory.taken_at.isoformat() if memory.taken_at else None,
+                            "public_id": memory.photo_public_id,
+                            "initial_status": memory.status,
+                        },
+                    )
+                return HttpResponseRedirect("/gestion/souvenirs/?flash=created")
+    else:
+        form = GestionMemoryForm()
+
+    return render(
+        request,
+        "gestion/memory_edit.html",
+        {
+            "form": form,
+            "memory": None,  # signals create mode to the template
+        },
+    )
 
 
 @staff_required
