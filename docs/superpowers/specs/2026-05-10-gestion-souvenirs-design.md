@@ -18,6 +18,7 @@ This phase closes that gap with full co-admin parity on photo CRUD — mirroring
 1. Co-admins can perform every photo-curation action on `/gestion/souvenirs/` that the super-admin currently does on `/admin/memoires/memory/`, except destructive operations (hard delete).
 2. The new surface is mobile-first, French-language, accessible, and consistent with the existing `/gestion/` patterns (single subnav line, KPI dashboard, plain-form interaction).
 3. Every state change writes an AuditLog row with human-readable metadata, retained per the P6c 12-month sweep.
+4. **All new photo uploads — via `/gestion/` or `/admin/` — have EXIF metadata stripped server-side at upload time.** No new photo leaks GPS coordinates through its stored Cloudinary original. Pre-phase photos are deferred to a Phase 2 one-shot reprocessing command (residual in §I).
 
 ## C. Non-goals (explicit)
 
@@ -29,7 +30,7 @@ This phase closes that gap with full co-admin parity on photo CRUD — mirroring
 | 4 | Manual reordering (drag-and-drop position field) | No `position` field on the model. Ordering is by `taken_at` (semantic) + `-created_at` (recency). |
 | 5 | Tags / categories on photos | No demand surfaced. Phase 2 candidate. |
 | 6 | Member-uploaded gallery + droit-à-l'image workflow | Phase 2 backlog item per `STATUS.md`. |
-| 7 | Server-side EXIF strip with Pillow/piexif | Dedicated mini-phase planned. This phase ships `fl_strip_profile` delivery-only mitigation. |
+| 7 | One-shot reprocessing of EXISTING Cloudinary photos to strip EXIF from already-stored originals | New uploads are EXIF-stripped server-side via Pillow in this phase. Pre-phase photos retain EXIF in their stored originals; constructing the raw Cloudinary URL still exposes their GPS. A `restrip_existing_memories` management command is a Phase 2 candidate. |
 | 8 | Direct browser → Cloudinary upload (signed) | Phase 2 enhancement; saves the double-hop for mobile co-admins. |
 | 9 | HTMX partial updates | Consistent with cooptation list using plain GET. |
 | 10 | "Preview before publish" 2-step flow | Full-parity decision: co-admin publishes directly. AuditLog handles accountability. |
@@ -74,7 +75,7 @@ Extends existing single-file gestion convention. No per-feature split.
 | `gestion/urls.py` | Extend with 4 routes above. |
 | `gestion/templates/gestion/memory_list.html` | New. Grid of `size=200` thumbnails, status filter chips, `?q=` search, pagination. |
 | `gestion/templates/gestion/memory_edit.html` | New. Shared by create + edit (renders without pk in create mode). Photo preview at `size=400` (edit only), `upload` file input, 4 form fields, save button, status-toggle form (edit only). |
-| `gestion/templates/gestion/base.html` | Add `Souvenirs` subnav link (between `Cooptations` and overflow). Mirror active-state highlighting pattern. |
+| `gestion/templates/gestion/base.html` | Add `Souvenirs` subnav link (after `Cooptations`). Mirror active-state highlighting pattern. Extend the flash-message map with `created`, `updated`, `published`, `unpublished`, `noop`, `bad_status` keys → French copy. |
 | `gestion/templates/gestion/dashboard.html` | Grid bumps `md:grid-cols-3` → `md:grid-cols-2 lg:grid-cols-4`; new 4th tile rendering `kpis.draft_memories` count. |
 | `gestion/tests/conftest.py` | Add `make_memory(make_user)` factory fixture; default `status="published"`, `photo_public_id="seed/test-photo-{counter}"`. |
 | `gestion/tests/test_memory_list.py` | New. |
@@ -84,7 +85,9 @@ Extends existing single-file gestion convention. No per-feature split.
 | `gestion/tests/test_caption_xss_safe.py` | New (regression — caption never rendered as markdown/HTML). |
 | `gestion/tests/test_dashboard.py` | Extend for 4th tile assertions. |
 | `members/models.py::AuditLog.ACTION_CHOICES` | Add 4 entries (Python-level, no migration). |
-| `alumni/cloudinary.py::memory_thumbnail_url` | Add `fl_strip_profile` to the transformation chain (delivery-side EXIF strip, no migration). |
+| `alumni/cloudinary.py::RealCloudinary.upload_file` | Add server-side EXIF strip via `PIL.Image.open(file).save(BytesIO(), format=...)` before passing to Cloudinary. Drops EXIF on JPEG/PNG/WebP resave. Applies to ALL upload callers (members, memoires, memoriam). Defense-in-depth: stored originals no longer have GPS. |
+| `alumni/cloudinary.py::memory_thumbnail_url` AND `memory_full_url` | Add `fl_strip_profile` to BOTH transformation chains (delivery-side EXIF strip on served URLs). Covers existing pre-phase photos whose originals still have EXIF. |
+| `pyproject.toml` | Add `pillow>=10.0` as explicit dependency. Currently transitive via `cloudinary`; making explicit prevents accidental drop if Cloudinary ever drops its PIL dep. |
 | `alumni/settings/base.py` | Raise `DATA_UPLOAD_MAX_MEMORY_SIZE` to `10 * 1024 * 1024` (8 MB form limit + headers). **Do not** raise `FILE_UPLOAD_MAX_MEMORY_SIZE` — leave at default 2.5 MB so files >2.5 MB stream to disk rather than buffer in RAM. |
 
 ### Permissions
@@ -262,7 +265,7 @@ Default `status` filter when query param absent: `"all"`.
 | Old-photo cleanup | `transaction.on_commit(lambda: client.delete(old_id))` inside the atomic block. Failure logged + ignored. |
 | No-op edit | WATCH_FIELDS snapshot pre vs post; if equal AND no upload, skip writes, redirect with `?flash=noop`. |
 | Caption rendering | Plain text only, never HTML/markdown. Regression test asserts XSS-safety. |
-| EXIF strip | Phase 1: `fl_strip_profile` in `memory_thumbnail_url` (delivery-side). Stored originals retain GPS. Phase 2 mini-phase planned for server-side strip. |
+| EXIF strip | Phase 1: **server-side strip via Pillow on upload** (drops EXIF from stored originals for ALL new uploads) + `fl_strip_profile` in both `memory_thumbnail_url` AND `memory_full_url` (defense-in-depth for served URLs, also covers existing pre-phase photos with EXIF still in stored originals). Pre-phase Cloudinary originals retain their EXIF; one-shot reprocessing is a Phase 2 management command. |
 | HTMX | Not used. Plain GET/POST + full-page reload. |
 | Accessibility | `min-h-tap` on every interactive element. Status chips wrapped in `role="group" aria-label="Filtrer par statut"`, active chip has `aria-pressed="true"`. Pagination links carry `aria-label` + `aria-current="page"` on the active page. |
 | `taken_at` validation | None. No min-year / max-year check. Trust operator. |
@@ -356,7 +359,7 @@ Default `status` filter when query param absent: `"all"`.
 | 1 | Photo-replace / metadata race — two co-admins editing same memory near-simultaneously can produce a silent lost-update | `select_for_update()` row lock serializes commits; no DB corruption | Silent lost-update of B's-unchanged-from-form-load fields possible. Likelihood near-zero at 0–3 co-admin scale. Mitigation = optimistic concurrency via `updated_at` (deferred) |
 | 2 | Cloudinary upload succeeds → DB write fails inside atomic → blob orphaned | Acknowledged; consistent with `memoires/admin.py` | Acceptable; Cloudinary free-tier headroom |
 | 3 | `client.delete(old_id)` fails post-commit | `transaction.on_commit` callback + try/except; `logger.warning` on failure | Orphan; operator unaware (intentional) |
-| 4 | EXIF GPS in stored Cloudinary originals | `fl_strip_profile` in delivery transformation chain | Original blob retains EXIF. Reaching it requires either Cloudinary console credentials OR constructing the raw URL from a known random public_id (never embedded in rendered HTML). Effective attack surface: someone with our Cloudinary admin access. Mini-phase planned for server-side strip. |
+| 4 | EXIF GPS in stored Cloudinary originals | (a) Server-side strip via Pillow on upload — new uploads no longer carry GPS in stored original. (b) `fl_strip_profile` in delivery URLs — strips on served URLs as defense-in-depth and for existing pre-phase photos. | **Pre-phase photos uploaded before this spec ships still have EXIF in their stored originals.** Public_ids appear in rendered `<img src>` URLs (e.g., on `/souvenirs/`), so anyone inspecting the HTML can extract a public_id and construct `https://res.cloudinary.com/<cloud>/image/upload/<public_id>` (no transformations) to fetch the raw pre-phase original and read GPS. **One-shot `restrip_existing_memories` management command is the Phase 2 fix** — re-uploads existing assets through the new Pillow path, then deletes the old originals. Scope of residual: ~however-many photos are on the wall at phase-ship time. |
 | 5 | Dashboard tile may read 0 long-term if curation pattern is "create-and-publish" | None | Revisit after first real usage; may swap for a different KPI |
 | 6 | Filter context lost on edit-redirect | None | Documented; consistent with cooptation |
 | 7 | Browser POST retry → duplicate Memory created | None | Acceptable at 0–3 co-admin scale, low frequency |
@@ -365,6 +368,8 @@ Default `status` filter when query param absent: `"all"`.
 | 10 | Orphan blob accumulation over months (from rollbacks + delete failures) | None | At our scale, maybe 10–50 orphans/year. Cloudinary console exposes "storage used"; operator can prune manually. `cleanup_orphans` management command is a Phase 2 candidate. |
 | 11 | DB connection pool exhaustion from `select_for_update` holding connections | None special | At 0–3 co-admin scale, well within Railway's pool size (~20). Awareness only. |
 | 12 | Browser cache shows stale thumbnail after photo replace | None | New upload → new random public_id → new URL → fresh fetch within 5–15 min (Cloudinary CDN default). No time-critical replacements expected. |
+| 13 | Cloudinary delivery transformation fails (corrupted source, transform-not-supported edge case) | `f_auto, q_auto:eco` is conservative; Cloudinary serves a fallback or 404 | Broken thumbnail tile in list view; operator notices visually, can re-upload. Not catastrophic. |
+| 14 | Pillow server-side strip on upload raises (corrupt JPEG, unsupported format edge case) | Try/except wrapping the Pillow resave; on failure fall back to uploading the original bytes with a `logger.warning` (EXIF NOT stripped on that one upload) | Edge case; operator can manually re-upload the photo if they suspect failure. Failure path emits an audit-log-adjacent `logger.warning`; no user-visible error. |
 
 ## J. Testing strategy
 
@@ -373,11 +378,12 @@ Default `status` filter when query param absent: `"all"`.
 | File | Action | Covers |
 |---|---|---|
 | `gestion/tests/test_memory_list.py` | New | Filter (all/published/draft), `?q=` search with accent-insensitivity, pagination at 12, ordering by `-created_at`, empty state, `loading="lazy"` attribute, permission gates (4 user types) |
-| `gestion/tests/test_memory_create.py` | New | Upload validation (0 / >8MB / bad MIME), Cloudinary success path, Cloudinary failure path (form-error re-render, no DB write), defensive empty-public_id check, AuditLog `.created` row + full metadata schema, **create-with-status=published emits ONE `.created` row** (not separate `.published`), redirect with `?flash=created`, permission gates |
+| `gestion/tests/test_memory_create.py` | New | Upload validation (0 / >8MB / bad MIME), Cloudinary success path, Cloudinary failure path (form-error re-render, no DB write), defensive empty-public_id check, **create-with-status=draft emits ONE `.created` row with `initial_status="draft"`**, **create-with-status=published emits ONE `.created` row with `initial_status="published"`** (not a separate `.published` row), full metadata schema on each, redirect with `?flash=created`, permission gates |
 | `gestion/tests/test_memory_edit.py` | New | Field-only edit → `.edited` row; photo replace triggers `client.delete(old_id)` post-commit (FakeCloudinary records the call); status flip via edit form → `.edited` + `.published`/`.unpublished` only when other fields ALSO changed; status-only flip via edit form → just `.published`/`.unpublished`; no-op detection → `?flash=noop` zero audit rows; smoke-level `select_for_update` presence; permission gates |
 | `gestion/tests/test_memory_status.py` | New | `target_status=published` on draft → `.published` row + redirect; `target_status=draft` on published → `.unpublished` row + redirect; `target_status==current` → `?flash=noop` zero rows; invalid `target_status` → `?flash=bad_status` zero rows; GET → 405; permission gates |
 | `gestion/tests/test_caption_xss_safe.py` | New | Caption containing `<script>alert(1)</script>` renders escaped on (a) public `/souvenirs/<pk>/`, (b) `/gestion/souvenirs/` list view `alt` attribute, (c) `/gestion/souvenirs/<pk>/modifier/` form textarea. Regression to prevent future markdown-render PR. |
 | `gestion/tests/test_dashboard.py` | Extend | New 4th tile renders correct draft count; link target is `/gestion/souvenirs/?status=draft`; grid class `md:grid-cols-2 lg:grid-cols-4`. |
+| `alumni/tests/test_cloudinary_extensions.py` | Extend | (a) `RealCloudinary.upload_file` strip-EXIF regression: upload a fixture JPEG with embedded GPS, capture the bytes passed to the Cloudinary SDK (via FakeCloudinary's upload_calls record), assert PIL re-read shows no GPS tag. (b) `memory_thumbnail_url` AND `memory_full_url` both produce URLs containing `fl_strip_profile` substring. |
 
 ### Fixture additions to `gestion/tests/conftest.py`
 
@@ -409,7 +415,7 @@ Tests call `make_memory(status="draft")` directly for drafts.
 
 - [ ] `make docker-run` against staging.py settings; upload a 6 MB JPEG → publishes correctly to `/souvenirs/`.
 - [ ] Replace photo on existing memory; verify old Cloudinary URL eventually 404s; new URL renders.
-- [ ] Status toggle round-trip (publish → unpublish → publish); verify 2 AuditLog rows in `/admin/memoires/` admin AuditLog view.
+- [ ] Status toggle round-trip (publish → unpublish → publish); verify 2 AuditLog rows in `/admin/members/auditlog/`.
 - [ ] Mobile viewport (360 × 800) walkthrough: list view, filter chips, search, create, edit, status toggle — every tap target reachable, no horizontal scroll.
 - [ ] Verify `fl_strip_profile` substring in a rendered `<img>` URL on (a) `/souvenirs/`, (b) `/souvenirs/<pk>/`, (c) `/gestion/souvenirs/`, (d) `/gestion/souvenirs/<pk>/modifier/`.
 - [ ] Co-admin login flow: login → `/gestion/` dashboard → click Souvenirs tile → see drafts → publish one.
@@ -427,28 +433,27 @@ Tests call `make_memory(status="draft")` directly for drafts.
 
 ## K. Implementation checklist
 
-The order below is the recommended commit sequence for `gsd-plan-phase`-style task breakdown.
+The order below is the recommended macro-sequence for `gsd-plan-phase`-style task breakdown. **Each task internally follows TDD per CLAUDE.md:** write failing test → implement → run green → run full suite → commit. The list below is the high-level commit order, not the per-test-within-task order.
 
+- [ ] **Pillow dependency.** Add `pillow>=10.0` to `pyproject.toml` dependencies (currently transitive via cloudinary; making explicit prevents accidental drop).
 - [ ] **Settings change.** Verify and update `DATA_UPLOAD_MAX_MEMORY_SIZE` in `alumni/settings/base.py` to `10 * 1024 * 1024`. Leave `FILE_UPLOAD_MAX_MEMORY_SIZE` at default.
-- [ ] **AuditLog choices.** Add 4 entries to `members/models.py::AuditLog.ACTION_CHOICES`. No migration. Verify `/admin/` list filter auto-updates.
-- [ ] **EXIF strip surface audit (5 substeps).**
-  1. Read `alumni/cloudinary.py` for all functions producing memory URLs.
-  2. Read `memoires/templatetags/memory_photo.py`.
-  3. Read `memoires/templates/memoires/{gallery,detail}.html` for image tags.
-  4. Ensure every render path includes `fl_strip_profile` (preferably at a chokepoint in `alumni/cloudinary.py`).
-  5. Add regression test asserting `"fl_strip_profile"` substring in a rendered `<img>` URL.
+- [ ] **AuditLog choices.** Add 4 entries to `members/models.py::AuditLog.ACTION_CHOICES`. No migration. Verify `/admin/members/auditlog/` list filter auto-updates.
+- [ ] **EXIF strip (3 substeps).**
+  1. **Server-side strip in `RealCloudinary.upload_file`.** Before passing the file to the Cloudinary SDK, run through `PIL.Image.open(file).save(BytesIO(), format=image.format)` to drop EXIF on JPEG/PNG/WebP resave. Wrap in try/except — on Pillow failure, log warning and upload original bytes (residual recorded in §I Risks #14).
+  2. **Delivery-side strip in both `memory_thumbnail_url` AND `memory_full_url`.** Add `fl_strip_profile` to their transformation chains.
+  3. **Regression tests in `alumni/tests/test_cloudinary_extensions.py`:** (a) upload a fixture JPEG with embedded GPS; assert the bytes captured by FakeCloudinary, when re-read by PIL, have no GPS tag; (b) both URL helpers produce URLs containing `fl_strip_profile` substring.
+- [ ] **Helper-usage audit.** Confirm `memoires/templatetags/memory_photo.py` + `memoires/templates/memoires/{gallery,detail}.html` route through `memory_thumbnail_url` / `memory_full_url` (or, if they construct URLs by hand, fix them to use the helpers).
 - [ ] **`gestion/forms.py`.** Add `GestionMemoryForm` lifted from `memoires.forms.MemoryAdminForm`. Tailwind `input_class` styling. Validation: `upload.size in (0, 8MB]`, `content_type` allow-list with French errors.
 - [ ] **`gestion/urls.py`.** Add 4 routes.
 - [ ] **`gestion/views.py`.** Add `PAGE_SIZE_MEMORY = 12` constant. Add `memory_list_view`, `memory_create_view`, `memory_edit_view`, `memory_status_view`. Extend `dashboard_view` KPIs with `draft_memories` count.
-- [ ] **Templates.** Add `gestion/templates/gestion/memory_list.html` + `memory_edit.html`. Extend `gestion/templates/gestion/base.html` subnav + `dashboard.html` 4th tile.
+- [ ] **Templates.** Add `gestion/templates/gestion/memory_list.html` + `memory_edit.html`. Extend `gestion/templates/gestion/base.html` subnav + `dashboard.html` 4th tile + flash-message map keys (`created`, `updated`, `published`, `unpublished`, `noop`, `bad_status` → French copy).
 - [ ] **Fixture.** Add `make_memory` to `gestion/tests/conftest.py`.
 - [ ] **Tests.** Add 5 new test files + extend `test_dashboard.py`. Target ~28 new tests.
-- [ ] **Flash messages.** Extend `gestion/templates/gestion/base.html` flash-message map with `created`, `updated`, `published`, `unpublished`, `noop`, `bad_status` → French copy.
-- [ ] **Full suite.** Run `make test`; expect `735` passing.
+- [ ] **Full suite.** Run `make test`; expect ≥ ~735 passing (+28 new). No regressions.
 - [ ] **Manual smoke tests.** Run the §J checklist before opening PR.
-- [ ] **Merge.** `git checkout main && git merge --no-ff feat/gestion-souvenirs -m "..."` with the descriptive merge message.
-- [ ] **Push + deploy.** `git push origin main`; watch Railway deploy; verify `/gestion/souvenirs/` reachable in prod with a real co-admin account.
-- [ ] **STATUS.md update.** New row in §Post-launch polish table. Test-suite trajectory bump.
+- [ ] **Merge.** `git checkout main && git merge --no-ff feat/gestion-souvenirs -m "..."` with a descriptive merge message.
+- [ ] **Push + deploy.** `git push origin main`; watch Railway deploy; verify `/gestion/souvenirs/` reachable in prod via super-admin (`bominomla`); co-admin verification deferred until a co-admin account exists in prod.
+- [ ] **STATUS.md update.** New row in §Post-launch polish table. Test-suite trajectory bump (`707 → ~735`).
 
 ## L. Open questions
 
