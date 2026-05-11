@@ -37,6 +37,7 @@ FLOW_MODULES = [
     "docs.handbook.flows.flow_member_mobile_login",
     "docs.handbook.flows.flow_member_desktop_directory",
     "docs.handbook.flows.flow_admin_magic_link_reissue",
+    "docs.handbook.flows.flow_admin_souvenirs",
 ]
 
 BASE_URL = "http://localhost:8000"
