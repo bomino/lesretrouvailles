@@ -72,7 +72,7 @@ The project is one Django project (`alumni/`) hosting eight apps. Knowing what o
 - **`members/`** — The big one. `Member`, `User` extensions, `PublicSearchEntry`, **`AuditLog`** (cross-domain event log), magic-link reissue, RGPD purge engine (`services.py::rgpd_purge_member`), WhatsApp roster import, member directory views, public ghost list. Search composition extracted into `members/search.py` (multi-token AND + pg_trgm trigram fallback). Also owns `audit_launch_readiness` for go-live checks.
 - **`cooptation/`** — Public signup flow (`/inscription/`), `AdminApplication`, `CooptationRequest`, parrainage logic, daily deadlines cron (`process_cooptation_deadlines`).
 - **`gestion/`** — Co-admin console at `/gestion/` (Gestion v1, tag `v1.1.0-gestion-console`). **No models** — pure views/forms/decorators composed over the other apps. The `staff_required` decorator in `gestion/decorators.py` is the right gate for any new staff-tier view (redirects to `/accounts/login/`, 403s authenticated non-staff). See admin-tiers section below.
-- **`memoires/`** — Mur des souvenirs. `Memory` (curated photo gallery, admin-uploaded).
+- **`memoires/`** — Mur des souvenirs. `Memory` (curated photo gallery, admin-uploaded). Since 2026-05-10, co-admins also manage the gallery via `/gestion/souvenirs/` (list, create, edit, photo replace, publish/unpublish); `/admin/memoires/` is now only for **hard delete** — every other op flows through `gestion.views.memory_*_view`.
 - **`memoriam/`** — In Memoriam. `InMemoriamEntry` (tribute fiche) + `InMemoriamNomination` (member-submitted proposal).
 - **`aide/`** — Public FAQ at `/aide/` (P8, tag `v1.2.0-self-service-help`). **No models** — `aide/faq.py::FAQ_ENTRIES` is a typed Python list rendered through the existing markdown + bleach pipeline, grouped by category with deterministic icons + anchor slugs from `CATEGORY_META`. To edit content, edit `faq.py` and submit a PR; structural tests in `aide/tests/test_faq_content.py` lock `CATEGORIES` and `CATEGORY_META` in sync. **Public-by-default** via `LOGIN_REQUIRED_WHITELIST` because the FAQ has to be reachable to members who don't have a session yet (activation, password reset). No-result `?q=` queries are logged via `AuditLog.aide.query.no_results` for the future-bot-decision data trail.
 
@@ -287,6 +287,7 @@ The owner develops on Windows. The repo is cross-platform but:
 | Operator launch procedure | `docs/runbooks/launch.md` |
 | User-facing French guide | `docs/guides/guide_membre.md` (member) + `guide_admin.md` (admin) |
 | Frontend admin console (gestion) | `gestion/` — views, forms, decorators, templates, tests |
+| Co-admin Mur des souvenirs CRUD | `gestion/views.py::memory_{list,create,edit,status}_view` + `gestion/templates/gestion/memory_*.html` |
 | Public FAQ (`/aide/`) | `aide/` — `faq.py` (typed entries), `views.py`, single accordion template |
 | Member directory search composition | `members/search.py` — multi-token AND + pg_trgm trigram fallback |
 | Custom AdminSite (locks /admin/ to superuser) | `alumni/admin.py` |
@@ -296,8 +297,10 @@ The owner develops on Windows. The repo is cross-platform but:
 | Magic-link reissue CLI | `members/management/commands/reissue_login_link.py` |
 | Daily cron handler | `cooptation/management/commands/process_cooptation_deadlines.py` |
 | Cloudinary client (real + fake) | `alumni/cloudinary.py` |
+| Server-side EXIF strip on upload | `alumni/cloudinary.py::_strip_exif_metadata` (applied to ALL uploads via `RealCloudinary.upload_file`) |
 | Object storage client (real + fake) | `alumni/storage.py` |
 | AuditLog model + action choices | `members/models.py::AuditLog` |
+| Active-page indicator (navigation) | `core/templatetags/active_link.py` — `{% active_class %}` + `{% active_aria %}` |
 
 ---
 
@@ -330,6 +333,7 @@ When the user reports a bug:
 - **Don't** propose Cloudinary removal without acknowledging the transform pipeline.
 - **Don't** apply S3 lifecycle rules to the Railway bucket — Tigris rejects the rule shapes we'd want.
 - **Don't** remove the explicit `import cloudinary.api` / `import cloudinary.uploader` in `RealCloudinary.__init__` — there's a regression test, but more importantly there's a real production failure waiting if you do.
+- **Don't** bypass `_strip_exif_metadata` if you add a new server-side upload path. The EXIF strip lives in `RealCloudinary.upload_file` — it sees every JPEG/PNG/WebP and re-encodes via Pillow to drop GPS/camera/timestamp metadata before Cloudinary receives the bytes. If you build a new uploader that calls Cloudinary directly (or a signed-direct-browser-upload flow), wire the same Pillow strip in or you're reopening a privacy hole. Regression test: `alumni/tests/test_cloudinary_extensions.py::TestStripExifMetadata`. Mini-phase planned for a `restrip_existing_memories` management command to reprocess pre-2026-05-10 uploads.
 - **Don't** add DB CHECK constraints for fields whose format might evolve. Use Python `clean()` instead.
 - **Don't** add a new `AuditLog.action` value without also adding it to `ACTION_CHOICES`. Forms validate against choices; ORM `create()` doesn't, but list filters in `/admin/auditlog/` rely on the enum.
 - **Don't** pull production secrets into the local environment.

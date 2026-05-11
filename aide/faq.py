@@ -141,7 +141,11 @@ FAQ_ENTRIES: list[FAQEntry] = [
             "sélectionnez un fichier de votre téléphone ou ordinateur.\n\n"
             "Formats acceptés : **JPG, PNG, WebP**. Taille maximale : **5 Mo**. La photo est "
             "automatiquement recadrée et publiée. Choisissez une photo nette de votre visage — "
-            "elle apparaîtra dans l'annuaire et sur votre profil."
+            "elle apparaîtra dans l'annuaire et sur votre profil.\n\n"
+            "🔒 **Vie privée** : les métadonnées EXIF de votre photo (coordonnées GPS du lieu "
+            "où elle a été prise, modèle d'appareil, date de prise de vue) sont **retirées "
+            "automatiquement** avant la publication. Personne ne peut remonter à votre "
+            "adresse à partir de votre photo de profil."
         ),
         related_links=[("Mon profil", "/profil/")],
     ),
