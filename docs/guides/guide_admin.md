@@ -42,11 +42,14 @@ C'est l'interface principale, simple et adaptée au mobile, conçue pour ne jama
 - **Depuis la plateforme** : connectez-vous, cliquez sur **« ⚙ Gestion »** dans la barre de navigation. Le lien n'est visible que pour les comptes admin (`is_staff=True`).
 - **Directement** : **https://villageretrouvailles.com/gestion/**.
 
-Vous arrivez sur un tableau de bord avec trois compteurs (membres actifs, cooptations à traiter, comptes suspendus) et trois liens :
+Vous arrivez sur un tableau de bord avec **quatre compteurs** (membres actifs, cooptations à traiter, comptes suspendus, **souvenirs en brouillon**) et **quatre liens** dans le sous-menu :
 
 - **Membres** — annuaire complet, recherche, modification de profil, suspendre/réactiver, changer le numéro WhatsApp, regénérer un lien de connexion.
 - **Cooptations** — file des candidatures (par défaut : « à traiter »), revue détaillée avec parrains et questionnaire, approuver ou refuser.
-- **Outils avancés** — visible **uniquement pour le Super Admin**. Lien direct vers `/admin/` pour les actions non couvertes par `/gestion/` (purge RGPD, import en masse, fiches In Memoriam, etc.).
+- **Souvenirs** — gestion du Mur des souvenirs (voir §6) : ajouter une photo, modifier la légende, remplacer l'image, publier ou dépublier.
+- **Outils avancés** — visible **uniquement pour le Super Admin**. Lien direct vers `/admin/` pour les actions non couvertes par `/gestion/` (purge RGPD, import en masse, fiches In Memoriam, suppression définitive d'une photo).
+
+> 💡 **Repère visuel** : dans la barre de navigation principale et dans le sous-menu Gestion, la section où vous vous trouvez est surlignée. Pratique pour ne pas se perdre en cliquant d'une page à l'autre.
 
 > 🔒 **Sécurité élémentaire :**
 > - Ne partagez **jamais** votre mot de passe d'admin (ni par WhatsApp, ni par email).
@@ -73,7 +76,7 @@ Pour révoquer : décocher **« Staff status »**. Le membre reste un membre ré
 Réservé au Super Admin pour les actions avancées :
 - **Members** — purge RGPD (irréversible), demandes de retrait, journal d'audit complet
 - **Cooptation** — questions de connaissance (config), réponses au questionnaire
-- **Memoires** — Mur des souvenirs (création, publication)
+- **Memoires** — **suppression définitive** d'une photo du Mur des souvenirs (la création, la modification, la publication et la dépublication se font désormais via `/gestion/souvenirs/` ; voir §6)
 - **Memoriam** — fiches In Memoriam et modération de nominations
 - **Authentication and Authorization** — utilisateurs, groupes, permissions, EmailAddresses Allauth
 
@@ -250,26 +253,47 @@ Une fois la suppression effectuée, répondez au membre (par email ou WhatsApp s
 
 ## 6. Gérer le contenu du Mur des souvenirs
 
-Le Mur des souvenirs est curé par les administrateurs (les membres ne peuvent pas uploader directement en Phase 1).
+Le Mur des souvenirs est curé par les administrateurs (les membres ne peuvent pas uploader directement en Phase 1). Depuis 2026-05-10, **les co-administrateurs peuvent gérer les photos directement depuis `/gestion/souvenirs/`** — plus besoin de passer par le Super Admin.
+
+### Accéder à la console Souvenirs
+
+- **Depuis le tableau de bord** : la tuile **« Souvenirs en brouillon »** (4ᵉ tuile) compte les photos téléversées en attente de publication ; cliquez dessus pour ouvrir la liste filtrée sur les brouillons.
+- **Depuis le sous-menu Gestion** : cliquez sur **« Souvenirs »**.
+- **Directement** : **https://villageretrouvailles.com/gestion/souvenirs/**.
 
 ### Ajouter une photo
 
-1. Allez à **Memoires → Memorys → Add memory**.
-2. **Photo** : cliquez sur **Choisir un fichier**, sélectionnez une photo (JPG, PNG ou WebP).
+1. Sur `/gestion/souvenirs/`, cliquez sur **« Ajouter une photo »**.
+2. **Photo** : cliquez sur **« Choisir un fichier »**, sélectionnez une image (JPEG, PNG ou WebP, **8 Mo maximum**).
 3. **Légende** : décrivez la photo en quelques phrases (qui, quand, où, le contexte).
 4. **Date approximative** (optionnel) : la date à laquelle la photo a été prise. Laissez vide si vous ne savez pas.
 5. **Lieu** (optionnel) : Birni, Niamey, Paris, etc.
 6. **Statut** :
-   - `Brouillon` — visible uniquement par les admins (pour préparer en avance)
+   - `Brouillon` — visible uniquement par les admins (pour préparer en avance ou batcher plusieurs photos avant publication)
    - `Publiée` — visible par tous les membres
-7. Cliquez **Save** (ou **Save and add another** si vous en avez plusieurs).
+7. Cliquez **« Créer »**. Vous êtes ramené à la liste avec un bandeau de confirmation.
 
-L'upload se fait directement vers Cloudinary ; la photo apparaît immédiatement dans la galerie.
+> 🔒 **Protection vie privée automatique :** depuis 2026-05-10, les métadonnées EXIF (coordonnées GPS, modèle d'appareil, date de prise de vue) sont **retirées côté serveur** avant l'envoi à Cloudinary. Aucune photo uploadée ne fuite plus de coordonnées GPS de la maison du membre. Cette protection s'applique aussi aux photos de profil et aux fiches In Memoriam.
 
-### Modifier ou supprimer
+### Modifier la légende, remplacer la photo, ou changer le statut
 
-- **Modifier** : cliquez sur la ligne, changez ce que vous voulez, sauvegardez.
-- **Supprimer** : cochez, action **« Delete selected memorys »**. Cela supprime aussi la photo de Cloudinary (la prochaine sauvegarde médias ne re-créera pas la photo dans le bucket).
+1. Sur la liste, cliquez sur la vignette de la photo à modifier.
+2. La page d'édition affiche la photo en grand, suivie du formulaire :
+   - **Remplacer la photo** (optionnel) — sélectionnez un nouveau fichier ; l'ancienne image est automatiquement supprimée de Cloudinary après sauvegarde.
+   - **Légende, date, lieu, statut** — modifiez ce que vous voulez.
+3. Cliquez **« Enregistrer »**.
+4. Pour basculer entre Brouillon et Publiée sans rien d'autre toucher, utilisez le bouton **« Publier »** ou **« Dépublier »** en bas de la page d'édition.
+
+> 💡 **Recherche + filtres** : la barre de recherche en haut de la liste filtre par légende ou lieu (accents tolérés). Les puces **Toutes / Publiées / Brouillons** filtrent par statut.
+
+### Supprimer définitivement une photo
+
+La console `/gestion/` ne permet **pas** la suppression définitive d'une photo (par sécurité — c'est irréversible et supprime aussi le fichier de Cloudinary). Pour ça :
+
+1. Dépubliez d'abord la photo via `/gestion/souvenirs/<id>/modifier/` → bouton **« Dépublier »**. Elle disparaît du Mur des souvenirs pour les membres.
+2. Si vous voulez vraiment effacer la photo de Cloudinary : Super Admin, allez sur `/admin/memoires/memory/`, cochez la ligne, action **« Delete selected memorys »**.
+
+> 💡 **Quoi auditer** : toutes les actions sur les photos écrivent une ligne dans le journal d'audit (`memoires.memory.created`, `memoires.memory.edited`, `memoires.memory.published`, `memoires.memory.unpublished`). Le Super Admin peut consulter le journal complet dans `/admin/members/auditlog/`.
 
 > 💡 Visez 10-20 photos seed à l'ouverture (objectif master spec). Pas besoin d'avoir un titre énorme — quelques photos bien légendées valent mieux qu'une grande galerie sans contexte.
 
