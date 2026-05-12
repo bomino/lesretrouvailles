@@ -141,23 +141,14 @@
         </section>
     {% endif %}
     <section class="mx-auto mt-16 grid max-w-5xl grid-cols-1 gap-6 md:mt-20 md:grid-cols-3">
-        {# Cards are visual only for anonymous visitors — destinations are member-only. #}
-        {% if request.user.is_authenticated %}
-            <a href="{% url 'members:directory' %}"
-               class="rounded-2xl border border-secondary/15 bg-surface/70 p-6 shadow-sm hover:border-tertiary/40 transition">
-            {% else %}
-                <article class="rounded-2xl border border-secondary/15 bg-surface/70 p-6 shadow-sm">
-                {% endif %}
-                <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-tertiary/10 text-tertiary text-xl">📖</span>
-                <h2 class="mt-4 font-display text-xl font-semibold tracking-tight">{% trans "Annuaire" %}</h2>
-                <p class="mt-2 text-sm text-secondary leading-relaxed">
-                    {% trans "Retrouvez vos camarades par nom, ville ou profession. Recherche insensible aux accents." %}
-                </p>
-                {% if request.user.is_authenticated %}
-                </a>
-            {% else %}
-            </article>
-        {% endif %}
+        <a href="{% if request.user.is_authenticated %}{% url 'members:directory' %}{% else %}{% url 'account_login' %}?next=/annuaire/{% endif %}"
+           class="rounded-2xl border border-secondary/15 bg-surface/70 p-6 shadow-sm hover:border-tertiary/40 transition block">
+            <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-tertiary/10 text-tertiary text-xl">📖</span>
+            <h2 class="mt-4 font-display text-xl font-semibold tracking-tight">{% trans "Annuaire" %}</h2>
+            <p class="mt-2 text-sm text-secondary leading-relaxed">
+                {% trans "Retrouvez vos camarades par nom, ville ou profession. Recherche insensible aux accents." %}
+            </p>
+        </a>
         <a href="{% if request.user.is_authenticated %}{% url 'memoriam:list' %}{% else %}{% url 'account_login' %}?next=/in-memoriam/{% endif %}"
            class="rounded-2xl border border-secondary/15 bg-surface/70 p-6 shadow-sm hover:border-tertiary/40 transition block">
             <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-ceremonial-gold/15 text-ceremonial-gold text-xl">🕊️</span>

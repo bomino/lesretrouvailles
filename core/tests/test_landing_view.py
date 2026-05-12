@@ -189,16 +189,26 @@ def test_ghost_section_hides_removed_entries(client, settings, make_admin):
 
 
 @pytest.mark.django_db
-def test_anonymous_member_only_cards_are_static(client):
-    """Annuaire/Mon profil destinations are gated to members. The cards
-    referencing them stay as <article> for anonymous visitors so a
-    first-time visitor doesn't hit a 302 wall. Cooptation is wired
-    differently — it points to the public /inscription/ form
-    (see test_anonymous_cooptation_card_links_to_signup)."""
+def test_anonymous_annuaire_card_links_to_login(client):
+    """The Annuaire feature card is clickable for anonymous visitors and
+    routes to the login form with ?next=/annuaire/, mirroring the In Memoriam
+    card. The directory itself stays member-gated; the card surfaces login
+    as the path to it rather than rendering as a dead <article>."""
     body = client.get("/").content.decode("utf-8")
     assert "Annuaire" in body
+    assert 'href="/accounts/login/?next=/annuaire/"' in body
+    # The card no longer points directly at /annuaire/ for anon — that would
+    # 302 to login anyway, but we surface the login URL explicitly.
     assert 'href="/annuaire/"' not in body
-    assert 'href="/profil/"' not in body
+
+
+@pytest.mark.django_db
+def test_authenticated_annuaire_card_links_to_directory(client, authed_member):
+    """For authenticated members, the Annuaire card links straight to the
+    directory (no login detour)."""
+    body = client.get("/").content.decode("utf-8")
+    assert 'href="/annuaire/"' in body
+    assert 'href="/accounts/login/?next=/annuaire/"' not in body
 
 
 @pytest.mark.django_db
