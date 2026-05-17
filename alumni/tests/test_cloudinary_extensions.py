@@ -59,6 +59,26 @@ class TestStripExifMetadata:
         result = _strip_exif_metadata(BytesIO(data), content_type="image/gif")
         assert result.read() == data
 
+    def test_strip_rewinds_already_consumed_file_obj(self):
+        """Regression: `_strip_exif_metadata` did `file_obj.read()` without
+        first seeking to 0. If any upstream caller (validation, virus scan,
+        future content-type sniffer) had already read the buffer, Pillow
+        would receive zero bytes → UnidentifiedImageError → empty fallback
+        → Cloudinary rejects the upload with no useful error context. Seek
+        defensively before reading so the strip path is robust to upstream
+        consumption."""
+        buf = self._make_jpeg_with_exif()
+        # Simulate an upstream consumer that left the cursor at EOF.
+        buf.read()
+        assert buf.tell() > 0
+
+        stripped = _strip_exif_metadata(buf, content_type="image/jpeg")
+
+        # Should produce a valid stripped JPEG, not an empty BytesIO.
+        stripped_img = Image.open(stripped)
+        assert stripped_img.size == (10, 10)
+        assert dict(stripped_img.getexif()) == {}
+
 
 class TestMemoryUrlExifStripFlag:
     def test_thumbnail_url_contains_fl_strip_profile(self):

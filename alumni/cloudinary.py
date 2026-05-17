@@ -31,7 +31,16 @@ def _strip_exif_metadata(file_obj: Any, *, content_type: str) -> BytesIO:
     """
     from PIL import Image, UnidentifiedImageError
 
-    # Pillow needs a seekable stream. Read into memory once and rewind.
+    # Pillow needs a seekable stream. Rewind first in case any upstream
+    # caller (validation, virus scan, content-type sniff) already consumed
+    # the buffer — otherwise file_obj.read() returns empty bytes and Pillow
+    # raises UnidentifiedImageError, dropping us into the empty-fallback
+    # path that surfaces as an opaque Cloudinary rejection.
+    if hasattr(file_obj, "seek"):
+        try:
+            file_obj.seek(0)
+        except (OSError, ValueError):
+            pass  # Non-seekable stream; fall through and hope for the best.
     raw = file_obj.read() if hasattr(file_obj, "read") else file_obj
     if isinstance(raw, bytes):
         source = BytesIO(raw)
