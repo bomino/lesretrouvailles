@@ -192,6 +192,33 @@ def test_signup_records_source_ip(client, active_member, second_active_member):
 
 
 @pytest.mark.django_db
+def test_signup_uses_rightmost_xff_token_not_spoofable_leftmost(
+    client, active_member, second_active_member
+):
+    """Regression: X-Forwarded-For is a list where each hop appends what it
+    saw as the source. The leftmost token is whatever the original client
+    *claimed* (and is therefore spoofable). Behind Railway's edge, the
+    rightmost token is what Railway actually saw — that's the one we trust.
+
+    Without this guard, a spammer sending `X-Forwarded-For: 1.1.1.1` would
+    have `1.1.1.1` recorded as source_ip and the 24h ip_badge in
+    `/admin/cooptation/adminapplication/` would key off the spoofed value.
+    """
+    from cooptation.models import AdminApplication
+
+    client.post(
+        "/inscription/",
+        _form_payload(active_member, second_active_member),
+        HTTP_X_FORWARDED_FOR="1.1.1.1, 203.0.113.5",
+        REMOTE_ADDR="10.0.0.1",
+    )
+    app = AdminApplication.objects.get()
+    assert app.source_ip == "203.0.113.5", (
+        "Must take rightmost XFF (Railway's view) — not leftmost (client-claimed)"
+    )
+
+
+@pytest.mark.django_db
 def test_signup_accepts_classes_with_section_letters(client, active_member, second_active_member):
     """Real-world classes have parallel sections (4eA, 3eB) — the form must
     accept them, not just the level-only 6e/5e/4e/3e form."""

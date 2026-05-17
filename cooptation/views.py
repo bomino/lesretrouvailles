@@ -22,9 +22,17 @@ from .models import AdminApplication, CooptationRequest
 
 
 def _client_ip(request) -> str:
+    """Return the rightmost (= last trusted hop) IP from X-Forwarded-For.
+
+    XFF is a list where each proxy appends what *it* saw as the source. The
+    leftmost token is what the original client claimed and is therefore
+    attacker-controlled. Behind Railway's edge, the rightmost token is the IP
+    Railway actually observed — that's the value worth recording on
+    AdminApplication.source_ip and the 24h ip_badge admin filter.
+    """
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        return forwarded.split(",")[-1].strip()
     return request.META.get("REMOTE_ADDR")
 
 
