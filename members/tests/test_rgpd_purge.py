@@ -429,3 +429,95 @@ def test_admin_action_intermediate_confirmation(fake_clients, make_member, clien
     assert resp.status_code in (200, 302)
     assert not Member.objects.filter(id=target_id).exists()
     assert AuditLog.objects.filter(action="rgpd.member.purged").count() == 1
+
+
+# -------- Email-less confirmation (regression: bypass when email is blank) --------
+
+
+@pytest.mark.django_db
+def test_admin_action_rejects_empty_confirm_for_email_less_member(
+    fake_clients, make_user, make_member, client
+):
+    """Regression: when the member has no email (~80% of the audience), an
+    empty `confirm_email_<id>` field used to match the empty `m.user.email`
+    and trigger the purge with NO real confirmation. The bypass must be
+    closed."""
+    from members.models import Member
+
+    user = make_user(username="22790000123", email="")
+    target = make_member(user=user, photo_public_id="members/admin/no-email")
+    target_id = target.id
+
+    admin = _make_admin_user()
+    client.force_login(admin)
+
+    resp = client.post(
+        "/admin/members/member/",
+        {
+            "action": "rgpd_purge_action",
+            "_selected_action": [str(target_id)],
+            "apply": "1",
+            # Empty confirmation — must NOT purge an email-less member.
+            f"confirm_email_{target_id}": "",
+        },
+    )
+    assert resp.status_code == 200
+    assert Member.objects.filter(id=target_id).exists(), (
+        "Empty confirm must NOT purge email-less member (bypass regression)"
+    )
+
+
+@pytest.mark.django_db
+def test_admin_action_accepts_username_confirm_for_email_less_member(
+    fake_clients, make_user, make_member, client
+):
+    """For email-less members, operator types the username (= WhatsApp digits
+    for roster-imported members) to confirm. CLAUDE.md auth section: username
+    is the login identity that doubles as the meaningful identifier for the
+    email-less ~80%."""
+    from members.models import AuditLog, Member
+
+    user = make_user(username="22790000456", email="")
+    target = make_member(user=user, photo_public_id="members/admin/by-username")
+    target_id = target.id
+
+    admin = _make_admin_user()
+    client.force_login(admin)
+
+    resp = client.post(
+        "/admin/members/member/",
+        {
+            "action": "rgpd_purge_action",
+            "_selected_action": [str(target_id)],
+            "apply": "1",
+            f"confirm_email_{target_id}": "22790000456",
+        },
+    )
+    assert resp.status_code in (200, 302)
+    assert not Member.objects.filter(id=target_id).exists()
+    assert AuditLog.objects.filter(action="rgpd.member.purged").count() == 1
+
+
+@pytest.mark.django_db
+def test_admin_action_rejects_wrong_username_for_email_less_member(
+    fake_clients, make_user, make_member, client
+):
+    from members.models import Member
+
+    user = make_user(username="22790000789", email="")
+    target = make_member(user=user, photo_public_id="members/admin/wrong-username")
+    target_id = target.id
+
+    admin = _make_admin_user()
+    client.force_login(admin)
+
+    client.post(
+        "/admin/members/member/",
+        {
+            "action": "rgpd_purge_action",
+            "_selected_action": [str(target_id)],
+            "apply": "1",
+            f"confirm_email_{target_id}": "22799999999",  # wrong digits
+        },
+    )
+    assert Member.objects.filter(id=target_id).exists()

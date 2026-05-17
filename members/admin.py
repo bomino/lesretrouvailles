@@ -149,12 +149,17 @@ class MemberAdmin(admin.ModelAdmin):
                 },
             )
 
-        # Validate all typed-emails before doing anything destructive.
+        # Validate all typed confirmations before doing anything destructive.
+        # For email-less members (~80% of the audience), fall back to comparing
+        # against User.username (= the WhatsApp digits for roster-imported
+        # accounts). Empty-string-vs-empty-string would otherwise match and
+        # bypass the type-to-confirm safety entirely.
         mismatches: list[Member] = []
         for plan in plans:
             m = plan["member"]
             typed = request.POST.get(f"confirm_email_{m.id}", "").strip()
-            if typed != m.user.email:
+            expected = m.user.email or m.user.username
+            if not typed or typed != expected:
                 mismatches.append(m)
 
         if mismatches or any(p["blocker"] for p in plans):
