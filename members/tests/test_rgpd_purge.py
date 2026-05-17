@@ -521,3 +521,58 @@ def test_admin_action_rejects_wrong_username_for_email_less_member(
         },
     )
     assert Member.objects.filter(id=target_id).exists()
+
+
+# -------- Service-level: blank-email filter must not nuke unrelated rows --------
+
+
+@pytest.mark.django_db
+def test_purge_email_less_member_does_not_anonymize_unrelated_blank_email_applications(
+    fake_clients, make_user, make_member
+):
+    """Regression: services.py filtered AdminApplications with
+    `email__iexact=member.user.email`. When `member.user.email == ""`, the
+    filter matched every blank-email AdminApplication and called `.purge()`
+    on each — anonymizing unrelated rows. Guard the filter with a non-empty
+    email check so an email-less member's purge touches only its own data."""
+    from cooptation.models import AdminApplication
+    from members.services import rgpd_purge_member
+
+    user = make_user(username="22790001111", email="")
+    target = make_member(user=user)
+
+    # Two unrelated applications with blank email — must survive the purge
+    # of the email-less member.
+    AdminApplication.objects.create(
+        full_name="Candidate Blank One",
+        nickname="",
+        years_attended=[1980],
+        classes=["6e"],
+        city="Niamey",
+        country="Niger",
+        profession="",
+        email="",
+        whatsapp="+22790000001",
+    )
+    AdminApplication.objects.create(
+        full_name="Candidate Blank Two",
+        nickname="",
+        years_attended=[1980],
+        classes=["6e"],
+        city="Niamey",
+        country="Niger",
+        profession="",
+        email="",
+        whatsapp="+22790000002",
+    )
+    initial_count = AdminApplication.objects.count()
+    assert initial_count == 2
+
+    actor = _make_admin_user()
+    result = rgpd_purge_member(target, actor=actor)
+
+    # All unrelated applications still exist, with their original full_names.
+    assert AdminApplication.objects.count() == 2
+    assert AdminApplication.objects.filter(full_name="Candidate Blank One").exists()
+    assert AdminApplication.objects.filter(full_name="Candidate Blank Two").exists()
+    assert result["deleted_counts"]["admin_applications_anonymized"] == 0
