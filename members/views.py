@@ -33,9 +33,16 @@ DIRECTORY_EMPTY_STATE_SUGGESTIONS: list[tuple[str, str]] = [
 
 
 def _client_ip(request) -> str:
+    """Return the rightmost (= last trusted hop) IP from X-Forwarded-For.
+
+    XFF is a list where each proxy appends what *it* saw as the source. The
+    leftmost token is what the client claimed and is attacker-controlled.
+    Behind Railway's edge, the rightmost token is the IP Railway actually
+    observed — that's the value worth recording on ConsentRecord.ip_address.
+    """
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        return forwarded.split(",")[-1].strip()
     return request.META.get("REMOTE_ADDR", "0.0.0.0")
 
 
@@ -162,6 +169,7 @@ def cloudinary_sign_view(request):
 
 @login_required
 @require_http_methods(["GET"])
+@ratelimit(key="user", rate="30/h", method="GET", block=False)
 def directory_view(request):
     qs = Member.objects.filter(status="active")
 
@@ -332,8 +340,15 @@ def directory_view(request):
     # Log empty-result queries with a meaningful filter so a future bot
     # decision is data-driven. Only fire when the user actually searched
     # (q or any facet) — empty filters returning zero just means there
-    # are no active members yet.
-    if paginator.count == 0 and (q or year_raw or city or profession):
+    # are no active members yet. Skip when rate-limited (block=False on
+    # the decorator above) so an authenticated abuser can't flood the
+    # audit table with arbitrary `q` values containing other members'
+    # names.
+    if (
+        paginator.count == 0
+        and (q or year_raw or city or profession)
+        and not getattr(request, "limited", False)
+    ):
         AuditLog.objects.create(
             actor=request.user,
             action="directory.query.no_results",
