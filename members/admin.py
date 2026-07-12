@@ -370,6 +370,11 @@ class RemovalRequestAdmin(admin.ModelAdmin):
         "requested_at",
         "confirmed_at",
         "expires_at",
+        # Status transitions belong to the public confirmation flow and the
+        # deadline cron. Editing it by hand either claims a removal that
+        # never executed, or moves a request out of 'pending_confirmation'
+        # so the pre_delete audit hook (signals.py) silently skips it.
+        "status",
     )
 
     def has_add_permission(self, request):

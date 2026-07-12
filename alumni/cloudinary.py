@@ -29,7 +29,7 @@ def _strip_exif_metadata(file_obj: Any, *, content_type: str) -> BytesIO:
     flow working — the photo lands on the wall; the operator can manually
     re-upload if they suspect a problem. The §I Risk #14 residual.
     """
-    from PIL import Image, UnidentifiedImageError
+    from PIL import Image, ImageOps, UnidentifiedImageError
 
     # Pillow needs a seekable stream. Rewind first in case any upstream
     # caller (validation, virus scan, content-type sniff) already consumed
@@ -56,6 +56,12 @@ def _strip_exif_metadata(file_obj: Any, *, content_type: str) -> BytesIO:
     try:
         img = Image.open(source)
         img.load()  # force-decode now so errors fire here, not later
+        # Bake the EXIF Orientation rotation into the pixels BEFORE the save
+        # drops the tag. Android cameras (this audience's devices) store
+        # sensor-native pixels and encode rotation only in that tag — without
+        # this, every portrait photo uploads sideways and g_face misses the
+        # face. No-op for images without an Orientation tag.
+        img = ImageOps.exif_transpose(img)
     except (UnidentifiedImageError, OSError, ValueError) as exc:
         logger.warning("EXIF strip failed (Pillow open): %s", exc, exc_info=True)
         source.seek(0)

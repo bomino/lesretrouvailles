@@ -183,3 +183,35 @@ def test_real_cloudinary_init_loads_required_submodules():
     assert callable(cloudinary.uploader.upload)
     assert callable(cloudinary.uploader.destroy)
     assert callable(cloudinary.utils.api_sign_request)
+
+
+class TestExifOrientation:
+    """Android cameras — the target audience's devices — record rotation in
+    the EXIF Orientation tag and store sensor-native pixels. Dropping the
+    tag without baking the rotation into the pixels uploads every portrait
+    photo sideways, and g_face cropping then misses the face."""
+
+    def _portrait_jpeg_with_orientation_6(self) -> BytesIO:
+        # 20 wide x 10 tall on disk; Orientation=6 means "rotate 90° CW to
+        # display", so the intended display size is 10 wide x 20 tall.
+        img = Image.new("RGB", (20, 10), color="blue")
+        exif = img.getexif()
+        exif[0x0112] = 6  # Orientation
+        buf = BytesIO()
+        img.save(buf, format="JPEG", exif=exif)
+        buf.seek(0)
+        return buf
+
+    def test_strip_bakes_orientation_into_pixels(self):
+        from alumni.cloudinary import _strip_exif_metadata
+
+        buf = self._portrait_jpeg_with_orientation_6()
+        assert Image.open(buf).size == (20, 10)  # sensor-native, pre-strip
+        buf.seek(0)
+
+        result = _strip_exif_metadata(buf, content_type="image/jpeg")
+        out = Image.open(result)
+        assert out.size == (10, 20), (
+            "pixels must be transposed to display orientation before EXIF is dropped"
+        )
+        assert out.getexif().get(0x0112) is None  # tag still gone

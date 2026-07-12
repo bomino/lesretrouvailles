@@ -115,10 +115,20 @@ class Member(models.Model):
         return self.full_name
 
     def save(self, *args, **kwargs):
+        # Title-case ONLY all-lowercase input (the operator/import case this
+        # normalization was written for). str.title() capitalizes after every
+        # non-letter, so applying it unconditionally rewrote correct values on
+        # every save — 'USA'->'Usa', "Côte d'Ivoire"->"Côte D'Ivoire",
+        # 'Aix-en-Provence'->'Aix-En-Provence' — and the operator could never
+        # fix them, because the fixing save re-mangled the value.
         if self.city:
-            self.city = self.city.strip().title()
+            self.city = self.city.strip()
+            if self.city.islower():
+                self.city = self.city.title()
         if self.country:
-            self.country = self.country.strip().title()
+            self.country = self.country.strip()
+            if self.country.islower():
+                self.country = self.country.title()
         super().save(*args, **kwargs)
 
     @property

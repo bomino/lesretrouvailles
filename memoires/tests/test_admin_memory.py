@@ -137,3 +137,32 @@ def test_admin_edit_with_new_upload_replaces_photo_and_deletes_old(
     m.refresh_from_db()
     assert m.photo_public_id != original_public_id, "photo_public_id should change after re-upload"
     assert m.photo_public_id.startswith("memoires/fake-")  # still a FakeCloudinary value
+
+
+@pytest.mark.django_db
+def test_delete_memory_removes_cloudinary_photo(fake_cloudinary, make_admin_user):
+    """Hard delete via /admin/memoires/ is that admin's remaining purpose
+    (every other op moved to /gestion/souvenirs/) — it must not orphan the
+    Cloudinary asset."""
+    from django.contrib.admin.sites import AdminSite
+    from django.test import RequestFactory, TestCase
+
+    from alumni import cloudinary as cloud_mod
+    from memoires.admin import MemoryAdmin
+    from memoires.models import Memory
+
+    cloud_mod.reset_fake_client()
+    memory = Memory.objects.create(
+        caption="À supprimer",
+        photo_public_id="memoires/orphan-candidate",
+        created_by=make_admin_user(),
+    )
+
+    admin_obj = MemoryAdmin(Memory, AdminSite())
+    req = RequestFactory().post("/admin/")
+    req.user = make_admin_user()
+
+    with TestCase.captureOnCommitCallbacks(execute=True):
+        admin_obj.delete_model(req, memory)
+
+    assert "memoires/orphan-candidate" in cloud_mod.get_client().delete_calls

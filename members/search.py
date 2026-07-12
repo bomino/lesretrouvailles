@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from django.contrib.postgres.lookups import Unaccent
 from django.contrib.postgres.search import TrigramSimilarity
-from django.db.models import F, Q, QuerySet, Value
+from django.db.models import Case, F, FloatField, Q, QuerySet, Value, When
 from django.db.models.functions import Greatest, Lower
 
 # Same six-field union as the prior directory_view substring search.
@@ -59,14 +59,19 @@ def _annotate_lc(qs: QuerySet) -> QuerySet:
 
 def _token_block(token: str) -> Q:
     """Build the per-token Q union: token matches any of the six lc fields,
-    or (if pure-numeric and in 1980-1985) the years_attended array."""
+    or (if pure-numeric and in 1980-1985) the years_attended array.
+
+    City/country only match for members who opted to show their city —
+    otherwise searching a city name reveals exactly the fact the
+    `show_city` toggle promises to hide.
+    """
     needle = Lower(Unaccent(Value(token)))
+    location_match = Q(city_lc__contains=needle) | Q(country_lc__contains=needle)
     block = (
         Q(first_lc__contains=needle)
         | Q(last_lc__contains=needle)
         | Q(nick_lc__contains=needle)
-        | Q(city_lc__contains=needle)
-        | Q(country_lc__contains=needle)
+        | (location_match & Q(show_city=True))
         | Q(prof_lc__contains=needle)
     )
     if token.isdigit():
@@ -88,16 +93,30 @@ def _longest_non_numeric_token(tokens: list[str]) -> str | None:
 
 def _trigram_fallback(qs: QuerySet, token: str) -> QuerySet:
     """Return qs ranked by max trigram similarity over the six fields,
-    filtered above the threshold."""
+    filtered above the threshold.
+
+    City/country similarity is zeroed out for members with show_city=False,
+    so the fuzzy path can't leak what the exact path now hides.
+    """
+    location_sim = Case(
+        When(
+            show_city=True,
+            then=Greatest(
+                TrigramSimilarity("city", token),
+                TrigramSimilarity("country", token),
+            ),
+        ),
+        default=Value(0.0),
+        output_field=FloatField(),
+    )
     return (
         qs.annotate(
             sim=Greatest(
                 TrigramSimilarity("first_name", token),
                 TrigramSimilarity("last_name", token),
                 TrigramSimilarity("nickname", token),
-                TrigramSimilarity("city", token),
-                TrigramSimilarity("country", token),
                 TrigramSimilarity("profession", token),
+                location_sim,
             )
         )
         .filter(sim__gte=_TRIGRAM_THRESHOLD)

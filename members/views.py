@@ -192,7 +192,10 @@ def directory_view(request):
             pass
 
     if city:
-        qs = qs.filter(city__iexact=city)
+        # show_city=False must actually hide the city: filtering over all
+        # members let anyone probe ~6 plausible cities and infer exactly
+        # what the privacy toggle promised to hide.
+        qs = qs.filter(city__iexact=city, show_city=True)
 
     if profession:
         qs = qs.filter(profession__icontains=profession)
@@ -263,6 +266,13 @@ def directory_view(request):
             params.pop(k, None)
         params.pop("page", None)  # always reset pagination on filter change
         return params.urlencode()
+
+    # Querystring for the paginator links: every current filter, URL-encoded,
+    # minus `page`. The template used to hand-roll '&{{k}}={{v}}', which
+    # HTML-escapes instead of URL-encoding — a value like 'M&M' rendered as
+    # '&q=M&amp;M' and the browser decoded it into a truncated filter plus a
+    # bogus extra param.
+    page_qs = _qs_without()
 
     active_filters: list[dict] = []
     if q:
@@ -383,6 +393,7 @@ def directory_view(request):
         template,
         {
             "page": page,
+            "page_qs": page_qs,
             "members": page.object_list,
             "letter_groups": letter_groups,
             "is_alphabetical": is_alphabetical,

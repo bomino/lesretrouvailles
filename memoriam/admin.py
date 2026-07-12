@@ -102,6 +102,31 @@ class InMemoriamEntryAdmin(admin.ModelAdmin):
         if should_fire_publish_email:
             transaction.on_commit(lambda: self._send_publish_emails(obj))
 
+    def delete_model(self, request, obj):
+        """The detail page promises families the fiche can be withdrawn on
+        request. Deleting the DB row used to leave the deceased's photo
+        permanently fetchable at its res.cloudinary.com URL."""
+        self._delete_photo_on_commit(obj.photo_public_id)
+        super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        for obj in queryset:
+            self._delete_photo_on_commit(obj.photo_public_id)
+        super().delete_queryset(request, queryset)
+
+    @staticmethod
+    def _delete_photo_on_commit(public_id: str) -> None:
+        if not public_id:
+            return
+
+        def _do_delete():
+            try:
+                get_client().delete(public_id)
+            except Exception:
+                logger.exception("Cloudinary delete failed for %s (orphaned asset)", public_id)
+
+        transaction.on_commit(_do_delete)
+
     @staticmethod
     def _send_publish_emails(obj):
         from members.models import Member
