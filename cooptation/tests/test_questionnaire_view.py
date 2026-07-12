@@ -148,3 +148,24 @@ def test_questionnaire_double_submit_race_returns_done_page_not_500(
         {"q1": "alpha", "q2": "gamma", "q3": "souvenir"},
     )
     assert response.status_code == 302  # redirect to the (now 410/done) page
+
+
+@pytest.mark.django_db
+def test_questionnaire_still_accepted_after_stale_sweep(expired_application_with_token):
+    """The 7-day grace sweep pushes the application to awaiting_admin. A
+    candidate who answers on day 8 must still be able to submit — the status
+    gate must not tell them 'vos réponses ont déjà été soumises' when they
+    never submitted, and must not close their only path in."""
+    from cooptation.models import QuestionnaireResponse
+
+    app = expired_application_with_token
+    app.status = "awaiting_admin"  # what _sweep_stale_questionnaires does
+    app.save()
+
+    assert Client().get("/questionnaire/abc123/").status_code == 200
+    response = Client().post(
+        "/questionnaire/abc123/",
+        {"q1": "alpha", "q2": "gamma", "q3": "souvenir"},
+    )
+    assert response.status_code == 302
+    assert QuestionnaireResponse.objects.filter(application=app).count() == 3

@@ -250,7 +250,6 @@ class GhostStatusFilter(admin.SimpleListFilter):
     def queryset(self, request, queryset):
         from datetime import timedelta
 
-        from django.db.models import Count
         from django.utils import timezone
 
         value = self.value()
@@ -260,13 +259,16 @@ class GhostStatusFilter(admin.SimpleListFilter):
         if value == "removed":
             return queryset.filter(removed_at__isnull=False)
 
-        qs = queryset.filter(removed_at__isnull=True).annotate(n=Count("added_by_admins"))
+        # signoff_n is annotated once by PublicSearchEntryAdmin.get_queryset;
+        # re-annotating the same Count here would put two identical aggregates
+        # over the same M2M join in every filtered changelist query.
+        qs = queryset.filter(removed_at__isnull=True)
         if value == "published":
             cutoff = timezone.now() - timedelta(days=365)
-            return qs.filter(n__gte=1, added_at__gt=cutoff)
+            return qs.filter(signoff_n__gte=1, added_at__gt=cutoff)
         if value == "stale":
             cutoff = timezone.now() - timedelta(days=365)
-            return qs.filter(n__gte=1, added_at__lte=cutoff)
+            return qs.filter(signoff_n__gte=1, added_at__lte=cutoff)
         return queryset
 
 

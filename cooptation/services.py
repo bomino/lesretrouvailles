@@ -9,6 +9,7 @@ from allauth.account.forms import default_token_generator as allauth_token_gener
 from allauth.account.utils import user_pk_to_url_str
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from members.models import VALID_WHATSAPP_PATTERN, Member
@@ -48,9 +49,15 @@ def approve_application(application: AdminApplication, *, reviewed_by) -> tuple:
         raise ApprovalError(f"Application {application.pk} has no email; cannot approve.")
 
     User = get_user_model()  # noqa: N806
-    if User.objects.filter(email=application.email).exists():
+    # Both fields matter: email is not unique, username IS. A coopted member
+    # whose email was later changed or blanked leaves a User whose *username*
+    # is still the old address — creating a second User with that username
+    # would raise IntegrityError, which callers don't catch (only
+    # ApprovalError), so it would 500 the gestion view and abort the admin
+    # bulk action mid-queryset.
+    if User.objects.filter(Q(email=application.email) | Q(username=application.email)).exists():
         raise ApprovalError(
-            f"A user already exists with email {application.email!r}; "
+            f"A user already exists with email or username {application.email!r}; "
             "refusing to adopt an existing account."
         )
     user = User.objects.create(username=application.email, email=application.email)

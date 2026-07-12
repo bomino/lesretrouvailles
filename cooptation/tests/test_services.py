@@ -276,3 +276,20 @@ def test_purge_clears_related_pii_and_kills_questionnaire_token(
     assert req.comment == ""
     resp = QuestionnaireResponse.objects.get(application=app)
     assert resp.candidate_answer == ""
+
+
+@pytest.mark.django_db
+def test_approve_refuses_when_username_taken_even_if_email_free(make_application, staff_user):
+    """User.username is unique but User.email is not. A coopted member whose
+    email was later changed/blanked leaves a User whose USERNAME is the old
+    address — approving a new application with that address must raise
+    ApprovalError, not an uncaught IntegrityError (which the gestion view
+    and the admin action do not catch)."""
+    from cooptation.services import ApprovalError, approve_application
+
+    User = get_user_model()  # noqa: N806
+    User.objects.create(username="alice@example.test", email="")  # email changed away
+
+    app = make_application(full_name="New Alice", email="alice@example.test")
+    with pytest.raises(ApprovalError):
+        approve_application(app, reviewed_by=staff_user)

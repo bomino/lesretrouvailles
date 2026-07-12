@@ -63,11 +63,17 @@ def _sanitize_utm(value: str) -> str:
 def signup_view(request):
     # block=False: a limited candidate gets a French 429 with their typed
     # form re-rendered, not django-ratelimit's bare English 403.
+    #
+    # An UNBOUND form seeded with the POST data: a bound form would run full
+    # validation the moment the template touches field.errors (two parrain
+    # lookups + the User-email check — DB work the throttle exists to
+    # prevent), and it would show validation errors next to the rate-limit
+    # banner, leaving the candidate unable to tell which problem to fix.
     if request.method == "POST" and getattr(request, "limited", False):
         return render(
             request,
             "cooptation/signup.html",
-            {"form": SignupForm(request.POST), "rate_limited": True},
+            {"form": SignupForm(initial=request.POST.dict()), "rate_limited": True},
             status=429,
         )
     # Stash UTM on every GET so a visitor arriving at /inscription/?utm_source=…
@@ -284,12 +290,21 @@ def questionnaire_view(request, token: str):
     except AdminApplication.DoesNotExist:
         return render(request, "cooptation/questionnaire_done.html", {"unknown": True}, status=410)
 
-    # The questionnaire exists solely for candidates whose cooptation
-    # expired and who are still pending review. Without this gate, an old
-    # emailed link could flip a rejected/approved/purged application back
-    # to awaiting_admin — silently reversing the admin's decision and
+    # The questionnaire exists solely for candidates whose cooptation expired
+    # and whose application is still in the review pipeline. Without this gate,
+    # an old emailed link could flip a rejected/approved/purged application
+    # back to awaiting_admin — silently reversing the admin's decision and
     # escaping the 180-day retention purge (which filters status='rejected').
-    if application.status != "cooptation_pending" or application.cooptation_outcome != "expired":
+    #
+    # awaiting_admin is deliberately allowed: _sweep_stale_questionnaires
+    # moves the application there 7 days after the questionnaire email, and a
+    # candidate who answers on day 8 must still be able to — telling them
+    # "vos réponses ont déjà été soumises" when they never submitted, and
+    # closing their only remaining path in, is not what this gate is for.
+    if (
+        application.status not in ("cooptation_pending", "awaiting_admin")
+        or application.cooptation_outcome != "expired"
+    ):
         return render(request, "cooptation/questionnaire_done.html", {"unknown": False}, status=410)
 
     if application.questionnaire_responses.exists():
