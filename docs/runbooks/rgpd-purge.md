@@ -5,7 +5,7 @@
 
 **Spec:** [docs/superpowers/specs/2026-05-05-rgpd-admin-purge-design.md](../superpowers/specs/2026-05-05-rgpd-admin-purge-design.md)
 **Engine:** `members/services.py::rgpd_purge_member`
-**CLI:** `python manage.py rgpd_purge_member <email>`
+**CLI:** `python manage.py rgpd_purge_member <email-or-username>` — the identifier is the member's email **or** their username (WhatsApp digits). ~80% of members have no email; the username path is the only way to reach them.
 **Admin UI:** Django admin → Membres → select rows → action "Purger RGPD (irréversible)"
 
 ---
@@ -28,9 +28,9 @@ This procedure does **not** apply to:
 3. Tick the checkbox next to the member to delete (or several, but **one at a time is safer**).
 4. From the actions dropdown above the list, choose **"Purger RGPD (irréversible)"** → **Go**.
 5. The confirmation page lists what will be deleted:
-   - Member ID + email
+   - Member ID + email (or username, for the ~80% with no email)
    - Counts: souvenirs, cooptation requests, memoriam nominations, admin applications to anonymize, photos on Cloudinary.
-6. **Type the member's email exactly** in the confirmation input. Submit is rejected on mismatch.
+6. **Type the member's email exactly** in the confirmation input — or, for an **email-less member, their username exactly** (the WhatsApp digits). The page tells you which one it expects. An empty value is always rejected, and so is any mismatch.
 7. Click **Purger maintenant**. The page redirects back to the changelist with a green success banner showing how many members were purged.
 
 **If a "Bloqué" message appears** instead of the deletion counts: the member has created In Memoriam fiches and we won't cascade-delete them silently. See [Edge case 1](#edge-case-1) below.
@@ -39,16 +39,28 @@ This procedure does **not** apply to:
 
 ## Procedure B — CLI (recommended for scripted RGPD batch handling, or remote ops)
 
+The identifier is the member's **email or username** (WhatsApp digits), so
+this procedure works for the email-less majority too. Run it inside the
+container — `railway run` executes on your machine, where the internal
+`DATABASE_URL` host does not resolve:
+
 ```bash
 # 1. Always preview first
-python manage.py rgpd_purge_member alice@example.com --dry-run
+railway ssh --service lesretrouvailles -- python manage.py rgpd_purge_member alice@example.com --dry-run
+
+# 1b. Email-less member: pass the username (WhatsApp digits)
+railway ssh --service lesretrouvailles -- python manage.py rgpd_purge_member 22790000001 --dry-run
 
 # 2. Execute with the interactive prompt (default)
-python manage.py rgpd_purge_member alice@example.com
+railway ssh --service lesretrouvailles -- python manage.py rgpd_purge_member alice@example.com
 
 # 3. For non-interactive / scripted execution
-python manage.py rgpd_purge_member alice@example.com --yes
+railway ssh --service lesretrouvailles -- python manage.py rgpd_purge_member alice@example.com --yes
 ```
+
+A blank identifier is refused outright (it used to match every email-less
+member), so an unset `$EMAIL` in a script fails loudly instead of resolving
+to an arbitrary member.
 
 Flags:
 
@@ -164,6 +176,14 @@ The `audit_log_id` and `email_hash` come from the CLI/UI summary. They let a fut
 
 - Self-service member-facing deletion flow (planned, not yet shipped — will call into the same engine).
 - Granular content-handling choices (delete vs anonymize for gallery photos / témoignages — master spec §9.4 Phase B).
-- AdminApplication 6-month retention auto-purge — separate cron, deferred.
-- AuditLog 12-month retention auto-purge — separate cron, deferred.
+- Self-service RGPD **data export** (Art. 20 portability). The consent charter
+  promises data "peuvent être exportées … sur demande" but no export command or
+  admin action exists yet. Until one ships, honor an export request by hand
+  (member + user + consent + preference rows) and treat it as a known gap.
 - DMARC monitoring (P6c).
+
+**Already shipped (do NOT treat as deferred):** the AdminApplication 6-month
+retention purge and the AuditLog 12-month retention purge both run daily inside
+`process_cooptation_deadlines`. Note the consequence for RGPD replies: the
+`audit_log_id` / `email_hash` you cite as proof of a purge are themselves
+deleted 12 months later.

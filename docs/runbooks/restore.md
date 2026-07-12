@@ -367,8 +367,13 @@ The platform's Postgres DB is on Railway with automatic daily snapshots (7-day r
 
 **Manual point-in-time export** (defense-in-depth, not required for P6a but available):
 
+`railway run` executes on *your* machine with prod env vars, and the internal
+`postgres.railway.internal` host does not resolve there. Use the **public**
+proxy URL (Railway dashboard → Postgres → Variables → `DATABASE_PUBLIC_URL`):
+
 ```bash
-railway run --service Postgres -- pg_dump $DATABASE_URL | gzip > /tmp/db-$(date +%F).sql.gz
+DB_URL="$(railway variables --service Postgres --json | jq -r .DATABASE_PUBLIC_URL)"
+pg_dump "$DB_URL" | gzip > /tmp/db-$(date +%F).sql.gz
 ```
 
 Store the resulting file in 1Password's encrypted file storage if you need to retain it longer than Railway's 7-day snapshot window.

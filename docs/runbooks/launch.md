@@ -15,10 +15,14 @@ The 6 `Member` rows currently in production are dev fixtures from `members/fixtu
 ### 0.1 — Inspect first
 
 ```bash
-railway run --service lesretrouvailles python manage.py shell -c \
+railway ssh --service lesretrouvailles -- python manage.py shell -c \
   "from members.models import Member; \
    [print(m.id, m.full_name, m.user.email) for m in Member.objects.all()]"
 ```
+
+> `railway ssh`, not `railway run`: anything that touches the DB must execute
+> *inside* Railway's network, because `DATABASE_URL` points at
+> `postgres.railway.internal` which does not resolve from your machine.
 
 Confirm these are test rows (`First1 Last1` / `Niamey` / `Médecin`-type values), not real founders.
 
@@ -27,7 +31,7 @@ Confirm these are test rows (`First1 Last1` / `Niamey` / `Médecin`-type values)
 Before any deletion, ensure production never has a state without an admin:
 
 ```bash
-railway run --service lesretrouvailles python manage.py createsuperuser
+railway ssh --service lesretrouvailles -- python manage.py createsuperuser
 ```
 
 Use **your real email** + a strong password. This account:
@@ -56,10 +60,10 @@ The Tigris bucket has 2 photos backed up from the test members. They're orphans 
 Run through these one by one. None are blocking individually, but all should be ✓ before announcing.
 
 ```bash
-railway run --service lesretrouvailles python manage.py audit_launch_readiness
+railway ssh --service lesretrouvailles -- python manage.py audit_launch_readiness
 ```
 
-This prints platform-side counts. After Step 0 they'll all be 0 except active members (= 1, the new super admin). That's expected — the seed-content audit makes sense to re-run after Step 4.
+This prints platform-side counts. After Step 0 they'll **all be 0** — including active members: `createsuperuser` creates a `User`, not a `Member` row, and the audit counts `Member` rows. That's expected; the seed-content audit only becomes meaningful after Step 4.
 
 Manual checks the audit can't do:
 
@@ -97,6 +101,25 @@ For the current launch (May 2026): announcement posted ~2026-05-07; deadline 202
 
 Pick 5-10 trusted members (e.g., the WhatsApp group's most active or your closest co-founders). Make a `pilot.csv` with just those rows:
 
+> **Targeting production.** The import reads a CSV and photo directory that
+> live on *your* machine, so it must run locally — but against the production
+> database. `railway run` injects prod env vars but keeps the internal
+> `postgres.railway.internal` host, which does not resolve outside Railway's
+> network. Export the **public** proxy URL instead (Railway dashboard →
+> Postgres → Variables → `DATABASE_PUBLIC_URL`):
+>
+> ```bash
+> export DJANGO_SETTINGS_MODULE=alumni.settings.prod
+> export DATABASE_URL="$(railway variables --service Postgres --json | jq -r .DATABASE_PUBLIC_URL)"
+> export SITE_URL=https://villageretrouvailles.com
+> # plus the Resend + Cloudinary vars the import needs:
+> export RESEND_API_KEY=... CLOUDINARY_URL=... SECRET_KEY=...
+> ```
+>
+> Without `SITE_URL`, every magic link in the output CSV is built from the
+> `http://localhost:8000` default and every DM'd link is dead. Verify with a
+> one-row CSV before the full run.
+
 ```bash
 python manage.py import_whatsapp_roster pilot.csv \
     --photos-dir roster_photos \
@@ -120,6 +143,10 @@ Fix anything urgent before Step 5.
 
 Once pilots have signed off:
 
+Same environment as Step 4 (see the targeting note there — `DJANGO_SETTINGS_MODULE`,
+`DATABASE_URL` from `DATABASE_PUBLIC_URL`, and `SITE_URL` must all be exported,
+or you will DM ~170 dead `localhost` links).
+
 ```bash
 python manage.py import_whatsapp_roster roster.csv \
     --photos-dir roster_photos \
@@ -137,7 +164,7 @@ This step takes time (a few hours of WhatsApp DMs spread over a day or two). Pac
 Now that the roster is imported, the seed-content audit becomes meaningful:
 
 ```bash
-railway run --service lesretrouvailles python manage.py audit_launch_readiness
+railway ssh --service lesretrouvailles -- python manage.py audit_launch_readiness
 ```
 
 Address any flagged items:
@@ -145,6 +172,8 @@ Address any flagged items:
 - **Memory rows < 10** — admin uploads 10-20 historical photos via `/admin/memoires/memory/`. These are the seed photos for Mur des souvenirs.
 - **InMemoriamEntry < 1** — admin creates 1-3 fiches via `/admin/memoriam/inmemoriamentry/` (with family consent following Annexe D §D.5).
 - **PublicSearchEntry < 3** — admin enters 3+ "ghost" entries via `/admin/members/publicsearchentry/` (the public landing's "Nous recherchons aussi…" list).
+- [ ] **`PUBLIC_GHOST_LIST_ENABLED=true`** on the `lesretrouvailles` service. The flag defaults to **false**, so the anonymous landing renders no ghost list at all until you flip it — the entries above stay invisible and the audit still passes. Set it once the entries and the removal flow are in place:
+  `railway variables --set PUBLIC_GHOST_LIST_ENABLED=true --service lesretrouvailles`
 
 Re-run the audit until all checks pass.
 
@@ -202,20 +231,21 @@ If something goes wrong post-launch:
 
 ### Symptom: emails are bouncing en masse
 
-1. Stop sending. `railway variables --remove EMAIL_BACKEND --service lesretrouvailles` (temporary; falls back to console backend, no real send).
+1. Stop sending. `railway variables --set EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend --service lesretrouvailles` (temporary; nothing leaves the container). Setting the var is what works — staging/prod default to `ResendBackend`, so *removing* the variable leaves real sending on.
 2. Investigate via DMARC reports + Resend dashboard.
 3. Fix the underlying issue (wrong DKIM, etc.).
 4. Re-enable; resume.
 
 ### Symptom: members can't log in (login form rejects credentials)
 
-1. Verify the auth-method settings on prod: `railway variables --service lesretrouvailles --json | grep -i ACCOUNT_LOGIN`.
+1. Print the auth settings the running container actually loaded (they are hardcoded in `alumni/settings/base.py`, never read from env — grepping Railway variables for `ACCOUNT_LOGIN` always returns nothing):
+   `railway ssh --service lesretrouvailles -- python manage.py shell -c "from django.conf import settings; print(settings.ACCOUNT_LOGIN_METHODS, settings.SETTINGS_MODULE)"`
 2. Check the deploy log for tracebacks during the latest deployment.
 3. If it's bad enough, revert to the previous deployment via Railway dashboard → Deployments → previous successful one → "Redeploy".
 
 ### Symptom: an undesired account got created (typo, wrong email, etc.)
 
-1. Run `python manage.py rgpd_purge_member <email>` per [`rgpd-purge.md`](rgpd-purge.md). Hard-deletes them cleanly + audit-logs.
+1. Run `railway ssh --service lesretrouvailles -- python manage.py rgpd_purge_member <email-or-username>` per [`rgpd-purge.md`](rgpd-purge.md). Hard-deletes them cleanly + audit-logs. For the ~80% of members with no email, pass their **username** (the WhatsApp digits) — the command accepts either.
 
 ### Symptom: full data loss
 

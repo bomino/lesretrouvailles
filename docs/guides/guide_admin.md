@@ -216,8 +216,8 @@ Conformément au Règlement Général sur la Protection des Données (RGPD, arti
 4. Dans le menu déroulant des actions en haut, choisissez **« Purger RGPD (irréversible) »** → cliquez **Go**.
 5. Une page de confirmation s'affiche avec :
    - Le résumé de ce qui sera supprimé (compte, profil, photos, requêtes de parrainage, etc.)
-   - Un champ texte où vous devez **saisir l'email exact** du membre pour confirmer.
-6. Saisissez l'email puis cliquez **« Purger maintenant »**.
+   - Un champ texte de confirmation. Saisissez **l'email exact** du membre — ou, pour les ~80 % de membres **sans email**, son **username exact** (le numéro WhatsApp en chiffres). La page vous indique lequel des deux elle attend.
+6. Saisissez la valeur demandée puis cliquez **« Purger maintenant »**.
 7. Vous êtes redirigé vers la liste avec un message de succès.
 8. Une entrée `rgpd.member.purged` est ajoutée au journal d'audit (sans aucune donnée personnelle, juste un hash).
 
@@ -225,12 +225,19 @@ Conformément au Règlement Général sur la Protection des Données (RGPD, arti
 
 Pour traiter plusieurs demandes en lot ou via SSH :
 
+La commande accepte **l'email OU le username** (numéro WhatsApp), donc elle
+fonctionne aussi pour les membres sans email. `railway ssh` (et non `railway run`) :
+la base n'est joignable que depuis le réseau interne de Railway.
+
 ```bash
 # Aperçu sans changement
-railway run --service lesretrouvailles python manage.py rgpd_purge_member alice@example.com --dry-run
+railway ssh --service lesretrouvailles -- python manage.py rgpd_purge_member alice@example.com --dry-run
+
+# Membre sans email : passez son username (chiffres WhatsApp)
+railway ssh --service lesretrouvailles -- python manage.py rgpd_purge_member 22790000001 --dry-run
 
 # Exécution réelle
-railway run --service lesretrouvailles python manage.py rgpd_purge_member alice@example.com
+railway ssh --service lesretrouvailles -- python manage.py rgpd_purge_member alice@example.com
 ```
 
 Le runbook détaillé : `docs/runbooks/rgpd-purge.md`.
@@ -273,7 +280,9 @@ Le Mur des souvenirs est curé par les administrateurs (les membres ne peuvent p
    - `Publiée` — visible par tous les membres
 7. Cliquez **« Créer »**. Vous êtes ramené à la liste avec un bandeau de confirmation.
 
-> 🔒 **Protection vie privée automatique :** depuis 2026-05-10, les métadonnées EXIF (coordonnées GPS, modèle d'appareil, date de prise de vue) sont **retirées côté serveur** avant l'envoi à Cloudinary. Aucune photo uploadée ne fuite plus de coordonnées GPS de la maison du membre. Cette protection s'applique aussi aux photos de profil et aux fiches In Memoriam.
+> 🔒 **Protection vie privée automatique :** depuis 2026-05-10, les métadonnées EXIF (coordonnées GPS, modèle d'appareil, date de prise de vue) sont **retirées côté serveur** avant l'envoi à Cloudinary pour toutes les photos que **vous** téléversez : Mur des souvenirs, fiches In Memoriam, photos importées avec le roster, et photos de membres déposées depuis `/gestion/`.
+>
+> ⚠️ **Exception connue :** la photo qu'un membre téléverse lui-même depuis « Profil → Modifier » part directement de son navigateur vers Cloudinary et **ne passe pas** par ce nettoyage (tech-debt F-03). Tant que ce n'est pas corrigé, ne promettez pas aux membres que leur photo de profil est nettoyée — et si un membre s'en inquiète, re-téléversez sa photo à sa place depuis `/gestion/`.
 
 ### Modifier la légende, remplacer la photo, ou changer le statut
 
@@ -436,7 +445,7 @@ Si le membre persiste :
    - **Email** (membres ayant fourni un email à l'inscription) ;
    - **Numéro WhatsApp** en chiffres seulement, sans `+` ni espaces (ex. `22790000001`) ;
    - **Identifiant fourni par l'administrateur** (super-admin `bominomla`, comptes créés manuellement).
-2. Vérifiez que le compte est actif : **Members → Members** → la ligne du membre → champ `Status` doit être `active`. Un statut `suspended` ou `deleted` bloque la connexion.
+2. Vérifiez que le compte est actif : **Members → Members** → la ligne du membre → champ `Status` doit être `active`. Suspendre un membre depuis `/gestion/` désactive aussi son compte de connexion (`User.is_active=False`) et ferme ses sessions ouvertes : un statut `suspended` bloque donc réellement la connexion, et « Réactiver le compte » la rétablit.
 3. Vérifiez l'`username` exact dans la fiche — un membre peut avoir oublié qu'il utilise son email plutôt que son numéro, ou vice versa.
 4. Si vraiment oublié, générez un nouveau lien magique depuis `/gestion/` (voir §4) ou `reissue_login_link` en CLI.
 
@@ -454,7 +463,10 @@ Une `AdminApplication` peut rester coincée en `cooptation_pending` si les deux 
 1. **Cooptation → Admin Applications** filtrée par `status = cooptation_pending`.
 2. **Cooptation → Cooptation requests** filtrée par cette application : voyez l'état des deux requêtes (pending / accepted / refused / expired).
 3. Si les deux ont expiré sans réponse, le système envoie automatiquement un email de questionnaire au candidat (méthode 2 du master spec). Le statut devrait évoluer dans les 24 h après le passage du cron.
-4. Si rien ne bouge, intervenez manuellement : action **« Push to awaiting_admin »** ou **« Reject application »**.
+4. Si rien ne bouge, intervenez manuellement depuis `/admin/cooptation/adminapplication/` :
+   - pour la faire remonter dans la file de revue, ouvrez la fiche et passez son champ **`Status`** à `awaiting_admin`, puis enregistrez ;
+   - pour la refuser, sélectionnez-la dans la liste et lancez l'action **« Rejeter les candidatures sélectionnées »**.
+   (Il n'existe pas d'action « Push to awaiting_admin » — les trois actions disponibles sont « Approuver… », « Rejeter… » et « Renvoyer le lien de mot de passe… ».)
 
 ---
 

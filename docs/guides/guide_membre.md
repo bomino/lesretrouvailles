@@ -175,7 +175,7 @@ Cet espace honore les camarades qui nous ont quittés en chemin. Chaque fiche es
 
 Si vous souhaitez qu'un·e ancien·ne décédé·e soit honoré·e, vous pouvez **proposer une nomination** depuis la page In Memoriam :
 
-1. Cliquez sur **« Nominer un·e ancien·ne »**.
+1. Cliquez sur **« Nominer un camarade »**.
 2. Renseignez le nom, les années au CEG, et un souvenir personnel.
 3. Indiquez un point de contact pour la famille (si possible).
 4. Soumettez.
@@ -195,7 +195,7 @@ Vous pouvez aider à faire grandir la communauté en parrainant un·e nouveau·e
 Quand un·e candidat·e s'inscrit via la page publique d'inscription, il choisit deux parrains parmi les membres existants. Si votre email est cité, vous recevez un message :
 
 ```
-Sujet : [Les Retrouvailles] {Nom} sollicite votre parrainage
+Sujet : Demande de cooptation pour {Nom}
 ```
 
 ### Examiner et répondre
@@ -204,7 +204,7 @@ Sujet : [Les Retrouvailles] {Nom} sollicite votre parrainage
 2. Allez dans **« Cooptations à valider »** dans le menu (un badge avec le nombre de demandes en attente s'affiche).
 3. Cliquez sur la demande pour voir les informations du candidat.
 4. Vérifiez : est-ce bien un·e ancien·ne du CEG 1 Birni ? Connaissez-vous ses années / sa famille ?
-5. Cliquez sur **« Accorder le parrainage »** ou **« Refuser »** (avec un mot d'explication facultatif).
+5. Choisissez **« J'accepte de coopter »** ou **« Je refuse »**, ajoutez un commentaire facultatif, puis cliquez **« Envoyer ma réponse »**.
 
 ### Délais
 
