@@ -12,13 +12,24 @@
             <h1 class="mt-2 font-display text-3xl font-semibold tracking-tight hero-rule md:text-4xl">
                 {% trans "Nos classes" %}
             </h1>
+            {% comment %}
+                Never render the count when it is zero: the source-language
+                plural rule pluralizes zero ("0 camarades retrouvés"), and
+                inviting the reader to find their class above an empty page
+                reads broken. {% comment %}, not {# #} — Django's hash-comment
+                does NOT span lines and would render this text into the page.
+            {% endcomment %}
             <p class="mt-4 text-base leading-relaxed text-secondary">
-                {% blocktrans count total=total_entries %}
-                    Les listes de classe d'origine du CEG 1 Birni — {{ total }} camarade retrouvé dans les archives.
-                {% plural %}
-                    Les listes de classe d'origine du CEG 1 Birni — {{ total }} camarades retrouvés dans les archives.
-                {% endblocktrans %}
-                {% trans "Retrouvez votre classe, voyez qui est déjà inscrit, et signalez-nous votre propre fiche." %}
+                {% if total_entries %}
+                    {% blocktrans count total=total_entries %}
+                        Les listes de classe d'origine du CEG 1 Birni — {{ total }} camarade retrouvé dans les archives.
+                    {% plural %}
+                        Les listes de classe d'origine du CEG 1 Birni — {{ total }} camarades retrouvés dans les archives.
+                    {% endblocktrans %}
+                    {% trans "Retrouvez votre classe, voyez qui est déjà inscrit, et signalez-nous votre propre fiche." %}
+                {% else %}
+                    {% trans "Les listes de classe d'origine du CEG 1 Birni (6ème 1980-1981 et 1981-1982) seront publiées ici." %}
+                {% endif %}
             </p>
         </header>
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -38,7 +49,7 @@
                                 {% blocktrans count n=c.registered %}{{ n }} inscrit{% plural %}{{ n }} inscrits{% endblocktrans %}
                             </span>
                         {% else %}
-                            <span class="mt-0.5 block text-xs text-secondary">{% trans "personne inscrit·e" %}</span>
+                            <span class="mt-0.5 block text-xs text-secondary">{% trans "Aucun inscrit pour l'instant" %}</span>
                         {% endif %}
                     </span>
                 </a>

@@ -282,3 +282,22 @@ def test_rgpd_purge_deletes_claimed_roster_entries(make_member, make_roster_entr
     assert not ClassRosterEntry.objects.filter(pk=entry.pk).exists()
     assert ClassRosterEntry.objects.filter(pk=unrelated.pk).exists()
     assert summary["deleted_counts"]["roster_entries"] == 1
+
+
+@pytest.mark.django_db
+def test_empty_archive_does_not_render_a_zero_count(consenting_client):
+    """Regression (seen in prod before the data was imported): the count line
+    rendered "0 camarades retrouvés" — the source-language plural rule pluralizes
+    zero — above copy inviting you to find your class on an empty page."""
+    body = consenting_client.get("/promotions/").content.decode("utf-8")
+    assert "0 camarade" not in body
+    assert "Retrouvez votre classe" not in body
+    assert "seront publiées ici" in body
+
+
+@pytest.mark.django_db
+def test_populated_archive_renders_the_count(consenting_client, make_roster_entry):
+    make_roster_entry()
+    make_roster_entry()
+    body = consenting_client.get("/promotions/").content.decode("utf-8")
+    assert "2 camarades" in body

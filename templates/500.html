@@ -1,8 +1,15 @@
 <!DOCTYPE html>
-{# Fully standalone ON PURPOSE: Django's default server_error renders this
-   with an EMPTY context (no request, no context processors). Do NOT extend
-   base.html and do NOT reference any template variable — a DB-outage 500
-   would crash the error page itself. #}
+{% comment %}
+    Fully standalone ON PURPOSE: Django's default server_error renders this
+    with an EMPTY context (no request, no context processors). Do NOT extend
+    base.html and do NOT reference any template variable — a DB-outage 500
+    would crash the error page itself.
+
+    {% comment %}, not {# #}: Django's hash-comment does not span lines, so a
+    multi-line one renders its own text into the page — and sitting before
+    <html> the browser hoists it into the body, showing developer notes to a
+    user who just hit a 500.
+{% endcomment %}
 <html lang="fr">
     <head>
         <meta charset="utf-8">

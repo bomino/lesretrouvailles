@@ -104,3 +104,16 @@ def test_logging_config_reaches_console_regardless_of_debug(settings):
     assert "filters" not in console or "require_debug_true" not in str(console.get("filters"))
     assert "console" in logging_conf["loggers"]["django"]["handlers"]
     assert "console" in logging_conf["root"]["handlers"]
+
+
+def test_standalone_error_templates_do_not_leak_developer_comments():
+    """Django's {# #} comment does NOT span lines: a multi-line one renders its
+    own text into the page. In 500.html / 403_csrf.html the comment sits before
+    <html>, so the browser hoists it into the body — a user who just hit a 500
+    would read developer notes. Use {% comment %} for anything multi-line."""
+    from django.template.loader import render_to_string
+
+    for template in ("500.html", "403_csrf.html"):
+        html = render_to_string(template, {})
+        assert "{#" not in html, f"{template} renders a raw hash-comment"
+        assert "ON PURPOSE" not in html, f"{template} leaks its developer comment"

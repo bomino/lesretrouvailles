@@ -1,7 +1,12 @@
 <!DOCTYPE html>
-{# Standalone ON PURPOSE: Django's csrf_failure view renders this WITHOUT a
-   request (t.render(c) with a plain dict), so context processors never run
-   and extending base.html would render a degraded shell. #}
+{% comment %}
+    Standalone ON PURPOSE: Django's csrf_failure view renders this WITHOUT a
+    request (t.render(c) with a plain dict), so context processors never run
+    and extending base.html would render a degraded shell.
+
+    {% comment %}, not {# #}: the hash-comment does not span lines and would
+    render this text into the page the user actually sees.
+{% endcomment %}
 <html lang="fr">
     <head>
         <meta charset="utf-8">
