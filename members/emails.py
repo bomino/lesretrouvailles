@@ -38,6 +38,9 @@ def send_admin_removal_notification(removal_request: RemovalRequest) -> None:
     staff_emails = list(
         User.objects.filter(is_staff=True, is_active=True).values_list("email", flat=True)
     )
+    # ~80% of users have no email; a blank string in the Resend 'to' list
+    # fails the whole API call (mirrors send_admin_ghost_added's filter).
+    staff_emails = [e for e in staff_emails if e]
     if not staff_emails:
         return
     send_email(
@@ -56,6 +59,7 @@ def send_admin_quarterly_ghost_digest(*, purged_logs, currently_listed, since) -
     staff_emails = list(
         User.objects.filter(is_staff=True, is_active=True).values_list("email", flat=True)
     )
+    staff_emails = [e for e in staff_emails if e]
     if not staff_emails:
         return
     send_email(

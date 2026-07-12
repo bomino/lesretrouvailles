@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import unicodedata
 from datetime import timedelta
 
@@ -19,6 +20,8 @@ from members.models import Member
 from . import emails
 from .forms import SignupForm
 from .models import AdminApplication, CooptationRequest
+
+logger = logging.getLogger(__name__)
 
 
 def _client_ip(request) -> str:
@@ -103,11 +106,22 @@ def signup_view(request):
                     application=app, parrain=p2, expires_at=expires
                 )
 
-            emails.send_application_received(app)
-            emails.send_cooptation_requests_sent(app, parrain_emails=[p1.user.email, p2.user.email])
-            emails.send_parrain_invitation(req1)
-            emails.send_parrain_invitation(req2)
-            emails.send_admin_new_application(app)
+            # The application is committed; the fan-out below is best-effort.
+            # A Resend outage must not 500 a recorded submission — the
+            # candidate would resubmit, creating duplicates.
+            for send in (
+                lambda: emails.send_application_received(app),
+                lambda: emails.send_cooptation_requests_sent(
+                    app, parrain_emails=[p1.user.email, p2.user.email]
+                ),
+                lambda: emails.send_parrain_invitation(req1),
+                lambda: emails.send_parrain_invitation(req2),
+                lambda: emails.send_admin_new_application(app),
+            ):
+                try:
+                    send()
+                except Exception:
+                    logger.exception("signup: post-commit email failed for application %s", app.pk)
 
             return HttpResponseRedirect("/inscription/merci/")
     else:

@@ -579,3 +579,48 @@ def test_audit_log_retention_handles_empty_queryset(make_admin):
     call_command("process_cooptation_deadlines")
 
     assert AuditLog.objects.filter(pk=fresh.pk).exists()
+
+
+@pytest.mark.django_db
+def test_j14_email_failure_neither_aborts_run_nor_permanently_skips(
+    make_cooptation_request, settings, monkeypatch
+):
+    """Regression: the old order stamped cooptation_expired_at BEFORE the
+    send; one Resend outage aborted the whole cron run and the guard then
+    skipped the app forever — the candidate never got their questionnaire
+    link. A failed send must leave the app retryable and not crash the run."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from django.core.management import call_command as cc
+
+    from cooptation.management.commands import process_cooptation_deadlines as cmd_mod
+
+    req = make_cooptation_request(expires_at=timezone.now() - timedelta(hours=1))
+    app = req.application
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("resend down")
+
+    monkeypatch.setattr(cmd_mod.emails, "send_cooptation_expired", _boom)
+    cc("process_cooptation_deadlines")  # must not raise
+
+    app.refresh_from_db()
+    assert app.cooptation_expired_at is None, "failed send must stay retryable"
+
+    # Outage over: the next run sends and stamps.
+    monkeypatch.undo()
+    from alumni.email import FakeResendBackend
+
+    FakeResendBackend.sent_messages.clear()
+    cc("process_cooptation_deadlines")
+    app.refresh_from_db()
+    assert app.cooptation_expired_at is not None
+    assert any(m["to"] == [app.email] for m in FakeResendBackend.sent_messages)
+
+
+@pytest.mark.django_db
+def test_derive_outcome_empty_requests_is_pending_not_all_accepted():
+    """An application with zero CooptationRequest rows (rows deleted via
+    /admin/) must not be promoted as 'Deux accords'."""
+    from cooptation.management.commands.process_cooptation_deadlines import Command
+
+    assert Command._derive_outcome([]) == "pending"

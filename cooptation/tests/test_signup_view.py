@@ -297,3 +297,56 @@ def test_signup_rejects_invalid_class_formats(
     assert response.status_code == 200  # form re-rendered with error
     assert AdminApplication.objects.count() == 0
     assert b"Classe inconnue" in response.content
+
+
+@pytest.mark.django_db
+def test_admin_new_application_filters_blank_staff_emails(settings, active_member):
+    """A co-admin without an email must not land a blank string in the
+    Resend 'to' list — that fails the API call on every signup."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from django.contrib.auth import get_user_model
+
+    from alumni.email import FakeResendBackend
+    from cooptation.emails import send_admin_new_application
+    from cooptation.models import AdminApplication
+
+    User = get_user_model()  # noqa: N806
+    User.objects.create_user(username="22790000001", email="", password="x", is_staff=True)
+    User.objects.create_user(
+        username="staff@example.test", email="staff@example.test", password="x", is_staff=True
+    )
+
+    app = AdminApplication.objects.create(
+        full_name="X Y",
+        years_attended=[1980],
+        classes=[],
+        city="Niamey",
+        country="Niger",
+        email="cand@example.test",
+    )
+    FakeResendBackend.sent_messages.clear()
+    send_admin_new_application(app)
+    assert len(FakeResendBackend.sent_messages) == 1
+    assert FakeResendBackend.sent_messages[0]["to"] == ["staff@example.test"]
+
+
+@pytest.mark.django_db
+def test_signup_email_failure_after_commit_does_not_500(
+    client, active_member, second_active_member, settings, monkeypatch
+):
+    """The application is committed before the email fan-out runs. A Resend
+    outage must not turn a recorded submission into a 500 — the candidate
+    would resubmit, creating duplicates."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from cooptation import views as cooptation_views
+    from cooptation.models import AdminApplication
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("resend down")
+
+    monkeypatch.setattr(cooptation_views.emails, "send_admin_new_application", _boom)
+
+    response = client.post("/inscription/", _form_payload(active_member, second_active_member))
+    assert response.status_code == 302
+    assert response.url == "/inscription/merci/"
+    assert AdminApplication.objects.count() == 1

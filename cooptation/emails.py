@@ -88,6 +88,9 @@ def send_admin_new_application(application: AdminApplication) -> None:
     staff_emails = list(
         User.objects.filter(is_staff=True, is_active=True).values_list("email", flat=True)
     )
+    # Email-less co-admins are realistic here; a blank string in the Resend
+    # 'to' list fails the whole API call.
+    staff_emails = [e for e in staff_emails if e]
     if not staff_emails:
         return
     send_email(

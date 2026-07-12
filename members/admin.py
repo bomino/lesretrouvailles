@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.contrib import admin, messages
 from django.shortcuts import redirect
@@ -14,6 +16,8 @@ from .models import (
     RemovalRequest,
 )
 from .services import PurgeRefused, rgpd_purge_member
+
+logger = logging.getLogger(__name__)
 
 
 @admin.register(Member)
@@ -327,7 +331,12 @@ class PublicSearchEntryAdmin(admin.ModelAdmin):
         obj = form.instance
         if getattr(obj, "_is_new", False):
             obj.added_by_admins.add(request.user)
-            send_admin_ghost_added(obj, added_by=request.user)
+            try:
+                send_admin_ghost_added(obj, added_by=request.user)
+            except Exception:
+                # Best-effort FYI: a Resend outage must not roll back the
+                # entry creation inside the admin's atomic changeform.
+                logger.exception("ghost-added FYI email failed for entry %s", obj.pk)
 
     @admin.display(description="Signatures")
     def signoff_count(self, obj):
