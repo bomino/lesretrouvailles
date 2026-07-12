@@ -148,11 +148,26 @@ class Command(BaseCommand):
         if limit:
             valid_rows = valid_rows[:limit]
 
+        # Predict what the execute pass will actually do: rows whose
+        # normalized username already exists get SKIPped, and intra-CSV
+        # duplicates (same digits after normalization) collapse to one.
+        # Without this the dry run over-promises on re-runs.
+        seen_usernames: set[str] = set()
+        duplicates_in_csv = 0
+        for row in valid_rows:
+            username = _digits_only(row["whatsapp"].strip())
+            if username in seen_usernames:
+                duplicates_in_csv += 1
+            seen_usernames.add(username)
+        already_exist = User.objects.filter(username__in=seen_usernames).count()
+
         # --- Output planning summary ---------------------------------------
         header = "DRY RUN — would import:" if dry_run else "Import plan:"
         self.stdout.write(header)
         self.stdout.write(f"  rows read:      {len(rows)}")
         self.stdout.write(f"  valid:          {len(valid_rows)}")
+        self.stdout.write(f"  would skip (already exist): {already_exist}")
+        self.stdout.write(f"  duplicates in CSV:         {duplicates_in_csv}")
         self.stdout.write(f"  errors:         {len(errors)}")
         if errors:
             self.stdout.write("  errors:")
@@ -168,7 +183,25 @@ class Command(BaseCommand):
 
         # --- Execute --------------------------------------------------------
         created = skipped = photos_uploaded = emails_sent = magic_link_count = 0
-        magic_links_rows: list[dict] = []
+
+        # The magic-links CSV is opened lazily on the first row and flushed
+        # after every append, so a crash mid-import never loses links that
+        # were already issued (each URL exists nowhere else).
+        links_file = None
+        links_writer = None
+
+        def _append_link(link_row: dict) -> None:
+            nonlocal links_file, links_writer
+            if links_writer is None:
+                magic_links_path.parent.mkdir(parents=True, exist_ok=True)
+                links_file = magic_links_path.open("w", newline="", encoding="utf-8")
+                links_writer = csv.DictWriter(
+                    links_file,
+                    fieldnames=["whatsapp", "full_name", "magic_link_url"],
+                )
+                links_writer.writeheader()
+            links_writer.writerow(link_row)
+            links_file.flush()
 
         for row in valid_rows:
             phone = row["whatsapp"].strip()
@@ -192,11 +225,22 @@ class Command(BaseCommand):
             password_set_url = _build_password_set_url(user)
             email = (row.get("email") or "").strip()
 
+            # Under --no-emails, email-having rows also land in the CSV —
+            # otherwise their password-set URLs would be silently dropped
+            # (there is no batch-send command).
+            needs_link_row = not email or no_emails
             if email and not no_emails:
-                self._send_welcome_email(member, password_set_url, email)
-                emails_sent += 1
-            elif not email:
-                magic_links_rows.append(
+                try:
+                    self._send_welcome_email(member, password_set_url, email)
+                    emails_sent += 1
+                except Exception as e:  # noqa: BLE001
+                    self.stderr.write(
+                        f"  WARN {phone}: welcome email failed ({e}); "
+                        "magic link written to CSV instead"
+                    )
+                    needs_link_row = True
+            if needs_link_row:
+                _append_link(
                     {
                         "whatsapp": phone,
                         "full_name": member.full_name,
@@ -205,17 +249,8 @@ class Command(BaseCommand):
                 )
                 magic_link_count += 1
 
-        # --- Write magic_links.csv -----------------------------------------
-        if magic_links_rows:
-            magic_links_path.parent.mkdir(parents=True, exist_ok=True)
-            with magic_links_path.open("w", newline="", encoding="utf-8") as f:
-                writer = csv.DictWriter(
-                    f,
-                    fieldnames=["whatsapp", "full_name", "magic_link_url"],
-                )
-                writer.writeheader()
-                for r in magic_links_rows:
-                    writer.writerow(r)
+        if links_file is not None:
+            links_file.close()
 
         # --- Final summary --------------------------------------------------
         self.stdout.write("")
@@ -260,7 +295,10 @@ class Command(BaseCommand):
             last_name=row["last_name"].strip(),
             nickname=row.get("nickname", "").strip(),
             years_attended=_parse_int_list(row["years_attended"]),
-            classes=_parse_str_list(row["classes"]),
+            # .get: the classes column is optional and may be absent from the
+            # CSV header entirely — row["classes"] KeyError'd every row while
+            # the dry run validated clean.
+            classes=_parse_str_list(row.get("classes", "")),
             city=row["city"].strip(),
             country=row.get("country", "").strip() or "Niger",
             profession=row.get("profession", "").strip(),
