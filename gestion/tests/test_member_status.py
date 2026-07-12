@@ -110,6 +110,88 @@ def test_member_status_noop_when_target_matches_current(client, coadmin_user, ma
 
 
 @pytest.mark.django_db
+def test_suspend_deactivates_user_and_kills_existing_session(client, coadmin_user, make_member):
+    """Security regression: suspension must actually revoke access. The old
+    view only flipped Member.status — the member kept their 90-day sliding
+    session and full authenticated access to the directory."""
+    from django.test import Client
+
+    member = make_member(status="active")
+    member.user.set_password("pw-secret-1")
+    member.user.save()
+
+    member_client = Client()
+    assert member_client.login(username=member.user.username, password="pw-secret-1")
+    # Authenticated but charter-unsigned members are redirected to /charte/,
+    # NOT to the login page — that distinction is what we assert on below.
+    assert "/charte/" in member_client.get("/annuaire/").url
+
+    client.force_login(coadmin_user)
+    client.post(f"/gestion/membres/{member.slug}/statut/", {"target_status": "suspended"})
+
+    member.user.refresh_from_db()
+    assert member.user.is_active is False
+
+    response = member_client.get("/annuaire/")
+    assert response.status_code == 302
+    assert "/accounts/login/" in response.url
+
+
+@pytest.mark.django_db
+def test_suspend_deletes_member_db_sessions(client, coadmin_user, make_member):
+    """The member's session rows are deleted outright, not just invalidated
+    by the is_active check — defence in depth against any auth path that
+    skips user_can_authenticate."""
+    from django.contrib.sessions.models import Session
+    from django.test import Client
+
+    member = make_member(status="active")
+    member.user.set_password("pw-secret-1")
+    member.user.save()
+
+    member_client = Client()
+    assert member_client.login(username=member.user.username, password="pw-secret-1")
+    session_key = member_client.session.session_key
+    assert Session.objects.filter(session_key=session_key).exists()
+
+    client.force_login(coadmin_user)
+    client.post(f"/gestion/membres/{member.slug}/statut/", {"target_status": "suspended"})
+
+    assert not Session.objects.filter(session_key=session_key).exists()
+
+
+@pytest.mark.django_db
+def test_suspended_member_cannot_log_back_in(client, coadmin_user, make_member):
+    from django.test import Client
+
+    member = make_member(status="active")
+    member.user.set_password("pw-secret-1")
+    member.user.save()
+
+    client.force_login(coadmin_user)
+    client.post(f"/gestion/membres/{member.slug}/statut/", {"target_status": "suspended"})
+
+    assert not Client().login(username=member.user.username, password="pw-secret-1")
+
+
+@pytest.mark.django_db
+def test_reactivate_restores_login(client, coadmin_user, make_member):
+    from django.test import Client
+
+    member = make_member(status="suspended")
+    member.user.set_password("pw-secret-1")
+    member.user.is_active = False
+    member.user.save()
+
+    client.force_login(coadmin_user)
+    client.post(f"/gestion/membres/{member.slug}/statut/", {"target_status": "active"})
+
+    member.user.refresh_from_db()
+    assert member.user.is_active is True
+    assert Client().login(username=member.user.username, password="pw-secret-1")
+
+
+@pytest.mark.django_db
 def test_member_status_rejects_invalid_target(client, coadmin_user, make_member):
     member = make_member(status="active")
     client.force_login(coadmin_user)

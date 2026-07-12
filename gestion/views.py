@@ -151,10 +151,23 @@ def member_edit_view(request, slug):
     )
 
 
+def _flush_user_sessions(user) -> None:
+    """Delete every live DB session belonging to `user`, so a suspended
+    member's 90-day sliding session dies immediately rather than surviving
+    until the next request's is_active check."""
+    from django.contrib.sessions.models import Session
+    from django.utils import timezone
+
+    uid = str(user.pk)
+    for session in Session.objects.filter(expire_date__gte=timezone.now()):
+        if session.get_decoded().get("_auth_user_id") == uid:
+            session.delete()
+
+
 @staff_required
 @require_http_methods(["POST"])
 def member_status_view(request, slug):
-    member = get_object_or_404(Member, slug=slug)
+    member = get_object_or_404(Member.objects.select_related("user"), slug=slug)
     target = request.POST.get("target_status", "").strip()
 
     if target not in ("active", "suspended"):
@@ -165,6 +178,13 @@ def member_status_view(request, slug):
 
     member.status = target
     member.save(update_fields=["status", "updated_at"])
+
+    # Suspension must actually revoke access: allauth/ModelBackend refuse
+    # inactive users at login, and the session flush kills any live session.
+    member.user.is_active = target == "active"
+    member.user.save(update_fields=["is_active"])
+    if target == "suspended":
+        _flush_user_sessions(member.user)
 
     action = "gestion.member.suspended" if target == "suspended" else "gestion.member.reactivated"
     AuditLog.objects.create(
