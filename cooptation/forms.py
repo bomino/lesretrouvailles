@@ -84,10 +84,16 @@ class SignupForm(forms.Form):
             )
         if p1 and p2 and p1 == p2:
             raise ValidationError("Veuillez nommer deux parrains différents.")
-        if p1 and not Member.objects.filter(user__email=p1, status="active").exists():
-            raise ValidationError(f"Email parrain inconnu ou inactif : {p1}")
-        if p2 and not Member.objects.filter(user__email=p2, status="active").exists():
-            raise ValidationError(f"Email parrain inconnu ou inactif : {p2}")
+        # One generic message, never echoing the address: the old per-email
+        # error ("inconnu ou inactif : <email>") let outsiders probe which
+        # addresses belong to active members of this private community.
+        p1_bad = p1 and not Member.objects.filter(user__email=p1, status="active").exists()
+        p2_bad = p2 and not Member.objects.filter(user__email=p2, status="active").exists()
+        if p1_bad or p2_bad:
+            raise ValidationError(
+                "Parrain inconnu ou inactif. Vérifiez les deux adresses email : "
+                "chaque parrain doit être un membre actif."
+            )
         return data
 
 

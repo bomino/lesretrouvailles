@@ -245,3 +245,34 @@ def test_purge_clears_pii_and_sets_status(make_application):
     assert app.email == ""
     assert app.whatsapp == ""
     assert app.source_ip is None
+
+
+@pytest.mark.django_db
+def test_purge_clears_related_pii_and_kills_questionnaire_token(
+    make_application, make_cooptation_request
+):
+    """RGPD regression: purge() cleared AdminApplication fields only —
+    questionnaire free-text answers, parrain comments, and the live
+    questionnaire token survived the 180-day retention purge."""
+    from cooptation.models import KnowledgeQuestion, QuestionnaireResponse
+    from cooptation.services import purge_application
+
+    app = make_application(full_name="Purge Me", email="p@example.test")
+    app.questionnaire_token = "purge-tok"
+    app.save()
+    req = make_cooptation_request(application=app, comment="Je le connais bien, famille X.")
+    q = KnowledgeQuestion.objects.create(position=1, kind="open", text="Souvenir ?")
+    QuestionnaireResponse.objects.create(
+        application=app,
+        question=q,
+        candidate_answer="Souvenir très personnel avec détails privés.",
+    )
+
+    purge_application(app)
+    app.refresh_from_db()
+    req.refresh_from_db()
+
+    assert app.questionnaire_token is None
+    assert req.comment == ""
+    resp = QuestionnaireResponse.objects.get(application=app)
+    assert resp.candidate_answer == ""

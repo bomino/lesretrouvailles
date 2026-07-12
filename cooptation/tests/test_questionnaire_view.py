@@ -94,3 +94,57 @@ def test_questionnaire_410_after_already_submitted(expired_application_with_toke
     )
     response = Client().get("/questionnaire/abc123/")
     assert response.status_code == 410
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("status", ["rejected", "approved", "purged"])
+def test_questionnaire_refuses_non_pending_application(expired_application_with_token, status):
+    """Security regression: an old emailed questionnaire link could flip a
+    rejected/approved/purged application back to awaiting_admin — silently
+    reversing the admin's decision and escaping the 180-day RGPD purge
+    (which filters status='rejected')."""
+    app = expired_application_with_token
+    app.status = status
+    app.save()
+
+    get = Client().get("/questionnaire/abc123/")
+    assert get.status_code == 410
+
+    post = Client().post("/questionnaire/abc123/", {"q1": "alpha", "q2": "gamma", "q3": "x"})
+    assert post.status_code == 410
+    app.refresh_from_db()
+    assert app.status == status
+
+
+@pytest.mark.django_db
+def test_questionnaire_refuses_when_outcome_not_expired(expired_application_with_token):
+    """The questionnaire is only for candidates whose cooptation expired."""
+    app = expired_application_with_token
+    app.cooptation_outcome = "pending"
+    app.save()
+
+    post = Client().post("/questionnaire/abc123/", {"q1": "alpha", "q2": "gamma", "q3": "x"})
+    assert post.status_code == 410
+
+
+@pytest.mark.django_db
+def test_questionnaire_double_submit_race_returns_done_page_not_500(
+    expired_application_with_token, monkeypatch
+):
+    """A double-click fires two POSTs; the second can pass the exists()
+    check before the first commits, then hit the unique_together constraint.
+    The candidate (whose answers WERE saved) must see the done page."""
+    from django.db import IntegrityError
+
+    from cooptation.models import QuestionnaireResponse
+
+    def _conflict(*args, **kwargs):
+        raise IntegrityError("duplicate key value violates unique constraint")
+
+    monkeypatch.setattr(QuestionnaireResponse.objects, "create", _conflict)
+
+    response = Client().post(
+        "/questionnaire/abc123/",
+        {"q1": "alpha", "q2": "gamma", "q3": "souvenir"},
+    )
+    assert response.status_code == 302  # redirect to the (now 410/done) page

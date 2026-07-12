@@ -8,7 +8,7 @@ from datetime import timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
@@ -85,6 +85,31 @@ def signup_view(request):
             if form.cleaned_data.get("website_url"):
                 return HttpResponseRedirect("/inscription/merci/")
 
+            # .filter().first(), not .get(): User.email is not unique and a
+            # shared family email would raise MultipleObjectsReturned — a 500
+            # for the candidate on a submission the form already validated.
+            p1 = (
+                Member.objects.filter(
+                    user__email=form.cleaned_data["parrain1_email"], status="active"
+                )
+                .select_related("user")
+                .first()
+            )
+            p2 = (
+                Member.objects.filter(
+                    user__email=form.cleaned_data["parrain2_email"], status="active"
+                )
+                .select_related("user")
+                .first()
+            )
+            if p1 is None or p2 is None:
+                form.add_error(
+                    None,
+                    "Parrain inconnu ou inactif. Vérifiez les deux adresses email : "
+                    "chaque parrain doit être un membre actif.",
+                )
+                return render(request, "cooptation/signup.html", {"form": form})
+
             with transaction.atomic():
                 app = AdminApplication.objects.create(
                     full_name=form.cleaned_data["full_name"],
@@ -100,12 +125,6 @@ def signup_view(request):
                     utm_source=request.session.pop("signup_utm_source", ""),
                     utm_campaign=request.session.pop("signup_utm_campaign", ""),
                     referrer=request.META.get("HTTP_REFERER", "")[:512],
-                )
-                p1 = Member.objects.get(
-                    user__email=form.cleaned_data["parrain1_email"], status="active"
-                )
-                p2 = Member.objects.get(
-                    user__email=form.cleaned_data["parrain2_email"], status="active"
                 )
                 expires = timezone.now() + timedelta(days=14)
                 req1 = CooptationRequest.objects.create(
@@ -265,6 +284,14 @@ def questionnaire_view(request, token: str):
     except AdminApplication.DoesNotExist:
         return render(request, "cooptation/questionnaire_done.html", {"unknown": True}, status=410)
 
+    # The questionnaire exists solely for candidates whose cooptation
+    # expired and who are still pending review. Without this gate, an old
+    # emailed link could flip a rejected/approved/purged application back
+    # to awaiting_admin — silently reversing the admin's decision and
+    # escaping the 180-day retention purge (which filters status='rejected').
+    if application.status != "cooptation_pending" or application.cooptation_outcome != "expired":
+        return render(request, "cooptation/questionnaire_done.html", {"unknown": False}, status=410)
+
     if application.questionnaire_responses.exists():
         return render(request, "cooptation/questionnaire_done.html", {"unknown": False}, status=410)
 
@@ -273,15 +300,24 @@ def questionnaire_view(request, token: str):
     questions = list(KnowledgeQuestion.objects.filter(is_active=True))
 
     if request.method == "POST":
-        with transaction.atomic():
-            for q in questions:
-                answer = (request.POST.get(f"q{q.position}") or "").strip()
-                grade = _grade_closed(answer, q.answer_keys) if q.kind == "closed" else None
-                QuestionnaireResponse.objects.create(
-                    application=application, question=q, candidate_answer=answer, auto_grade=grade
-                )
-            application.status = "awaiting_admin"
-            application.save()
+        try:
+            with transaction.atomic():
+                for q in questions:
+                    answer = (request.POST.get(f"q{q.position}") or "").strip()
+                    grade = _grade_closed(answer, q.answer_keys) if q.kind == "closed" else None
+                    QuestionnaireResponse.objects.create(
+                        application=application,
+                        question=q,
+                        candidate_answer=answer,
+                        auto_grade=grade,
+                    )
+                application.status = "awaiting_admin"
+                application.save()
+        except IntegrityError:
+            # Double-click race: the second POST passed the exists() check
+            # before the first committed, then hit unique_together. The
+            # answers WERE saved — show the done page, not a 500.
+            pass
         return HttpResponseRedirect(f"/questionnaire/{token}/")
 
     return render(

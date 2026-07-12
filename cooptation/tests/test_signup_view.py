@@ -374,3 +374,51 @@ def test_signup_rate_limit_buckets_on_real_client_ip_not_shared_proxy(client):
 
     other = client.post("/inscription/", {}, HTTP_X_FORWARDED_FOR="1.1.1.1, 198.51.100.9")
     assert other.status_code == 200  # different real client, own bucket
+
+
+@pytest.mark.django_db
+def test_signup_survives_two_users_sharing_parrain_email(
+    client, active_member, second_active_member, settings
+):
+    """User.email is not unique; a shared family email must not turn the
+    candidate's signup into a MultipleObjectsReturned 500."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from django.contrib.auth import get_user_model
+
+    from cooptation.models import AdminApplication
+    from members.models import Member
+
+    User = get_user_model()  # noqa: N806
+    twin = User.objects.create_user(
+        username="twin-user",
+        email=active_member.user.email,  # same email as parrain 1
+        password="x",
+    )
+    Member.objects.create(
+        user=twin,
+        first_name="Twin",
+        last_name="Same-Email",
+        years_attended=[1980],
+        classes=["6e"],
+        city="Niamey",
+    )
+
+    response = client.post("/inscription/", _form_payload(active_member, second_active_member))
+    assert response.status_code == 302
+    assert AdminApplication.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_unknown_parrain_error_does_not_echo_email_or_confirm_membership_state(
+    client, active_member
+):
+    """Privacy: 'Email parrain inconnu ou inactif : <email>' let outsiders
+    probe which addresses belong to active members of this private
+    community. The message must be generic and must not echo the probe."""
+    payload = _form_payload(active_member, active_member, parrain2_email="probe@example.test")
+    response = client.post("/inscription/", payload)
+    assert response.status_code == 200
+    body = response.content.decode("utf-8")
+    # The old message echoed the probed address back inside the error text.
+    assert "inactif : probe@example.test" not in body
+    assert "inconnu ou inactif : probe@example.test" not in body

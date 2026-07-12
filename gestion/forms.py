@@ -95,6 +95,23 @@ class MemberAdminEditForm(forms.ModelForm):
             )
         return classes
 
+    def clean_email(self):
+        """ACCOUNT_LOGIN_METHODS includes 'email': two Users sharing an email
+        makes email+password login ambiguous for both, and approval / RGPD
+        purge paths assume uniqueness. Mirrors clean_new_username's
+        collision check."""
+        email = (self.cleaned_data.get("email") or "").strip()
+        if email:
+            collision = (
+                get_user_model()
+                .objects.filter(email__iexact=email)
+                .exclude(pk=self.instance.user_id)
+                .exists()
+            )
+            if collision:
+                raise forms.ValidationError("Cet email est déjà utilisé par un autre compte.")
+        return email
+
     def clean_whatsapp(self):
         """Strip everything except digits so admins can paste 'WhatsApp-flavored'
         formats like '+1 555-123-4567' or '+227 90 00 01 23'. The length check
