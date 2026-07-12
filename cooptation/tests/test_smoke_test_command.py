@@ -146,3 +146,36 @@ def test_command_errors_when_admin_email_unknown(staff_user, fake_backend):
             candidate_email="smoke-candidate@example.test",
             admin_email="nobody@example.test",
         )
+
+
+@pytest.mark.django_db
+def test_smoke_cleanup_refuses_to_delete_a_real_member(settings):
+    """_cleanup deletes the User/Member matching --candidate-email with no
+    marker check. The command is meant to run against live environments over
+    `railway ssh`, so a typo (or the operator's own address) would silently
+    destroy a real member's account."""
+    from django.contrib.auth import get_user_model
+
+    from cooptation.management.commands.smoke_test_cooptation import Command
+    from members.models import Member
+
+    User = get_user_model()  # noqa: N806
+    real_user = User.objects.create_user(
+        username="22790000123",
+        email="real.member@example.test",
+        password="x",
+    )
+    Member.objects.create(
+        user=real_user,
+        first_name="Vrai",
+        last_name="Membre",
+        years_attended=[1980],
+        classes=["6e"],
+        city="Niamey",
+        status="active",
+    )
+
+    Command()._cleanup("real.member@example.test")
+
+    assert User.objects.filter(pk=real_user.pk).exists(), "a real member must survive cleanup"
+    assert Member.objects.filter(user=real_user).exists()

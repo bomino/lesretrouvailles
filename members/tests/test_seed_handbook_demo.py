@@ -120,3 +120,19 @@ class TestSeedHandbookDemo:
         # Real bominomla survives both calls; --reset only nukes demo_*.
         assert bomino.is_superuser
         assert bomino.check_password("real-password")
+
+
+@pytest.mark.django_db
+def test_seed_handbook_demo_refuses_to_run_outside_dev(settings):
+    """The command creates an is_staff account whose password is hardcoded in
+    the repo, plus 12 fake members. members/ ships in the production image,
+    so an operator slip (`manage.py seed_handbook_demo` against prod) would
+    create a working /gestion/ login with a committed password."""
+    from django.core.management import call_command
+    from django.core.management.base import CommandError
+
+    settings.DEBUG = False
+    settings.SETTINGS_MODULE = "alumni.settings.prod"
+
+    with pytest.raises(CommandError, match="dev"):
+        call_command("seed_handbook_demo")

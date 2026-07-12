@@ -576,3 +576,32 @@ def test_purge_email_less_member_does_not_anonymize_unrelated_blank_email_applic
     assert AdminApplication.objects.filter(full_name="Candidate Blank One").exists()
     assert AdminApplication.objects.filter(full_name="Candidate Blank Two").exists()
     assert result["deleted_counts"]["admin_applications_anonymized"] == 0
+
+
+@pytest.mark.django_db
+def test_rgpd_cli_rejects_blank_email_instead_of_matching_all_email_less_members():
+    """`rgpd_purge_member "$EMAIL" --yes` with an unset variable used to
+    resolve email='' against the ~80% of members who have no email."""
+    from django.core.management import call_command
+    from django.core.management.base import CommandError
+
+    with pytest.raises(CommandError):
+        call_command("rgpd_purge_member", "", "--yes")
+
+
+@pytest.mark.django_db
+def test_rgpd_cli_resolves_email_less_member_by_username(make_member, make_user):
+    """The documented CLI could not target the majority cohort at all:
+    lookup was email-only. Accept the WhatsApp-digits username too."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    user = make_user(username="22790000999", email="")
+    member = make_member(user=user)
+
+    out = StringIO()
+    call_command("rgpd_purge_member", "22790000999", "--dry-run", stdout=out)
+    output = out.getvalue()
+    assert "No member found" not in output, "email-less members must be targetable by username"
+    assert str(member.pk) in output
