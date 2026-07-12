@@ -101,5 +101,24 @@ if STORAGE_BACKUP_REQUIRED and STORAGE_CLIENT_PATH.endswith("RealStorage"):
             "STORAGE_SECRET_ACCESS_KEY is missing.",
         )
 
-EMAIL_BACKEND = "alumni.email.ResendBackend"
+# Env-driven (default ResendBackend) so the launch runbook's "emails are
+# bouncing en masse" rollback — `railway variables --remove EMAIL_BACKEND`
+# / set it to the console backend — actually takes effect. Hardcoding it
+# here made that documented rollback a silent no-op.
+EMAIL_BACKEND = env("EMAIL_BACKEND", default="alumni.email.ResendBackend")
 PASSWORD_RESET_TIMEOUT = 7 * 24 * 60 * 60  # 7 days for the post-approval password-set link
+
+# Every rate limiter (django-ratelimit decorators, allauth's login throttle)
+# rides on the default cache. base.py falls back to a per-process LocMemCache
+# when neither CACHE_BACKEND=db nor REDIS_URL is set — behind N gunicorn
+# workers that means N independent counters that also reset on every deploy,
+# so the throttles silently don't throttle. Prod-shaped environments default
+# to the Postgres-backed DatabaseCache instead: no new infrastructure, and
+# docker/entrypoint.sh creates the table on boot.
+if CACHES["default"]["BACKEND"].endswith("locmem.LocMemCache"):  # noqa: F405
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+            "LOCATION": "alumni_cache",
+        },
+    }

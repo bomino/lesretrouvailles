@@ -53,3 +53,16 @@ def make_member(db, make_user):
         return Member.objects.create(**defaults)
 
     return _make
+
+
+@pytest.fixture(autouse=True)
+def _clear_fake_email_backend():
+    """FakeResendBackend.sent_messages is a process-wide class attribute.
+    Without an autouse clear (cooptation/ and gestion/ have one), residue
+    from a previous module leaks in: test_dry_run_makes_no_changes asserts
+    `sent_messages == []` and only passed because of collection order."""
+    from alumni.email import FakeResendBackend
+
+    FakeResendBackend.sent_messages.clear()
+    yield
+    FakeResendBackend.sent_messages.clear()

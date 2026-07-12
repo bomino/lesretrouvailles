@@ -14,7 +14,7 @@ def test_dashboard_anon_redirects_to_login(client):
     response = client.get("/gestion/", follow=False)
     assert response.status_code == 302
     assert "/accounts/login/" in response.url
-    assert "next=/gestion/" in response.url
+    assert "next=%2Fgestion%2F" in response.url  # URL-encoded (see LoginRequiredMiddleware)
 
 
 @pytest.mark.django_db

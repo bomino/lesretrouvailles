@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import urlencode
+
 from django.conf import settings
 from django.http import HttpResponseRedirect
 
@@ -21,8 +23,12 @@ class LoginRequiredMiddleware:
             return self.get_response(request)
 
         login_url = getattr(settings, "LOGIN_URL", "/accounts/login/")
-        next_path = request.get_full_path()
-        return HttpResponseRedirect(f"{login_url}?next={next_path}")
+        # urlencode, like ConsentRequiredMiddleware below: interpolating
+        # get_full_path() raw split a destination containing '&' into a
+        # truncated next= plus a stray login-page param, so the user landed
+        # on a partially-filtered page after logging in.
+        qs = urlencode({"next": request.get_full_path()})
+        return HttpResponseRedirect(f"{login_url}?{qs}")
 
     def _is_whitelisted(self, path: str) -> bool:
         for entry in self.whitelist:

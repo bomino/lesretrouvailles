@@ -131,3 +131,15 @@ def make_memoriam_nomination(db):
         return InMemoriamNomination.objects.create(**defaults)
 
     return _make
+
+
+@pytest.fixture(autouse=True)
+def _clear_fake_email_backend():
+    """Process-wide class attribute — clear before AND after every test so
+    residue can't make a negative assertion pass (or a positive one pass
+    against a stale message)."""
+    from alumni.email import FakeResendBackend
+
+    FakeResendBackend.sent_messages.clear()
+    yield
+    FakeResendBackend.sent_messages.clear()

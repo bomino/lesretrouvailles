@@ -122,3 +122,25 @@ def test_vouch_eager_transition_to_awaiting_admin_when_all_responded(
     app.refresh_from_db()
     assert app.status == "awaiting_admin"
     assert app.cooptation_outcome == "all_accepted"
+
+
+@pytest.mark.django_db
+def test_non_staff_parrain_can_view_and_submit_vouch(client, make_cooptation_request):
+    """Prod parrains are ordinary alumni (only 0-3 co-admins have is_staff).
+    The shared fixture used to build every parrain as staff, so a staff gate
+    wrongly added to this view would have kept the suite green while locking
+    every real parrain out of the core cooptation flow."""
+    req = make_cooptation_request()
+    parrain_user = req.parrain.user
+    assert parrain_user.is_staff is False, "fixture must build prod-shaped parrains"
+
+    client.force_login(parrain_user)
+    assert client.get(f"/cooptation/{req.token}/").status_code == 200
+
+    response = client.post(
+        f"/cooptation/{req.token}/",
+        {"response": "accepted", "comment": "Je le connais."},
+    )
+    assert response.status_code == 302
+    req.refresh_from_db()
+    assert req.response == "accepted"

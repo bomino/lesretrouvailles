@@ -98,11 +98,15 @@ def make_cooptation_request(db, make_application):
             from members.models import Member
 
             user_model = get_user_model()
+            # Non-staff, like real parrains: in production only 0-3 co-admins
+            # have is_staff. A staff parrain would mask a staff gate wrongly
+            # added to parrain_vouch_view (every real parrain locked out of the
+            # core cooptation flow, with zero test signal) and would silently
+            # join every "notify all staff" recipient set.
             user = user_model.objects.create_user(
                 username=f"parrain{counter['i']}@example.test",
                 email=f"parrain{counter['i']}@example.test",
                 password="x",
-                is_staff=True,
             )
             parrain = Member.objects.create(
                 user=user,

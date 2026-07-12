@@ -2,6 +2,7 @@ import logging
 
 from django.conf import settings
 from django.contrib import admin, messages
+from django.db.models import Count
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.utils.html import format_html
@@ -204,6 +205,7 @@ class MemberAdmin(admin.ModelAdmin):
 
 @admin.register(NotificationPreference)
 class NotificationPreferenceAdmin(admin.ModelAdmin):
+    list_select_related = ("member",)
     list_display = (
         "member",
         "digest_weekly",
@@ -217,6 +219,7 @@ class NotificationPreferenceAdmin(admin.ModelAdmin):
 
 @admin.register(ConsentRecord)
 class ConsentRecordAdmin(admin.ModelAdmin):
+    list_select_related = ("member",)
     list_display = ("member", "charter_version", "accepted_at", "ip_address")
     list_filter = ("charter_version",)
     search_fields = ("member__first_name", "member__last_name")
@@ -338,9 +341,13 @@ class PublicSearchEntryAdmin(admin.ModelAdmin):
                 # entry creation inside the admin's atomic changeform.
                 logger.exception("ghost-added FYI email failed for entry %s", obj.pk)
 
+    def get_queryset(self, request):
+        # Annotate once instead of one COUNT per changelist row.
+        return super().get_queryset(request).annotate(signoff_n=Count("added_by_admins"))
+
     @admin.display(description="Signatures")
     def signoff_count(self, obj):
-        return obj.added_by_admins.count()
+        return obj.signoff_n
 
     @admin.display(description="Retiré le")
     def retrait_at(self, obj):
@@ -359,6 +366,7 @@ class RemovalRequestAdmin(admin.ModelAdmin):
         "requested_at",
         "expires_at",
     )
+    list_select_related = ("entry",)
     list_filter = ("status",)
     search_fields = ("requester_email", "entry__first_name", "entry__last_name_initial")
     readonly_fields = (
@@ -392,6 +400,9 @@ class AuditLogAdmin(admin.ModelAdmin):
         "target_type",
         "target_id",
     )
+    # AuditLog is the one table that grows without bound; "actor" in
+    # list_display meant one User query per row (100/page by default).
+    list_select_related = ("actor",)
     list_filter = ("action", "target_type")
     search_fields = ("action", "target_type", "target_id")
     readonly_fields = (

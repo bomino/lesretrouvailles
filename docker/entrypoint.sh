@@ -5,8 +5,11 @@ set -euo pipefail
 python manage.py migrate --noinput
 
 # Database-backed cache table. Idempotent — safe to run on every boot.
-# Only used when CACHE_BACKEND=db (staging / multi-worker setups).
-if [ "${CACHE_BACKEND:-}" = "db" ]; then
+# staging/prod settings fall back to DatabaseCache whenever REDIS_URL is
+# unset (a per-process LocMemCache would give each gunicorn worker its own
+# rate-limit counters), so the table must exist in that case too — not only
+# when CACHE_BACKEND=db was set explicitly.
+if [ -z "${REDIS_URL:-}" ]; then
     python manage.py createcachetable
 fi
 

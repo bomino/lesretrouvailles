@@ -134,3 +134,27 @@ def test_nomination_admin_email_failure_does_not_500_after_save(
     response = client.post("/in-memoriam/nominer/", payload)
     assert response.status_code == 302
     assert InMemoriamNomination.objects.filter(proposed_name="Résilient").exists()
+
+
+@pytest.mark.django_db
+def test_nomination_rejects_years_outside_1980_1985(authed_member_client, fake_email):
+    """InMemoriamEntry.clean() validates years against VALID_YEARS but the
+    member-facing NominationForm applied no equivalent check: garbage flowed
+    verbatim into the admin-alert email and the nomination admin."""
+    client, _ = authed_member_client
+    response = client.post(
+        "/in-memoriam/nominer/",
+        {
+            "proposed_name": "Hors Plage",
+            "proposed_nickname": "",
+            "proposed_years": "1975,99999",
+            "personal_memory": "Mémoire.",
+            "family_contact_hint": "",
+        },
+    )
+    assert response.status_code == 200  # re-rendered with errors
+    assert "1980" in response.content.decode("utf-8")
+
+    from memoriam.models import InMemoriamNomination
+
+    assert not InMemoriamNomination.objects.filter(proposed_name="Hors Plage").exists()

@@ -62,7 +62,10 @@ def test_member_edit_post_updates_basic_fields(client, coadmin_user, make_member
     assert member.first_name == "New"
     assert member.years_attended == [1980, 1981, 1982]
     assert member.classes == ["6e", "5e"]
-    assert member.city == "Newcity"  # Member.save() title-cases
+    # Member.save() only title-cases all-lowercase input, so a deliberately
+    # cased value like "NewCity" survives verbatim (it used to be mangled to
+    # "Newcity" on every save, unfixably).
+    assert member.city == "NewCity"
 
 
 @pytest.mark.django_db

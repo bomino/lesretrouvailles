@@ -153,8 +153,11 @@ def test_login_link_hides_wa_me_button_for_non_digit_username(
     assert "https://wa.me/" not in body
     # The Copier button still renders so the operator can paste manually
     assert "Copier" in body
-    # And we explain why the wa.me button is missing
-    assert "n'est pas un num" in body  # "n'est pas un numéro WhatsApp"
+    # And we point the operator at the field that actually gates the button
+    # (Member.whatsapp), not at the login identity — changing the username to
+    # "fix" this would lock the member out.
+    assert "Num" in body and "WhatsApp" in body  # « Numéro WhatsApp » … est vide
+    assert "Modifier le profil" in body
 
 
 @pytest.mark.django_db

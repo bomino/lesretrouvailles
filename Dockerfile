@@ -47,7 +47,7 @@ WORKDIR /app
 RUN pip install --upgrade pip && pip install \
     "django>=5.0,<5.1" \
     "psycopg[binary]>=3.1" \
-    "django-allauth>=0.61" \
+    "django-allauth>=65.0" \
     "django-environ>=0.11" \
     "whitenoise>=6.6" \
     "gunicorn>=21" \
@@ -57,7 +57,8 @@ RUN pip install --upgrade pip && pip install \
     "bleach>=6.0" \
     "boto3>=1.34" \
     "redis>=5.0" \
-    "resend>=2.0"
+    "resend>=2.0" \
+    "pillow>=10.0"
 
 # Copy source code
 COPY pyproject.toml ./

@@ -39,7 +39,7 @@ Suite (Phase 2 — backlog dans [`docs/superpowers/STATUS.md`](docs/superpowers/
 - **Médias** : Cloudinary (upload signé direct + transforms), bucket Railway/Tigris S3-compatible (sauvegarde hebdomadaire)
 - **Email** : [Resend](https://resend.com/) avec SPF/DKIM/DMARC sur villageretrouvailles.com
 - **Hébergement** : Railway (app, Postgres, cron services, bucket)
-- **Tests** : pytest + pytest-django (~697 tests passants)
+- **Tests** : pytest + pytest-django (suite complète verte ; `make test`)
 - **Lint/format** : ruff (Python), djLint (templates Django), pre-commit hooks
 
 ---
