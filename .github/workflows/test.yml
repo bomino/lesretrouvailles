@@ -45,8 +45,9 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       # App templates live under */templates/ — the old `djlint templates/`
-      # scope missed every one of them.
-      - run: djlint templates/ core/templates/ members/templates/ cooptation/templates/ gestion/templates/ memoires/templates/ memoriam/templates/ aide/templates/ --check
+      # scope missed every one of them. (core has no templates/ dir of its
+      # own; its templates live under the project-level templates/core/.)
+      - run: djlint templates/ members/templates/ cooptation/templates/ gestion/templates/ memoires/templates/ memoriam/templates/ aide/templates/ --check
       # The committed theme file must match a fresh export from DESIGN.md;
       # otherwise CI builds CSS from the export while the Docker image builds
       # it from the stale committed file, and token-derived styles silently
