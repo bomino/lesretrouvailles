@@ -10,6 +10,11 @@
         <div class="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
             Candidature rejetée. Le candidat a été notifié.
         </div>
+    {% elif request.GET.flash == "approve_refused" %}
+        <div class="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+            Approbation impossible : cette candidature n'est plus en attente, n'a pas d'email,
+            ou son email correspond déjà à un compte existant.
+        </div>
     {% endif %}
     <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
         <article class="md:col-span-2 space-y-4">

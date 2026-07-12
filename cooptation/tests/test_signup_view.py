@@ -168,6 +168,32 @@ def test_signup_rejects_email_matching_existing_member(client, active_member, se
 
 
 @pytest.mark.django_db
+def test_signup_rejects_email_matching_existing_user_without_member(
+    client, active_member, second_active_member
+):
+    """Security regression: the superuser (and any staff account) has a User
+    but no Member row, so the Member-only check let a candidate apply with
+    that email — and approval would then hijack the account. Emails matching
+    ANY existing User must be rejected."""
+    from django.contrib.auth import get_user_model
+
+    from cooptation.models import AdminApplication
+
+    User = get_user_model()  # noqa: N806
+    User.objects.create_superuser(
+        username="bominomla",
+        email="admin@example.test",
+        password="x",
+    )
+
+    payload = _form_payload(active_member, second_active_member, email="admin@example.test")
+    response = client.post("/inscription/", payload)
+    assert response.status_code == 200
+    assert b"correspond" in response.content or b"compte" in response.content
+    assert AdminApplication.objects.count() == 0
+
+
+@pytest.mark.django_db
 def test_signup_honeypot_silently_rejects(client, active_member, second_active_member):
     """Honeypot field non-empty → render success page but do not create application."""
     from cooptation.models import AdminApplication

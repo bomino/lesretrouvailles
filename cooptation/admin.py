@@ -82,11 +82,17 @@ class AdminApplicationAdmin(admin.ModelAdmin):
 
     @admin.action(description="Approuver les candidatures sélectionnées")
     def approve_action(self, request, queryset):
+        approved = 0
         for app in queryset:
-            services.approve_application(app, reviewed_by=request.user)
-        self.message_user(
-            request, f"{queryset.count()} candidature(s) approuvée(s).", messages.SUCCESS
-        )
+            try:
+                services.approve_application(app, reviewed_by=request.user)
+            except services.ApprovalError as exc:
+                self.message_user(
+                    request, f"Candidature {app.pk} non approuvée : {exc}", messages.WARNING
+                )
+            else:
+                approved += 1
+        self.message_user(request, f"{approved} candidature(s) approuvée(s).", messages.SUCCESS)
 
     @admin.action(description="Rejeter les candidatures sélectionnées")
     def reject_action(self, request, queryset):

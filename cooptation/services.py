@@ -22,19 +22,38 @@ def _digits_only(phone: str) -> str:
     return re.sub(r"\D", "", phone or "")
 
 
+class ApprovalError(ValueError):
+    """Raised when an application cannot be safely approved."""
+
+
+APPROVABLE_STATUSES = frozenset({"cooptation_pending", "awaiting_admin"})
+
+
 @transaction.atomic
 def approve_application(application: AdminApplication, *, reviewed_by) -> tuple:
     """Create User+Member, mark application approved, send password-set email.
 
-    Idempotent on `application.email` — if a User already exists with that
-    email, we update its associated Member rather than crashing.
+    Refuses (ApprovalError) when the application is not in a reviewable
+    status, has a blank email (purged records), or when a User already
+    exists with that email — adopting an existing account would wipe its
+    password and overwrite its Member profile (account hijack).
     Returns (user, member).
     """
+    if application.status not in APPROVABLE_STATUSES:
+        raise ApprovalError(
+            f"Application {application.pk} has status {application.status!r}; "
+            "only cooptation_pending/awaiting_admin can be approved."
+        )
+    if not application.email:
+        raise ApprovalError(f"Application {application.pk} has no email; cannot approve.")
+
     User = get_user_model()  # noqa: N806
-    user, _ = User.objects.get_or_create(
-        email=application.email,
-        defaults={"username": application.email},
-    )
+    if User.objects.filter(email=application.email).exists():
+        raise ApprovalError(
+            f"A user already exists with email {application.email!r}; "
+            "refusing to adopt an existing account."
+        )
+    user = User.objects.create(username=application.email, email=application.email)
     user.set_unusable_password()
     user.is_active = True
     user.save()

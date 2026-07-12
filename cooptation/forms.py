@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from django import forms
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
 from members.models import VALID_CLASS_PATTERN, VALID_YEARS, Member
@@ -72,11 +73,12 @@ class SignupForm(forms.Form):
             raise ValidationError("Vous ne pouvez pas vous parrainer (parrain n°1).")
         if email and p2 and email == p2:
             raise ValidationError("Vous ne pouvez pas vous parrainer (parrain n°2).")
-        if email and Member.objects.filter(user__email=email).exists():
-            # Any Member (incl. suspended/deleted) blocks reuse — without this,
-            # approve_application's `update_or_create` would silently overwrite
-            # the existing Member's profile. Generic message avoids leaking
-            # whether the email is on file.
+        if email and get_user_model().objects.filter(email=email).exists():
+            # ANY existing User blocks reuse, not just Members — staff and the
+            # superuser have no Member row, and approving an application with
+            # their email would hijack the account (password wiped, Member
+            # profile attached). Generic message avoids leaking whether the
+            # email is on file.
             raise ValidationError(
                 "Cet email correspond déjà à un compte. Connectez-vous ou utilisez un autre email."
             )

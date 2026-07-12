@@ -23,6 +23,7 @@ from django.views.decorators.http import require_http_methods
 from alumni.cloudinary import get_client
 from cooptation.models import AdminApplication, CooptationRequest, QuestionnaireResponse
 from cooptation.services import (
+    ApprovalError,
     _build_password_set_url,
     approve_application,
     reject_application,
@@ -326,7 +327,13 @@ def application_detail_view(request, pk):
 @require_http_methods(["POST"])
 def application_approve_view(request, pk):
     application = get_object_or_404(AdminApplication, pk=pk)
-    approve_application(application, reviewed_by=request.user)
+    try:
+        approve_application(application, reviewed_by=request.user)
+    except ApprovalError:
+        return HttpResponseRedirect(
+            reverse("gestion:application_detail", kwargs={"pk": application.pk})
+            + "?flash=approve_refused"
+        )
     AuditLog.objects.create(
         actor=request.user,
         action="gestion.application.approved",

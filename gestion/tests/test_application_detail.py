@@ -131,6 +131,33 @@ def test_application_approve_non_staff_blocked(client, regular_member_user, make
     assert response.status_code == 403
 
 
+@pytest.mark.django_db
+def test_application_approve_refused_redirects_with_flash_not_500(
+    client, coadmin_user, make_application, settings
+):
+    """Approving an application the service refuses (already approved, blank
+    email, existing user…) must surface a French flash message, not a 500,
+    and must not write a gestion.application.approved audit row."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from members.models import AuditLog
+
+    app = make_application(email="done@example.test", status="approved")
+    client.force_login(coadmin_user)
+    response = client.post(f"/gestion/cooptations/{app.pk}/approuver/")
+    assert response.status_code == 302
+    assert "flash=approve_refused" in response.url
+
+    app.refresh_from_db()
+    assert app.status == "approved"
+    assert not AuditLog.objects.filter(
+        action="gestion.application.approved", target_id=str(app.pk)
+    ).exists()
+
+    # The flash renders a French explanation on the detail page.
+    follow = client.get(response.url)
+    assert b"Approbation impossible" in follow.content
+
+
 # ---------- Reject action ----------
 
 
