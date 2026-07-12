@@ -67,6 +67,12 @@ This prints platform-side counts. After Step 0 they'll **all be 0** — includin
 
 Manual checks the audit can't do:
 
+- [ ] **`WHATSAPP_GROUP_URL`** set on `lesretrouvailles` to the real group invite
+  (`https://chat.whatsapp.com/<code>`). While it is empty, every « Groupe WhatsApp »
+  link on the site is **hidden** — which is deliberate (it used to render a dead
+  placeholder link), but it means the group is unreachable from the platform until
+  you set it:
+  `railway variables --set WHATSAPP_GROUP_URL=https://chat.whatsapp.com/xxxx --service lesretrouvailles`
 - [ ] **`BASIC_AUTH_REQUIRED=false`** on `lesretrouvailles` Railway service. Already done; verify with `railway variables --service lesretrouvailles --json | grep BASIC_AUTH_REQUIRED`.
 - [ ] **DMARC** — follow [`dmarc.md`](dmarc.md) §1.1-§1.3 if you haven't yet. `dig TXT _dmarc.villageretrouvailles.com` should show `p=quarantine` (or stricter) + `rua=`.
 - [ ] **`backup_media` last run** — Railway dashboard → `media-backup-cron` → Deploys; confirm a successful run within the last 8 days.

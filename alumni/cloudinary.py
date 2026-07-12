@@ -16,6 +16,13 @@ logger = logging.getLogger(__name__)
 # MIME types we know how to strip via Pillow's resave.
 _STRIPPABLE_MIME_TYPES = frozenset({"image/jpeg", "image/png", "image/webp"})
 
+# Signed-upload policy. These go INSIDE the Cloudinary signature (see
+# RealCloudinary.sign_upload) — Cloudinary only enforces what it can verify,
+# so an unsigned restriction is decoration. Cloudinary expects
+# allowed_formats as a comma-joined string in the signed payload.
+UPLOAD_MAX_BYTES = 5 * 1024 * 1024
+UPLOAD_ALLOWED_FORMATS = "jpg,jpeg,png,webp"
+
 
 def _strip_exif_metadata(file_obj: Any, *, content_type: str) -> BytesIO:
     """Re-encode the image via Pillow to drop EXIF/XMP/IPTC from the bytes.
@@ -123,17 +130,29 @@ class RealCloudinary:
         self._cloudinary = cloudinary
 
     def sign_upload(self, *, folder: str, timestamp: int) -> dict[str, Any]:
+        """Signed direct-upload params for the browser.
+
+        The size/format restrictions are INSIDE the signature. Cloudinary only
+        enforces the parameters it can verify, so returning them alongside an
+        unsigned signature (as this did) was cosmetic: a member could skip the
+        JS and POST a 50 MB file of any type straight into the account. Because
+        they are signed, the browser must send them back verbatim — tampering
+        with either value invalidates the signature and Cloudinary rejects the
+        upload.
+        """
         api_key = self._cloudinary.config().api_key
         api_secret = self._cloudinary.config().api_secret
-        params = {"folder": folder, "timestamp": timestamp}
+        params = {
+            "folder": folder,
+            "timestamp": timestamp,
+            "max_file_size": UPLOAD_MAX_BYTES,
+            "allowed_formats": UPLOAD_ALLOWED_FORMATS,
+        }
         signature = self._cloudinary.utils.api_sign_request(params, api_secret)
         return {
             "api_key": api_key,
-            "timestamp": timestamp,
             "signature": signature,
-            "folder": folder,
-            "max_file_size": 5 * 1024 * 1024,
-            "allowed_formats": ["jpg", "jpeg", "png", "webp"],
+            **params,
         }
 
     def upload_file(self, file_obj: Any, *, folder: str) -> str:
@@ -184,6 +203,9 @@ class FakeCloudinary:
         self.download_calls: list[str] = []
 
     def sign_upload(self, *, folder: str, timestamp: int) -> dict[str, Any]:
+        # Same payload SHAPE as RealCloudinary (incl. the comma-joined
+        # allowed_formats), or tests would pass against a contract production
+        # does not have — the trap that hid the Cloudinary submodule bug.
         self.sign_calls.append({"folder": folder, "timestamp": timestamp})
         digest = hashlib.sha1(f"{folder}:{timestamp}".encode()).hexdigest()[:16]
         return {
@@ -191,8 +213,8 @@ class FakeCloudinary:
             "timestamp": timestamp,
             "signature": f"fake-sig-{digest}",
             "folder": folder,
-            "max_file_size": 5 * 1024 * 1024,
-            "allowed_formats": ["jpg", "jpeg", "png", "webp"],
+            "max_file_size": UPLOAD_MAX_BYTES,
+            "allowed_formats": UPLOAD_ALLOWED_FORMATS,
         }
 
     def upload_file(self, file_obj: Any, *, folder: str) -> str:

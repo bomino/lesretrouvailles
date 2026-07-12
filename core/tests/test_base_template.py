@@ -19,9 +19,12 @@ def test_base_template_has_a11y_baseline(client):
 
 
 @pytest.mark.django_db
-def test_base_template_renders_logo_and_whatsapp_link(client):
+def test_base_template_renders_logo_and_whatsapp_link(client, settings):
     """The header must render the brand logo and a WhatsApp affordance
     (DESIGN.md §Logo). The footer must render the founding-date badge."""
+    # The WhatsApp links only render once the group URL is configured — they
+    # used to hardcode a dead placeholder (F-13). Prod sets WHATSAPP_GROUP_URL.
+    settings.WHATSAPP_GROUP_URL = "https://chat.whatsapp.com/TESTINVITE"
     response = client.get(reverse("landing"))
     html = response.content.decode("utf-8")
 
@@ -158,9 +161,12 @@ def test_authenticated_navbar_renders_hamburger_toggle_with_a11y(client):
 
 
 @pytest.mark.django_db
-def test_mobile_dropdown_contains_all_nav_links_and_logout(client):
+def test_mobile_dropdown_contains_all_nav_links_and_logout(client, settings):
     """The mobile dropdown holds the full nav, the WhatsApp link, and a
     Se déconnecter button — replacing the old horizontal bottom-bar."""
+    # The WhatsApp links only render once the group URL is configured — they
+    # used to hardcode a dead placeholder (F-13). Prod sets WHATSAPP_GROUP_URL.
+    settings.WHATSAPP_GROUP_URL = "https://chat.whatsapp.com/TESTINVITE"
     from django.contrib.auth import get_user_model
 
     from members.charters import CHARTER_CURRENT_VERSION
@@ -353,9 +359,12 @@ def test_navbar_hides_whatsapp_button_for_authenticated_user(client):
 
 
 @pytest.mark.django_db
-def test_navbar_keeps_whatsapp_button_for_anonymous_user(client):
+def test_navbar_keeps_whatsapp_button_for_anonymous_user(client, settings):
     """Anon users on the landing page still see the WhatsApp CTA — it's a
     discovery affordance for non-members."""
+    # The WhatsApp links only render once the group URL is configured — they
+    # used to hardcode a dead placeholder (F-13). Prod sets WHATSAPP_GROUP_URL.
+    settings.WHATSAPP_GROUP_URL = "https://chat.whatsapp.com/TESTINVITE"
     html = client.get(reverse("landing")).content.decode("utf-8")
     assert "Rejoindre le groupe WhatsApp" in html
 

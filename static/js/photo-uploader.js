@@ -106,6 +106,13 @@
                 fd.append("timestamp", String(sig.timestamp));
                 fd.append("signature", sig.signature);
                 fd.append("folder", sig.folder);
+                // max_file_size and allowed_formats are part of the SIGNATURE, so
+                // they must be echoed back verbatim — Cloudinary recomputes the
+                // signature over what it receives and rejects any mismatch. That
+                // is what makes the 5 MB / image-only policy actually enforced
+                // rather than a client-side suggestion.
+                fd.append("max_file_size", String(sig.max_file_size));
+                fd.append("allowed_formats", sig.allowed_formats);
 
                 const upResp = await fetch(
                     `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,

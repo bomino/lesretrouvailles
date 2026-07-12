@@ -401,7 +401,13 @@ def application_reject_view(request, pk):
         )
 
     reason = form.cleaned_data["reason"]
-    reject_application(application, reviewed_by=request.user, note=reason)
+    try:
+        reject_application(application, reviewed_by=request.user, note=reason)
+    except ApprovalError:
+        return HttpResponseRedirect(
+            reverse("gestion:application_detail", kwargs={"pk": application.pk})
+            + "?flash=reject_refused"
+        )
     AuditLog.objects.create(
         actor=request.user,
         action="gestion.application.rejected",

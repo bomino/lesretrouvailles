@@ -109,11 +109,17 @@ class AdminApplicationAdmin(admin.ModelAdmin):
     @admin.action(description="Rejeter les candidatures sélectionnées")
     def reject_action(self, request, queryset):
         reason = (request.POST.get("reason") or "Demande non éligible").strip()
+        rejected = 0
         for app in queryset:
-            services.reject_application(app, reviewed_by=request.user, note=reason)
-        self.message_user(
-            request, f"{queryset.count()} candidature(s) rejetée(s).", messages.WARNING
-        )
+            try:
+                services.reject_application(app, reviewed_by=request.user, note=reason)
+            except services.ApplicationStateError as exc:
+                self.message_user(
+                    request, f"Candidature {app.pk} non rejetée : {exc}", messages.WARNING
+                )
+            else:
+                rejected += 1
+        self.message_user(request, f"{rejected} candidature(s) rejetée(s).", messages.WARNING)
 
     @admin.action(description="Renvoyer le lien de mot de passe (candidats déjà approuvés)")
     def resend_password_link_action(self, request, queryset):

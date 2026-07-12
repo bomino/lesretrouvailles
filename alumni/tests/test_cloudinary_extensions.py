@@ -215,3 +215,31 @@ class TestExifOrientation:
             "pixels must be transposed to display orientation before EXIF is dropped"
         )
         assert out.getexif().get(0x0112) is None  # tag still gone
+
+
+def test_signed_upload_covers_the_size_and_format_restrictions():
+    """F-04: max_file_size / allowed_formats were returned to the browser but
+    NOT part of the signed params. Cloudinary only enforces what is signed, so
+    a member could skip the JS and POST a 50 MB file of any type straight into
+    the account. The signature must cover them."""
+    import cloudinary.utils
+
+    from alumni.cloudinary import RealCloudinary
+
+    client = RealCloudinary()
+    payload = client.sign_upload(folder="members/abc/", timestamp=1700000000)
+
+    assert payload["max_file_size"] == 5 * 1024 * 1024
+    assert payload["allowed_formats"] == "jpg,jpeg,png,webp"
+
+    secret = client._cloudinary.config().api_secret
+    expected = cloudinary.utils.api_sign_request(
+        {
+            "folder": "members/abc/",
+            "timestamp": 1700000000,
+            "max_file_size": 5 * 1024 * 1024,
+            "allowed_formats": "jpg,jpeg,png,webp",
+        },
+        secret,
+    )
+    assert payload["signature"] == expected, "restrictions must be inside the signature"

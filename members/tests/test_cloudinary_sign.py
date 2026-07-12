@@ -33,7 +33,10 @@ def test_sign_endpoint_returns_signature_pinned_to_member_folder(consenting_clie
     assert body["signature"]
     assert body["timestamp"]
     assert body["max_file_size"] == 5 * 1024 * 1024
-    assert body["allowed_formats"] == ["jpg", "jpeg", "png", "webp"]
+    # Comma-joined, not a list: this value is inside the Cloudinary signature
+    # now, and Cloudinary signs allowed_formats as a comma-joined string. The
+    # browser echoes it back verbatim or the signature check fails.
+    assert body["allowed_formats"] == "jpg,jpeg,png,webp"
 
 
 @pytest.mark.django_db

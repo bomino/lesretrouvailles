@@ -121,16 +121,17 @@
                     {% block header_actions %}
                         {# WhatsApp CTA: shown only to anonymous users on desktop (a "join the community" pitch). #}
                         {# Authenticated users have already joined and find the link in the footer + mobile dropdown. #}
-                        {# TODO P2: replace href with the real "Les Retrouvailles" WhatsApp invite URL. #}
                         {% if not request.user.is_authenticated %}
-                            <a href="https://chat.whatsapp.com/"
-                               rel="noopener noreferrer"
-                               target="_blank"
-                               class="hidden md:inline-flex items-center gap-2 rounded-full bg-whatsapp-green px-4 py-2 min-h-tap text-sm font-medium text-on-whatsapp-green shadow-sm hover:opacity-95 transition">
-                                <span aria-hidden="true">💬</span>
-                                <span class="hidden lg:inline">{% trans "Rejoindre le groupe WhatsApp" %}</span>
-                                <span class="lg:hidden">{% trans "WhatsApp" %}</span>
-                            </a>
+                            {% if whatsapp_group_url %}
+                                <a href="{{ whatsapp_group_url }}"
+                                   rel="noopener noreferrer"
+                                   target="_blank"
+                                   class="hidden md:inline-flex items-center gap-2 rounded-full bg-whatsapp-green px-4 py-2 min-h-tap text-sm font-medium text-on-whatsapp-green shadow-sm hover:opacity-95 transition">
+                                    <span aria-hidden="true">💬</span>
+                                    <span class="hidden lg:inline">{% trans "Rejoindre le groupe WhatsApp" %}</span>
+                                    <span class="lg:hidden">{% trans "WhatsApp" %}</span>
+                                </a>
+                            {% endif %}
                         {% endif %}
                         {% if request.user.is_authenticated %}
                             {% with current_member=request.user.member %}
@@ -185,13 +186,15 @@
                                 {% trans "Aide" %}
                             </a>
                             {# Anonymous mobile: WhatsApp icon-only + Connexion link inline. #}
-                            <a href="https://chat.whatsapp.com/"
-                               rel="noopener noreferrer"
-                               target="_blank"
-                               class="md:hidden inline-flex items-center justify-center rounded-full bg-whatsapp-green min-h-tap min-w-tap text-on-whatsapp-green shadow-sm hover:opacity-95 transition"
-                               aria-label="{% trans 'Rejoindre le groupe WhatsApp' %}">
-                                <span aria-hidden="true">💬</span>
-                            </a>
+                            {% if whatsapp_group_url %}
+                                <a href="{{ whatsapp_group_url }}"
+                                   rel="noopener noreferrer"
+                                   target="_blank"
+                                   class="md:hidden inline-flex items-center justify-center rounded-full bg-whatsapp-green min-h-tap min-w-tap text-on-whatsapp-green shadow-sm hover:opacity-95 transition"
+                                   aria-label="{% trans 'Rejoindre le groupe WhatsApp' %}">
+                                    <span aria-hidden="true">💬</span>
+                                </a>
+                            {% endif %}
                             <a href="{% url 'account_login' %}"
                                class="inline-flex items-center rounded-lg border border-secondary/20 px-3 py-2 min-h-tap text-sm font-medium hover:border-tertiary/40 hover:text-tertiary transition">
                                 {% trans "Connexion" %}
@@ -278,13 +281,15 @@
                             </li>
                         {% endif %}
                         <li {% if not request.user.is_staff %}class="border-t border-secondary/10 mt-1 pt-1"{% endif %}>
-                            <a href="https://chat.whatsapp.com/"
-                               rel="noopener noreferrer"
-                               target="_blank"
-                               class="flex items-center gap-2 min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition">
-                                <span aria-hidden="true">💬</span>
-                                {% trans "Groupe WhatsApp" %}
-                            </a>
+                            {% if whatsapp_group_url %}
+                                <a href="{{ whatsapp_group_url }}"
+                                   rel="noopener noreferrer"
+                                   target="_blank"
+                                   class="flex items-center gap-2 min-h-tap rounded-lg px-4 py-2 hover:bg-base-200 hover:text-tertiary transition">
+                                    <span aria-hidden="true">💬</span>
+                                    {% trans "Groupe WhatsApp" %}
+                                </a>
+                            {% endif %}
                         </li>
                         <li>
                             <form method="post" action="{% url 'account_logout' %}">
@@ -363,10 +368,12 @@
                                    class="hover:text-tertiary transition">{% trans "Guide membre" %}</a>
                             </li>
                             <li>
-                                <a href="https://chat.whatsapp.com/"
-                                   target="_blank"
-                                   rel="noopener noreferrer"
-                                   class="hover:text-tertiary transition">{% trans "Groupe WhatsApp" %}</a>
+                                {% if whatsapp_group_url %}
+                                    <a href="{{ whatsapp_group_url }}"
+                                       target="_blank"
+                                       rel="noopener noreferrer"
+                                       class="hover:text-tertiary transition">{% trans "Groupe WhatsApp" %}</a>
+                                {% endif %}
                             </li>
                         </ul>
                     </div>

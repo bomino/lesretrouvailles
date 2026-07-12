@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from datetime import timedelta
 
@@ -17,30 +18,51 @@ from members.models import VALID_WHATSAPP_PATTERN, Member
 from . import emails
 from .models import AdminApplication
 
+logger = logging.getLogger(__name__)
+
 
 def _digits_only(phone: str) -> str:
     """Normalize a free-form phone string to digits only (no +, no spaces)."""
     return re.sub(r"\D", "", phone or "")
 
 
-class ApprovalError(ValueError):
-    """Raised when an application cannot be safely approved."""
+class ApplicationStateError(ValueError):
+    """The application is not in a state where this transition is allowed.
+
+    Approve and reject both raise it, so a caller can guard both with one
+    `except`. UI checks are not enough: admin bulk actions and direct POSTs
+    reach these services without passing through a template.
+    """
 
 
-APPROVABLE_STATUSES = frozenset({"cooptation_pending", "awaiting_admin"})
+# Kept so existing callers (`except ApprovalError`) keep working.
+ApprovalError = ApplicationStateError
+
+# The only states from which an application can still be decided. Anything
+# else — approved, rejected, purged — is terminal: re-deciding it would
+# resurrect a purged record, reset the 180-day retention clock on a rejection,
+# or silently re-approve someone.
+DECIDABLE_STATUSES = frozenset({"cooptation_pending", "awaiting_admin"})
+APPROVABLE_STATUSES = DECIDABLE_STATUSES  # back-compat alias
 
 
-@transaction.atomic
 def approve_application(application: AdminApplication, *, reviewed_by) -> tuple:
     """Create User+Member, mark application approved, send password-set email.
 
-    Refuses (ApprovalError) when the application is not in a reviewable
-    status, has a blank email (purged records), or when a User already
-    exists with that email — adopting an existing account would wipe its
+    Refuses (ApplicationStateError) when the application is not in a decidable
+    status, has a blank email (purged records), or when a User already exists
+    with that email or username — adopting an existing account would wipe its
     password and overwrite its Member profile (account hijack).
+
+    The email is sent AFTER the transaction commits, and a send failure is
+    logged rather than raised: it used to sit inside @transaction.atomic, so a
+    Resend outage rolled the approval back and one flaky provider blocked every
+    co-admin from approving anyone. The candidate's password link can always be
+    re-sent from the admin ("Renvoyer le lien de mot de passe").
+
     Returns (user, member).
     """
-    if application.status not in APPROVABLE_STATUSES:
+    if application.status not in DECIDABLE_STATUSES:
         raise ApprovalError(
             f"Application {application.pk} has status {application.status!r}; "
             "only cooptation_pending/awaiting_admin can be approved."
@@ -60,45 +82,54 @@ def approve_application(application: AdminApplication, *, reviewed_by) -> tuple:
             f"A user already exists with email or username {application.email!r}; "
             "refusing to adopt an existing account."
         )
-    user = User.objects.create(username=application.email, email=application.email)
-    user.set_unusable_password()
-    user.is_active = True
-    user.save()
+    with transaction.atomic():
+        user = User.objects.create(username=application.email, email=application.email)
+        user.set_unusable_password()
+        user.is_active = True
+        user.save()
 
-    parts = application.full_name.split(maxsplit=1)
-    first_name = parts[0] if parts else ""
-    last_name = parts[1] if len(parts) > 1 else ""
+        parts = application.full_name.split(maxsplit=1)
+        first_name = parts[0] if parts else ""
+        last_name = parts[1] if len(parts) > 1 else ""
 
-    # Coopted members come in with a whatsapp number on the AdminApplication
-    # (free-form, possibly with +/spaces). Strip to digits-only so wa.me deep
-    # links and operator DMs work without further normalization. Drop it if
-    # the result doesn't match the expected 8-15 digit shape.
-    candidate_whatsapp = _digits_only(application.whatsapp)
-    if not VALID_WHATSAPP_PATTERN.fullmatch(candidate_whatsapp):
-        candidate_whatsapp = ""
+        # Coopted members come in with a whatsapp number on the AdminApplication
+        # (free-form, possibly with +/spaces). Strip to digits-only so wa.me deep
+        # links and operator DMs work without further normalization. Drop it if
+        # the result doesn't match the expected 8-15 digit shape.
+        candidate_whatsapp = _digits_only(application.whatsapp)
+        if not VALID_WHATSAPP_PATTERN.fullmatch(candidate_whatsapp):
+            candidate_whatsapp = ""
 
-    member, _ = Member.objects.update_or_create(
-        user=user,
-        defaults={
-            "first_name": first_name,
-            "last_name": last_name,
-            "nickname": application.nickname,
-            "years_attended": application.years_attended,
-            "classes": application.classes,
-            "city": application.city,
-            "country": application.country,
-            "profession": application.profession,
-            "whatsapp": candidate_whatsapp,
-            "status": "active",
-        },
-    )
+        member, _ = Member.objects.update_or_create(
+            user=user,
+            defaults={
+                "first_name": first_name,
+                "last_name": last_name,
+                "nickname": application.nickname,
+                "years_attended": application.years_attended,
+                "classes": application.classes,
+                "city": application.city,
+                "country": application.country,
+                "profession": application.profession,
+                "whatsapp": candidate_whatsapp,
+                "status": "active",
+            },
+        )
 
-    application.status = "approved"
-    application.reviewed_by = reviewed_by
-    application.save()
+        application.status = "approved"
+        application.reviewed_by = reviewed_by
+        application.save()
 
+    # Committed. The email is best-effort from here — see the docstring.
     password_set_url = _build_password_set_url(user)
-    emails.send_application_approved(application, password_set_url=password_set_url)
+    try:
+        emails.send_application_approved(application, password_set_url=password_set_url)
+    except Exception:
+        logger.exception(
+            "approve_application: password-set email failed for application %s "
+            "(the account WAS created; re-send from the admin)",
+            application.pk,
+        )
 
     return user, member
 
@@ -126,15 +157,40 @@ def _build_password_set_url(user) -> str:
     return f"{site_url}/accounts/password/reset/key/{uidb36}-{token}/"
 
 
-@transaction.atomic
 def reject_application(application: AdminApplication, *, reviewed_by, note: str) -> None:
-    application.status = "rejected"
-    application.review_note = note
-    application.reviewed_by = reviewed_by
-    application.rejected_at = timezone.now()
-    application.retention_until = application.rejected_at + timedelta(days=180)
-    application.save()
-    emails.send_application_rejected(application, reason=note)
+    """Reject a decidable application.
+
+    Refuses (ApplicationStateError) on a terminal status: re-rejecting an
+    approved candidate would strand their live account, and re-rejecting an
+    already-rejected or purged record would reset the 180-day retention clock,
+    keeping PII past the RGPD window. UI checks are not enough — the admin bulk
+    action reaches this service directly.
+
+    Like approve_application, the email is sent after the commit and a failure
+    is logged, not raised: a Resend outage must not roll back the decision.
+    """
+    if application.status not in DECIDABLE_STATUSES:
+        raise ApplicationStateError(
+            f"Application {application.pk} has status {application.status!r}; "
+            "only cooptation_pending/awaiting_admin can be rejected."
+        )
+
+    with transaction.atomic():
+        application.status = "rejected"
+        application.review_note = note
+        application.reviewed_by = reviewed_by
+        application.rejected_at = timezone.now()
+        application.retention_until = application.rejected_at + timedelta(days=180)
+        application.save()
+
+    try:
+        emails.send_application_rejected(application, reason=note)
+    except Exception:
+        logger.exception(
+            "reject_application: rejection email failed for application %s "
+            "(the rejection WAS recorded)",
+            application.pk,
+        )
 
 
 def purge_application(application: AdminApplication) -> None:

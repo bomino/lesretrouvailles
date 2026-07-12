@@ -249,6 +249,13 @@ PUBLIC_GHOST_LIST_ENABLED = env.bool("PUBLIC_GHOST_LIST_ENABLED", default=False)
 # blank, so leaving this unset disables analytics cleanly.
 CLOUDFLARE_ANALYTICS_TOKEN = env("CLOUDFLARE_ANALYTICS_TOKEN", default="")
 
+# WhatsApp group invite. The four "Groupe WhatsApp" links in base.html used to
+# hardcode https://chat.whatsapp.com/ — a bare placeholder with no invite code,
+# which shipped to production as a dead link on the platform whose entire
+# onboarding channel is WhatsApp. Env-driven now, and the links are HIDDEN
+# while it is empty, so an unset value can never render a broken link again.
+WHATSAPP_GROUP_URL = env("WHATSAPP_GROUP_URL", default="")
+
 # Resend email
 RESEND_API_KEY = env("RESEND_API_KEY", default="")
 

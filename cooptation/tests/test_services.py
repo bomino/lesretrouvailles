@@ -293,3 +293,72 @@ def test_approve_refuses_when_username_taken_even_if_email_free(make_application
     app = make_application(full_name="New Alice", email="alice@example.test")
     with pytest.raises(ApprovalError):
         approve_application(app, reviewed_by=staff_user)
+
+
+# ---------- F-07 / F-08: state guards + emails outside the transaction ----------
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("status", ["approved", "rejected", "purged"])
+def test_reject_refuses_terminal_status(make_application, staff_user, status, settings):
+    """F-07: reject_application had no status precondition, so a direct POST or
+    an admin bulk action could re-reject an approved or purged application and
+    reset its 180-day retention clock."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from cooptation.services import ApplicationStateError, reject_application
+
+    app = make_application(email=f"rej-{status}@example.test")
+    app.status = status
+    app.save()
+
+    with pytest.raises(ApplicationStateError):
+        reject_application(app, reviewed_by=staff_user, note="nope")
+
+    app.refresh_from_db()
+    assert app.status == status
+
+
+@pytest.mark.django_db
+def test_approve_email_failure_does_not_roll_back_the_approval(
+    make_application, staff_user, settings, monkeypatch
+):
+    """F-08: the send used to sit INSIDE @transaction.atomic. A Resend outage
+    therefore rolled back the whole approval — one flaky provider blocked every
+    co-admin from approving anyone."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from django.contrib.auth import get_user_model
+
+    from cooptation import services
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("resend down")
+
+    monkeypatch.setattr(services.emails, "send_application_approved", _boom)
+
+    app = make_application(full_name="Robust Candidate", email="robust@example.test")
+    user, member = services.approve_application(app, reviewed_by=staff_user)
+
+    app.refresh_from_db()
+    assert app.status == "approved", "approval must survive a failed email"
+    assert get_user_model().objects.filter(email="robust@example.test").exists()
+    assert member.pk is not None
+
+
+@pytest.mark.django_db
+def test_reject_email_failure_does_not_roll_back_the_rejection(
+    make_application, staff_user, settings, monkeypatch
+):
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from cooptation import services
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("resend down")
+
+    monkeypatch.setattr(services.emails, "send_application_rejected", _boom)
+
+    app = make_application(email="rejrobust@example.test")
+    services.reject_application(app, reviewed_by=staff_user, note="Hors cohorte")
+
+    app.refresh_from_db()
+    assert app.status == "rejected"
+    assert app.retention_until is not None
