@@ -36,6 +36,9 @@ dev = [
     "ruff==0.15.12",
     "pre-commit>=3.7",
     "djlint==1.36.4",
+    # Dev-only: scripts/convert_class_rosters.py reads the class-roster .xlsx
+    # workbooks. Never a runtime dep — production never touches those files.
+    "openpyxl>=3.1",
     "beautifulsoup4>=4.12",
     "freezegun>=1.5",
 ]

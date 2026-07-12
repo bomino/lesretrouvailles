@@ -290,6 +290,7 @@ The owner develops on Windows. The repo is cross-platform but:
 | Co-admin Mur des souvenirs CRUD | `gestion/views.py::memory_{list,create,edit,status}_view` + `gestion/templates/gestion/memory_*.html` |
 | Public FAQ (`/aide/`) | `aide/` — `faq.py` (typed entries), `views.py`, single accordion template |
 | Member directory search composition | `members/search.py` — multi-token AND + pg_trgm trigram fallback |
+| Promotions (class-roster archive) | `members/models.py::ClassRosterEntry` + `members/views.py::promotions_*` — members-only, noindex; source data lives in gitignored `private-data/` (the repo is PUBLIC) |
 | Custom AdminSite (locks /admin/ to superuser) | `alumni/admin.py` |
 | Cooptation services (approve/reject/purge) | `cooptation/services.py` |
 | Member purge (RGPD) engine | `members/services.py::rgpd_purge_member` |
@@ -336,6 +337,7 @@ When the user reports a bug:
 - **Don't** bypass `_strip_exif_metadata` if you add a new server-side upload path. The EXIF strip lives in `RealCloudinary.upload_file` — it sees every JPEG/PNG/WebP and re-encodes via Pillow to drop GPS/camera/timestamp metadata before Cloudinary receives the bytes. If you build a new uploader that calls Cloudinary directly (or a signed-direct-browser-upload flow), wire the same Pillow strip in or you're reopening a privacy hole. Regression test: `alumni/tests/test_cloudinary_extensions.py::TestStripExifMetadata`. Mini-phase planned for a `restrip_existing_memories` management command to reprocess pre-2026-05-10 uploads.
 - **Don't** add DB CHECK constraints for fields whose format might evolve. Use Python `clean()` instead.
 - **Don't** add a new `AuditLog.action` value without also adding it to `ACTION_CHOICES`. Forms validate against choices; ORM `create()` doesn't, but list filters in `/admin/auditlog/` rely on the enum.
+- **Don't** commit anything derived from the class rosters or the WhatsApp roster. The GitHub repo is **public** and those files carry the real names of ~335 living alumni. They belong in `private-data/` (gitignored). `ClassRosterEntry` rows are members-only and `noindex` for the same reason.
 - **Don't** pull production secrets into the local environment.
 - **Don't** delete records on production without explicit user confirmation. The P6b RGPD purge engine is the right tool for member deletions; for other test artifacts, surface what you'd delete and ask.
 - **Don't** add a new Django app without updating ALL THREE config files that enumerate apps explicitly. The platform doesn't use wildcards anywhere — each new app means an explicit edit in three places, and missing any of them produces a different, silent failure mode:

@@ -10,6 +10,7 @@ from django.utils.html import format_html
 from .emails import send_admin_ghost_added
 from .models import (
     AuditLog,
+    ClassRosterEntry,
     ConsentRecord,
     Member,
     NotificationPreference,
@@ -424,3 +425,27 @@ class AuditLogAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(ClassRosterEntry)
+class ClassRosterEntryAdmin(admin.ModelAdmin):
+    """Promotions archive. `needs_review` is the operator's worklist: rows with
+    a blank surname, or a person the source workbooks listed twice."""
+
+    list_display = (
+        "full_name",
+        "nickname",
+        "class_label",
+        "school_year_start",
+        "member",
+        "needs_review",
+    )
+    list_filter = ("needs_review", "school_year_start", "class_label")
+    search_fields = ("first_name", "last_name", "nickname")
+    list_select_related = ("member",)
+    readonly_fields = ("source_ref", "created_at", "updated_at")
+    autocomplete_fields = ()
+
+    @admin.display(description="Nom complet", ordering="last_name")
+    def full_name(self, obj):
+        return obj.full_name

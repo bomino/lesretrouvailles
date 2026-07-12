@@ -374,6 +374,55 @@ Une fois par trimestre (Janvier, Avril, Juillet, Octobre), vous recevez un email
 
 ---
 
+## 8bis. Gérer les listes de classe (« Promotions »)
+
+Les listes de classe d'origine (6ème 1980-81 et 1981-82, 352 fiches) alimentent la page
+**Promotions**, visible **uniquement par les membres connectés**. Contrairement à la liste
+publique « Nous recherchons aussi » (§8), ces fiches portent le **nom complet** — d'où le
+verrouillage derrière la connexion.
+
+### Importer / ré-importer
+
+Les fichiers sources et le CSV dérivé ne sont **jamais** versionnés (le dépôt GitHub est
+public) : gardez-les dans `private-data/`, qui est ignoré par git.
+
+```bash
+# 1. (une seule fois) convertir les classeurs Excel en CSV
+python scripts/convert_class_rosters.py
+
+# 2. vérifier, puis importer
+python manage.py import_class_roster private-data/class_rosters.csv --dry-run
+python manage.py import_class_roster private-data/class_rosters.csv
+```
+
+La commande est **idempotente** : la relancer met à jour les fiches existantes sans jamais
+créer de doublon. Pour l'exécuter sur la production, suivez la procédure de ciblage prod
+décrite dans [`launch.md`](../runbooks/launch.md) (settings de prod + `DATABASE_PUBLIC_URL`).
+
+### Corriger une fiche
+
+`/admin/members/classrosterentry/` → filtre **« À vérifier »**. Ce filtre isole les
+**36 fiches douteuses** : nom incomplet (un seul mot) ou personne listée deux fois dans les
+classeurs d'origine. Corrigez le prénom / nom / surnom directement dans la fiche.
+
+### Retirer quelqu'un (demande RGPD)
+
+Une personne **non inscrite** qui demande à ne plus figurer sur ces listes :
+supprimez simplement sa fiche dans `/admin/members/classrosterentry/`. C'est la voie RGPD
+pour cette surface.
+
+Une personne **inscrite** : la purge RGPD (§5) supprime automatiquement ses fiches de classe
+en même temps que son compte — le résumé de purge les compte sous `roster_entries`.
+
+### Lier une fiche à un membre à sa place
+
+Un membre peut revendiquer sa propre fiche (bouton **« C'est moi »**), mais seulement si son
+nom **correspond** à celui de la fiche. Une camarade dont le nom d'usage a changé (mariage)
+sera donc bloquée : faites le lien vous-même depuis `/admin/members/classrosterentry/` en
+renseignant le champ **Member**.
+
+---
+
 ## 9. Surveillance et maintenance
 
 Tâches récurrentes (cadence trimestrielle pour la plupart). Posez-vous des rappels calendrier.

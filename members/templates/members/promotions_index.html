@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% load i18n %}
+{# Login-gated + noindex: these are full names of alumni who never registered. #}
+{% block robots %}<meta name="robots" content="noindex,nofollow">{% endblock %}
+{% block title %}
+    {% trans "Promotions" %} — {{ block.super }}
+{% endblock %}
+{% block content %}
+    <section class="mx-auto max-w-4xl">
+        <header class="mb-8">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-tertiary">{% trans "Archives" %}</p>
+            <h1 class="mt-2 font-display text-3xl font-semibold tracking-tight hero-rule md:text-4xl">
+                {% trans "Nos classes" %}
+            </h1>
+            <p class="mt-4 text-base leading-relaxed text-secondary">
+                {% blocktrans count total=total_entries %}
+                    Les listes de classe d'origine du CEG 1 Birni — {{ total }} camarade retrouvé dans les archives.
+                {% plural %}
+                    Les listes de classe d'origine du CEG 1 Birni — {{ total }} camarades retrouvés dans les archives.
+                {% endblocktrans %}
+                {% trans "Retrouvez votre classe, voyez qui est déjà inscrit, et signalez-nous votre propre fiche." %}
+            </p>
+        </header>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {% for c in classes %}
+                <a href="{% url 'members:promotion_class' year=c.school_year_start class_label=c.class_label %}"
+                   class="group flex items-center justify-between rounded-2xl border border-secondary/15 bg-surface p-5 shadow-sm transition hover:border-tertiary/40 hover:shadow-md min-h-tap">
+                    <span>
+                        <span class="block font-display text-lg font-semibold tracking-tight group-hover:text-tertiary">{{ c.class_label }}</span>
+                        <span class="mt-0.5 block text-sm text-secondary">{{ c.school_year_label }}</span>
+                    </span>
+                    <span class="text-right">
+                        <span class="block text-sm font-medium tabular-nums">
+                            {% blocktrans count n=c.total %}{{ n }} élève{% plural %}{{ n }} élèves{% endblocktrans %}
+                        </span>
+                        {% if c.registered %}
+                            <span class="mt-0.5 block text-xs font-medium text-whatsapp-green tabular-nums">
+                                {% blocktrans count n=c.registered %}{{ n }} inscrit{% plural %}{{ n }} inscrits{% endblocktrans %}
+                            </span>
+                        {% else %}
+                            <span class="mt-0.5 block text-xs text-secondary">{% trans "personne inscrit·e" %}</span>
+                        {% endif %}
+                    </span>
+                </a>
+            {% empty %}
+                <div class="sm:col-span-2 rounded-2xl border border-secondary/15 bg-surface/70 p-8 text-center shadow-sm">
+                    <p class="text-base text-secondary">{% trans "Les listes de classe seront ajoutées prochainement." %}</p>
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+{% endblock %}

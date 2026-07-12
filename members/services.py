@@ -20,9 +20,96 @@ from django.db import transaction
 
 from alumni import cloudinary as cloud_mod
 from alumni import storage as storage_mod
-from members.models import AuditLog, Member
+from members.models import AuditLog, ClassRosterEntry, Member
 
 logger = logging.getLogger(__name__)
+
+
+class ClaimRefused(Exception):  # noqa: N818 — semantically a refusal, not an error
+    """A member may not claim this class-roster entry."""
+
+
+def _name_tokens(*parts: str) -> set[str]:
+    """Accent- and case-insensitive token set, for name comparison."""
+    import unicodedata
+
+    text = " ".join(p for p in parts if p)
+    folded = unicodedata.normalize("NFD", text.casefold())
+    stripped = "".join(c for c in folded if unicodedata.category(c) != "Mn")
+    return {t for t in stripped.split() if t}
+
+
+def can_claim(entry: ClassRosterEntry, member: Member) -> bool:
+    """Does `member`'s name plausibly match this roster entry?
+
+    Without a guard, « C'est moi » would let any member attach ANY classmate's
+    name to their own profile. Requiring at least one shared name token blocks
+    casually claiming an unrelated person while staying lenient about the
+    spelling drift you get across 45 years and a transcription (accents, "ou"
+    vs "u", a dropped middle name).
+
+    Deliberately a speed bump, not a wall: every claim is audited with both
+    names and staff can unlink anything. A member whose registered name shares
+    nothing with the roster (e.g. a married name) is told to ask an admin.
+    """
+    entry_tokens = _name_tokens(entry.first_name, entry.last_name, entry.nickname)
+    member_tokens = _name_tokens(member.first_name, member.last_name, member.nickname)
+    return bool(entry_tokens & member_tokens)
+
+
+@transaction.atomic
+def claim_entry(entry: ClassRosterEntry, *, member: Member, actor) -> ClassRosterEntry:
+    """Link a roster entry to the member who says it is them."""
+    if entry.member_id == member.pk:
+        return entry  # idempotent
+    if entry.member_id is not None:
+        raise ClaimRefused("Cette fiche est déjà revendiquée par un autre membre.")
+    if not can_claim(entry, member):
+        raise ClaimRefused(
+            "Ce nom ne correspond pas au vôtre. Demandez à un administrateur de faire le lien."
+        )
+
+    entry.member = member
+    entry.save(update_fields=["member", "updated_at"])
+    AuditLog.objects.create(
+        actor=actor,
+        action="promotions.entry.claimed",
+        target_type="members.ClassRosterEntry",
+        target_id=str(entry.pk),
+        metadata={
+            "member_full_name": member.full_name,
+            "entry_full_name": entry.full_name,
+            "class_label": entry.class_label,
+            "school_year_start": entry.school_year_start,
+        },
+    )
+    return entry
+
+
+@transaction.atomic
+def unclaim_entry(entry: ClassRosterEntry, *, member: Member, actor) -> ClassRosterEntry:
+    """Unlink. Only the claimer, or staff, may do this."""
+    if entry.member_id is None:
+        return entry  # idempotent
+    is_staff = bool(getattr(actor, "is_staff", False))
+    if entry.member_id != member.pk and not is_staff:
+        raise ClaimRefused("Cette fiche est revendiquée par un autre membre.")
+
+    previous = entry.member
+    entry.member = None
+    entry.save(update_fields=["member", "updated_at"])
+    AuditLog.objects.create(
+        actor=actor,
+        action="promotions.entry.unclaimed",
+        target_type="members.ClassRosterEntry",
+        target_id=str(entry.pk),
+        metadata={
+            "member_full_name": previous.full_name if previous else "",
+            "entry_full_name": entry.full_name,
+            "class_label": entry.class_label,
+        },
+    )
+    return entry
 
 
 class PurgeRefused(Exception):  # noqa: N818 — semantically a refusal, not an error
@@ -126,11 +213,18 @@ def rgpd_purge_member(
     else:
         application_count = 0
 
+    # Claimed Promotions rows carry the member's full name. They cascade with
+    # the Member (ClassRosterEntry.member is on_delete=CASCADE) — count them so
+    # the summary tells the truth about what the purge erased. A purge that
+    # leaves the person's name in the class archive is not a purge.
+    roster_count = ClassRosterEntry.objects.filter(member=member).count()
+
     deleted_counts = {
         "memories": memory_count,
         "cooptation_requests": cooptation_count,
         "memoriam_nominations": nomination_count,
         "admin_applications_anonymized": application_count,
+        "roster_entries": roster_count,
         "cloudinary_public_ids": len(public_ids),
         "bucket_versions": 0,  # filled in below if not dry_run
     }

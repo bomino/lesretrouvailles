@@ -11,6 +11,7 @@ from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.core.validators import validate_email
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods
@@ -556,3 +557,116 @@ def removal_confirm_view(request, confirm_token: str):
 @require_http_methods(["GET"])
 def removal_expired_view(request):
     return render(request, "members/removal_expired_or_invalid.html")
+
+
+# ---------------------------------------------------------------------------
+# Promotions — members-only class-roster archive
+#
+# These are the historical 6ème class lists (1980-81, 1981-82) transcribed from
+# a classmate's workbooks. The people on them are NOT members: most never
+# registered. The archive exists because the Annuaire is nearly empty at
+# launch — alumni can browse their real class list, see who already joined, and
+# claim their own entry.
+#
+# Privacy: full names, but login-gated (NOT in LOGIN_REQUIRED_WHITELIST) and
+# noindex. Nothing here is ever shown to an anonymous visitor.
+# ---------------------------------------------------------------------------
+
+
+@login_required
+@require_http_methods(["GET"])
+def promotions_index_view(request):
+    """The classes, with headcount and how many have registered."""
+    from django.db.models import Count, Q
+
+    from .models import ClassRosterEntry
+
+    classes = (
+        ClassRosterEntry.objects.values("school_year_start", "class_label")
+        .annotate(
+            total=Count("pk"),
+            registered=Count("pk", filter=Q(member__isnull=False, member__status="active")),
+        )
+        .order_by("school_year_start", "class_label")
+    )
+    for row in classes:
+        row["school_year_label"] = f"{row['school_year_start']}-{row['school_year_start'] + 1}"
+
+    return render(
+        request,
+        "members/promotions_index.html",
+        {
+            "classes": list(classes),
+            "total_entries": sum(c["total"] for c in classes),
+        },
+    )
+
+
+@login_required
+@require_http_methods(["GET"])
+def promotion_class_view(request, year: int, class_label: str):
+    """One class list (~30 rows)."""
+    from .models import ClassRosterEntry
+    from .services import can_claim
+
+    entries = list(
+        ClassRosterEntry.objects.filter(
+            school_year_start=year,
+            class_label=class_label,
+        ).select_related("member", "member__user")
+    )
+    if not entries:
+        raise Http404
+
+    my_member = getattr(request.user, "member", None)
+    for entry in entries:
+        # Offer « C'est moi » only on an unclaimed row whose name plausibly
+        # matches the viewer — the same guard the POST enforces, so the button
+        # never leads to a refusal.
+        entry.claimable = (
+            my_member is not None and entry.member_id is None and can_claim(entry, my_member)
+        )
+        entry.is_mine = my_member is not None and entry.member_id == my_member.pk
+
+    return render(
+        request,
+        "members/promotion_class.html",
+        {
+            "entries": entries,
+            "year": year,
+            "school_year_label": f"{year}-{year + 1}",
+            "class_label": class_label,
+            "registered_count": sum(1 for e in entries if e.is_linked),
+        },
+    )
+
+
+@login_required
+@require_http_methods(["POST"])
+def roster_claim_view(request, pk: int):
+    """« C'est moi » / « Ce n'est pas moi »."""
+    from .models import ClassRosterEntry
+    from .services import ClaimRefused, claim_entry, unclaim_entry
+
+    entry = get_object_or_404(ClassRosterEntry, pk=pk)
+    member = getattr(request.user, "member", None)
+    if member is None:
+        raise Http404  # staff without a Member profile have nothing to claim with
+
+    unclaim = bool(request.POST.get("unclaim"))
+    try:
+        if unclaim:
+            unclaim_entry(entry, member=member, actor=request.user)
+            messages.success(request, "Revendication retirée.")
+        else:
+            claim_entry(entry, member=member, actor=request.user)
+            messages.success(request, "Fiche liée à votre profil.")
+    except ClaimRefused as exc:
+        messages.error(request, str(exc))
+
+    return HttpResponseRedirect(
+        reverse(
+            "members:promotion_class",
+            kwargs={"year": entry.school_year_start, "class_label": entry.class_label},
+        )
+    )

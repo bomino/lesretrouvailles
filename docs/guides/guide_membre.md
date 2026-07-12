@@ -123,6 +123,29 @@ Cliquez sur **« Annuaire »** dans le menu.
 
 Vous voyez tous les membres inscrits, avec leur nom, leur photo, leurs années au CEG et leur ville.
 
+### Les listes de classe d'origine (« Promotions »)
+
+L'Annuaire ne montre que les camarades **déjà inscrits**. Pour retrouver toute votre classe —
+y compris celles et ceux qui n'ont pas encore rejoint la plateforme — cliquez sur
+**« Promotions »** dans le menu.
+
+Vous y trouverez les **listes de classe d'origine** du CEG 1 Birni (6ème 1980-1981 et
+6ème 1981-1982), transcrites depuis les archives d'un camarade. Pour chaque classe :
+
+- les camarades **déjà inscrits** apparaissent en vert — cliquez sur leur nom pour voir leur profil ;
+- les autres sont marqués **« Pas encore inscrit·e »**. Si vous avez leur numéro, c'est le moment
+  de les inviter sur WhatsApp !
+
+**Votre propre fiche :** quand vous voyez votre nom, cliquez sur **« C'est moi »**. Votre fiche
+de classe est alors reliée à votre profil, et vos camarades vous verront comme inscrit·e.
+Vous pouvez toujours revenir en arrière avec **« Ce n'est pas moi »**.
+
+> Ces listes ne sont visibles **que par les membres connectés**. Elles ne sont jamais publiques
+> et ne sont pas référencées par les moteurs de recherche.
+>
+> Un nom est mal orthographié, ou vous ne souhaitez pas y figurer ? Écrivez à un administrateur
+> sur WhatsApp : il peut corriger ou supprimer la fiche.
+
 ### Recherche
 
 Tapez un nom (ou un morceau de nom) dans la barre de recherche. La recherche est :

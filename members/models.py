@@ -334,6 +334,8 @@ class AuditLog(models.Model):
         ("memoires.memory.edited", "Souvenir modifié"),
         ("memoires.memory.published", "Souvenir publié"),
         ("memoires.memory.unpublished", "Souvenir dépublié"),
+        ("promotions.entry.claimed", "Fiche de classe revendiquée"),
+        ("promotions.entry.unclaimed", "Revendication de fiche de classe retirée"),
     ]
 
     actor = models.ForeignKey(
@@ -405,3 +407,89 @@ class RemovalRequest(models.Model):
 
             self.expires_at = (self.requested_at or timezone.now()) + timedelta(days=30)
         super().save(*args, **kwargs)
+
+
+class ClassRosterEntry(models.Model):
+    """One pupil on one historical class list ("Promotions" archive).
+
+    Transcribed from the paper/Excel rosters a classmate supplied (6ème
+    1980-81 and 1981-82). These people are NOT members: most never
+    registered, and there is no account, email or phone behind a row. That is
+    the whole point — the archive lets alumni browse their real class lists
+    while the Annuaire is still nearly empty, and claim their own entry.
+
+    Privacy posture: full names, but the pages are login-gated and noindex
+    (see `promotions_index_view`). Unlike `PublicSearchEntry`, nothing here is
+    ever shown to anonymous visitors. Source data is never committed — the
+    repo is public (see .gitignore).
+
+    `member` is CASCADE on purpose: when `rgpd_purge_member` deletes a member,
+    their claimed rows must die with them, or the purge would leave the
+    person's full name sitting in the archive.
+    """
+
+    school_year_start = models.IntegerField(
+        verbose_name="Année de rentrée",
+        help_text="1980 pour l'année scolaire 1980-1981.",
+    )
+    class_label = models.CharField(max_length=4, verbose_name="Classe")  # "6eA"
+    first_name = models.CharField(max_length=80, verbose_name="Prénom")
+    last_name = models.CharField(max_length=80, blank=True, verbose_name="Nom")
+    nickname = models.CharField(max_length=60, blank=True, verbose_name="Surnom")
+
+    # Provenance AND idempotence key ("80-81:6eA:12"). Deliberately not
+    # (year, class, first, last): 20 source rows have a blank surname, so two
+    # genuinely different people could collide and one would be silently lost.
+    source_ref = models.CharField(max_length=60, unique=True, editable=False)
+
+    member = models.ForeignKey(
+        "members.Member",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="roster_entries",
+        help_text="Renseigné quand le membre revendique cette fiche.",
+    )
+    needs_review = models.BooleanField(
+        default=False,
+        verbose_name="À vérifier",
+        help_text="Nom incomplet, ou personne listée deux fois dans les sources.",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Fiche de classe"
+        verbose_name_plural = "Fiches de classe"
+        ordering = ["last_name", "first_name"]
+        indexes = [models.Index(fields=["school_year_start", "class_label"])]
+
+    def __str__(self) -> str:
+        return f"{self.full_name} ({self.class_label} {self.school_year_start})"
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}".strip()
+
+    @property
+    def school_year_label(self) -> str:
+        return f"{self.school_year_start}-{self.school_year_start + 1}"
+
+    @property
+    def is_linked(self) -> bool:
+        """Claimed AND the member is still visible in the Annuaire.
+
+        profile_detail_view 404s for suspended/deleted members, so a row for
+        one of those must render unlinked rather than point at a dead page.
+        """
+        return self.member is not None and self.member.status == "active"
+
+    def clean(self) -> None:
+        super().clean()
+        if self.school_year_start not in VALID_YEARS:
+            raise ValidationError({"school_year_start": "Année hors plage 1980-1985."})
+        if not VALID_CLASS_PATTERN.match(self.class_label or ""):
+            raise ValidationError(
+                {"class_label": "Classe inconnue. Format attendu : 6e, 6eA, 5eB, etc."}
+            )
