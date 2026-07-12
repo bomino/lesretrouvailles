@@ -6,12 +6,15 @@ import markdown as _markdown
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.core.validators import validate_email
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods
+from django_ratelimit.core import is_ratelimited
 from django_ratelimit.decorators import ratelimit
 
 from alumni.cloudinary import get_client, now_timestamp
@@ -169,7 +172,6 @@ def cloudinary_sign_view(request):
 
 @login_required
 @require_http_methods(["GET"])
-@ratelimit(key="user", rate="30/h", method="GET", block=False)
 def directory_view(request):
     qs = Member.objects.filter(status="active")
 
@@ -340,14 +342,22 @@ def directory_view(request):
     # Log empty-result queries with a meaningful filter so a future bot
     # decision is data-driven. Only fire when the user actually searched
     # (q or any facet) — empty filters returning zero just means there
-    # are no active members yet. Skip when rate-limited (block=False on
-    # the decorator above) so an authenticated abuser can't flood the
-    # audit table with arbitrary `q` values containing other members'
-    # names.
+    # are no active members yet. The 30/h cap is consumed only by actual
+    # log-write attempts (a view-level decorator counted every directory
+    # browse, silently dropping legitimate rows) — it exists so an
+    # authenticated abuser can't flood the audit table with arbitrary
+    # `q` values containing other members' names.
     if (
         paginator.count == 0
         and (q or year_raw or city or profession)
-        and not getattr(request, "limited", False)
+        and not is_ratelimited(
+            request,
+            group="directory.no_results",
+            key="user",
+            rate="30/h",
+            method="GET",
+            increment=True,
+        )
     ):
         AuditLog.objects.create(
             actor=request.user,
@@ -398,12 +408,19 @@ from .models import RemovalRequest  # noqa: E402
 def removal_request_form_view(request, entry_token: str):
     from .models import PublicSearchEntry
 
-    if getattr(request, "limited", False):
-        from django.http import HttpResponse
-
-        return HttpResponse(status=429, headers={"Retry-After": "3600"})
-
     entry = get_object_or_404(PublicSearchEntry, removal_token=entry_token)
+
+    if getattr(request, "limited", False):
+        # A bodiless 429 renders as a blank page — give the requester
+        # French copy and keep them on the form.
+        response = render(
+            request,
+            "members/removal_request_form.html",
+            {"entry": entry, "error": "Trop de demandes — merci de réessayer dans une heure."},
+            status=429,
+        )
+        response["Retry-After"] = "3600"
+        return response
 
     if request.method == "POST":
         email = (request.POST.get("email") or "").strip()[:254]
@@ -415,15 +432,23 @@ def removal_request_form_view(request, entry_token: str):
                 {"entry": entry, "error": "Email requis."},
                 status=400,
             )
-
-        forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-        ip = forwarded.split(",")[0].strip() if forwarded else request.META.get("REMOTE_ADDR")
+        try:
+            validate_email(email)
+        except ValidationError:
+            # A malformed address used to be persisted, then crash the
+            # confirmation send — a 500 after the rows were committed.
+            return render(
+                request,
+                "members/removal_request_form.html",
+                {"entry": entry, "error": "Adresse email invalide."},
+                status=400,
+            )
 
         rreq = RemovalRequest.objects.create(
             entry=entry,
             requester_email=email,
             reason=reason,
-            requester_ip=ip,
+            requester_ip=_client_ip(request),
         )
 
         from .models import AuditLog

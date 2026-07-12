@@ -350,3 +350,27 @@ def test_signup_email_failure_after_commit_does_not_500(
     assert response.status_code == 302
     assert response.url == "/inscription/merci/"
     assert AdminApplication.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_signup_rate_limit_returns_french_429_not_english_403(client):
+    """The 6th POST in an hour must keep the candidate on a French page,
+    not Django's bare English '403 Forbidden'."""
+    for _ in range(5):
+        client.post("/inscription/", {})  # invalid form still consumes the bucket
+    response = client.post("/inscription/", {})
+    assert response.status_code == 429
+    assert b"Trop de demandes" in response.content
+
+
+@pytest.mark.django_db
+def test_signup_rate_limit_buckets_on_real_client_ip_not_shared_proxy(client):
+    """Behind Railway's proxy every client shares REMOTE_ADDR. The limiter
+    must bucket on the rightmost X-Forwarded-For token so one abuser cannot
+    block all signups platform-wide."""
+    for _ in range(6):
+        blocked = client.post("/inscription/", {}, HTTP_X_FORWARDED_FOR="1.1.1.1, 203.0.113.5")
+    assert blocked.status_code == 429
+
+    other = client.post("/inscription/", {}, HTTP_X_FORWARDED_FOR="1.1.1.1, 198.51.100.9")
+    assert other.status_code == 200  # different real client, own bucket

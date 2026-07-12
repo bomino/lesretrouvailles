@@ -118,3 +118,19 @@ def test_aide_q_no_results_log_is_rate_limited_per_ip(client_anon):
     assert count <= 30, f"Expected at most 30 rows under per-IP limit, got {count}"
     # Also assert the cap actually engaged — if it's 35 the limit isn't wired.
     assert count >= 1
+
+
+@pytest.mark.django_db
+def test_plain_aide_gets_do_not_consume_no_results_budget(client_anon):
+    """Regression: the view-level decorator counted EVERY GET (page loads,
+    successful searches), so a member browsing the FAQ 30+ times silently
+    stopped no-results logging — the dataset under-collected exactly when
+    the page was in use. Only actual log-write attempts may consume."""
+    for _ in range(31):
+        assert client_anon.get(reverse("aide:index")).status_code == 200
+    # Successful searches don't consume either.
+    for _ in range(5):
+        client_anon.get(reverse("aide:index"), {"q": "mot de passe"})
+
+    client_anon.get(reverse("aide:index"), {"q": "zzz_definitely_no_match_zzz"})
+    assert AuditLog.objects.filter(action="aide.query.no_results").count() == 1

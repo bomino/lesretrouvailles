@@ -14,7 +14,7 @@ import bleach
 import markdown as _markdown
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
-from django_ratelimit.decorators import ratelimit
+from django_ratelimit.core import is_ratelimited
 
 from members.models import AuditLog
 
@@ -102,15 +102,26 @@ def guide_view(request: HttpRequest) -> HttpResponse:
     )
 
 
-@ratelimit(key="ip", rate="30/h", method="GET", block=False)
 def aide_view(request: HttpRequest) -> HttpResponse:
     q = (request.GET.get("q") or "").strip()
     entries = _filter_entries(q)
-    # Page always renders (block=False above). Only the AuditLog write is
-    # rate-limited: an unauthenticated attacker can otherwise loop the
-    # endpoint and inflate the table indefinitely. 30/h per IP keeps the
-    # bot-decision dataset useful without unbounded growth.
-    if q and not entries and not getattr(request, "limited", False):
+    # Only the AuditLog write is rate-limited (30/h per IP): an anonymous
+    # attacker can otherwise loop the endpoint and inflate the table
+    # indefinitely. The counter is consumed inside this branch — a
+    # view-level decorator counted every plain page load, silently dropping
+    # legitimate no-results rows once someone browsed the FAQ 30 times.
+    if (
+        q
+        and not entries
+        and not is_ratelimited(
+            request,
+            group="aide.no_results",
+            key="ip",
+            rate="30/h",
+            method="GET",
+            increment=True,
+        )
+    ):
         _log_no_results(request, q)
     sections = _group_by_category(entries)
     return render(

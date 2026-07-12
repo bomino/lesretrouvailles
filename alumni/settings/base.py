@@ -217,6 +217,11 @@ else:
         },
     }
 
+# django-ratelimit: resolve the real client IP (rightmost X-Forwarded-For
+# hop) instead of REMOTE_ADDR, which behind Railway's proxy is shared by
+# every client — without this, every key="ip" throttle is one global bucket.
+RATELIMIT_IP_META_KEY = "alumni.ratelimit.client_ip"
+
 # Login + consent gating
 LOGIN_REQUIRED_WHITELIST = [
     "/",

@@ -59,8 +59,17 @@ def _sanitize_utm(value: str) -> str:
 
 
 @require_http_methods(["GET", "POST"])
-@ratelimit(key="ip", rate="5/h", method="POST", block=True)
+@ratelimit(key="ip", rate="5/h", method="POST", block=False)
 def signup_view(request):
+    # block=False: a limited candidate gets a French 429 with their typed
+    # form re-rendered, not django-ratelimit's bare English 403.
+    if request.method == "POST" and getattr(request, "limited", False):
+        return render(
+            request,
+            "cooptation/signup.html",
+            {"form": SignupForm(request.POST), "rate_limited": True},
+            status=429,
+        )
     # Stash UTM on every GET so a visitor arriving at /inscription/?utm_source=…
     # has it preserved through the form-render → form-submit hop. Sanitization
     # happens here (not at write time) so what's in the session is already safe.
