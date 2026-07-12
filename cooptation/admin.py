@@ -52,18 +52,30 @@ class AdminApplicationAdmin(admin.ModelAdmin):
     inlines = [CooptationRequestInline, QuestionnaireResponseInline]
     actions = ["approve_action", "reject_action", "resend_password_link_action"]
 
+    def get_queryset(self, request):
+        """Annotate the 24h same-IP count once for the whole changelist —
+        ip_badge used to fire one COUNT query per rendered row."""
+        from datetime import timedelta
+
+        from django.db.models import Count, OuterRef, Subquery
+        from django.utils import timezone
+
+        recent_qs = (
+            AdminApplication.objects.filter(
+                source_ip=OuterRef("source_ip"),
+                submitted_at__gte=timezone.now() - timedelta(hours=24),
+            )
+            .values("source_ip")
+            .annotate(n=Count("pk"))
+            .values("n")
+        )
+        return super().get_queryset(request).annotate(recent_ip_count=Subquery(recent_qs))
+
     @admin.display(description="IP")
     def ip_badge(self, obj):
         if not obj.source_ip:
             return ""
-        from datetime import timedelta
-
-        from django.utils import timezone
-
-        recent = AdminApplication.objects.filter(
-            source_ip=obj.source_ip,
-            submitted_at__gte=timezone.now() - timedelta(hours=24),
-        ).count()
+        recent = getattr(obj, "recent_ip_count", None) or 0
         if recent >= 3:
             return format_html(
                 '<span title="{} demandes en 24h">🚩 {}</span>', recent, obj.source_ip
@@ -82,11 +94,17 @@ class AdminApplicationAdmin(admin.ModelAdmin):
 
     @admin.action(description="Approuver les candidatures sélectionnées")
     def approve_action(self, request, queryset):
+        approved = 0
         for app in queryset:
-            services.approve_application(app, reviewed_by=request.user)
-        self.message_user(
-            request, f"{queryset.count()} candidature(s) approuvée(s).", messages.SUCCESS
-        )
+            try:
+                services.approve_application(app, reviewed_by=request.user)
+            except services.ApprovalError as exc:
+                self.message_user(
+                    request, f"Candidature {app.pk} non approuvée : {exc}", messages.WARNING
+                )
+            else:
+                approved += 1
+        self.message_user(request, f"{approved} candidature(s) approuvée(s).", messages.SUCCESS)
 
     @admin.action(description="Rejeter les candidatures sélectionnées")
     def reject_action(self, request, queryset):
@@ -118,6 +136,7 @@ class AdminApplicationAdmin(admin.ModelAdmin):
 class CooptationRequestAdmin(admin.ModelAdmin):
     list_display = ("application", "parrain", "response", "responded_at", "expires_at")
     list_filter = ("response",)
+    list_select_related = ("application", "parrain")
     readonly_fields = (
         "application",
         "parrain",
@@ -139,5 +158,6 @@ class KnowledgeQuestionAdmin(admin.ModelAdmin):
 @admin.register(QuestionnaireResponse)
 class QuestionnaireResponseAdmin(admin.ModelAdmin):
     list_display = ("application", "question", "auto_grade", "submitted_at")
+    list_select_related = ("application", "question")
     readonly_fields = ("application", "question", "candidate_answer", "auto_grade", "submitted_at")
     list_filter = ("auto_grade",)

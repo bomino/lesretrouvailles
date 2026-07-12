@@ -159,3 +159,42 @@ def test_search_query_with_sql_injection_attempt_is_safe(consenting_client, make
     from members.models import Member
 
     assert Member.objects.filter(first_name="Alpha").exists()
+
+
+@pytest.mark.django_db
+def test_show_city_false_excludes_member_from_city_filter(consenting_client, make_member):
+    """Privacy regression: the card and profile hide the city when
+    show_city=False, but ?city=X filtered over ALL members — probing ~6
+    plausible cities disclosed exactly what the toggle promised to hide."""
+    hidden = make_member(first_name="Discret", city="Niamey", show_city=False, status="active")
+    shown = make_member(first_name="Ouvert", city="Niamey", show_city=True, status="active")
+
+    body = consenting_client.get("/annuaire/?city=Niamey").content.decode("utf-8")
+    assert shown.first_name in body
+    assert hidden.first_name not in body
+
+
+@pytest.mark.django_db
+def test_show_city_false_excludes_member_from_city_search(consenting_client, make_member):
+    """Same inference via ?q= — search matched city_lc/country_lc for every
+    member regardless of the flag."""
+    hidden = make_member(first_name="Discret", city="Zinder", show_city=False, status="active")
+
+    body = consenting_client.get("/annuaire/?q=Zinder").content.decode("utf-8")
+    assert hidden.first_name not in body
+
+
+@pytest.mark.django_db
+def test_pagination_links_urlencode_filter_values(consenting_client, make_member):
+    """The paginator hand-rolled '&{{k}}={{v}}' with HTML-escaping, not
+    URL-encoding: q=M&M rendered '?page=2&q=M&amp;M', which the browser
+    decodes to a truncated filter plus a bogus param."""
+    for i in range(25):
+        make_member(first_name=f"Paginated{i}", city="M&M", status="active")
+
+    body = consenting_client.get("/annuaire/?city=M%26M").content.decode("utf-8")
+    assert "page=2" in body, "sanity: the filtered result set must paginate"
+    # HTML-escaped (&amp;) means the browser will decode it to a raw & and
+    # truncate the filter; the value must be percent-encoded instead.
+    assert "city=M&amp;M" not in body
+    assert "city=M%26M" in body

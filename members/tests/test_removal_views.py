@@ -256,3 +256,49 @@ def test_form_post_rate_limited_after_5_per_hour(client, entry, settings):
         {"email": "r6@x.test"},
     )
     assert response.status_code == 429
+
+
+@pytest.mark.django_db
+def test_rate_limited_removal_post_renders_french_429_page(client, entry, settings):
+    """A bodiless 429 renders as a blank white page; the requester needs
+    French copy telling them to retry later."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    settings.RATELIMIT_ENABLE = True
+    from django.core.cache import cache
+
+    cache.clear()
+    for i in range(5):
+        client.post(f"/retrait/{entry.removal_token}/", {"email": f"r{i}@x.test"})
+    response = client.post(f"/retrait/{entry.removal_token}/", {"email": "r6@x.test"})
+    assert response.status_code == 429
+    assert b"Trop de demandes" in response.content
+
+
+@pytest.mark.django_db
+def test_removal_request_records_rightmost_xff_token(client, entry, settings):
+    """requester_ip exists for abuse forensics; the leftmost XFF token is
+    attacker-supplied fiction. Record the rightmost (Railway-observed) hop."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from members.models import RemovalRequest
+
+    client.post(
+        f"/retrait/{entry.removal_token}/",
+        {"email": "xff@x.test"},
+        HTTP_X_FORWARDED_FOR="1.1.1.1, 203.0.113.5",
+    )
+    rreq = RemovalRequest.objects.get(requester_email="xff@x.test")
+    assert rreq.requester_ip == "203.0.113.5"
+
+
+@pytest.mark.django_db
+def test_removal_request_rejects_malformed_email_before_any_write(client, entry, settings):
+    """A malformed address used to be persisted then crash the confirmation
+    send — 500 after DB writes. Validate up front, re-render in French."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from members.models import AuditLog, RemovalRequest
+
+    response = client.post(f"/retrait/{entry.removal_token}/", {"email": "jean"})
+    assert response.status_code == 400
+    assert b"invalide" in response.content
+    assert RemovalRequest.objects.count() == 0
+    assert not AuditLog.objects.filter(action="ghost.removal.requested").exists()

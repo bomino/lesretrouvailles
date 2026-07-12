@@ -74,6 +74,20 @@ def test_member_detail_suspended_shows_reactivate_button(client, coadmin_user, m
 
 
 @pytest.mark.django_db
+def test_member_suspend_confirm_does_not_interpolate_member_name(client, coadmin_user, make_member):
+    """Stored-XSS / broken-dialog regression: member names routinely contain
+    apostrophes (N'Diaye) and originate from the public signup form for
+    coopted members. Inside an inline onclick attribute, HTML-escaping does
+    not protect a JS string — the name must not be interpolated at all."""
+    member = make_member(first_name="N'Diaye", last_name="Amadou", status="active")
+    client.force_login(coadmin_user)
+    response = client.get(f"/gestion/membres/{member.slug}/")
+    body = response.content.decode("utf-8")
+    assert "confirm('Suspendre ce membre ?" in body
+    assert "confirm('Suspendre N" not in body
+
+
+@pytest.mark.django_db
 def test_member_detail_links_to_edit(client, coadmin_user, make_member):
     member = make_member()
     client.force_login(coadmin_user)

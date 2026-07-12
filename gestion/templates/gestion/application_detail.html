@@ -10,6 +10,11 @@
         <div class="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
             Candidature rejetée. Le candidat a été notifié.
         </div>
+    {% elif request.GET.flash == "approve_refused" %}
+        <div class="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+            Approbation impossible : cette candidature n'est plus en attente, n'a pas d'email,
+            ou son email correspond déjà à un compte existant.
+        </div>
     {% endif %}
     <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
         <article class="md:col-span-2 space-y-4">
@@ -135,8 +140,11 @@
                       action="{% url 'gestion:application_approve' pk=application.pk %}">
                     {% csrf_token %}
                     <button type="submit"
-                            class="w-full rounded-lg bg-whatsapp-green px-4 py-2 min-h-tap text-sm font-medium text-on-whatsapp-green shadow-sm hover:opacity-95 transition"
-                            onclick="return confirm('Approuver {{ application.full_name }} ? Cette action est irréversible : un compte Membre va être créé et un email envoyé.');">
+                        class="w-full rounded-lg bg-whatsapp-green px-4 py-2 min-h-tap text-sm font-medium text-on-whatsapp-green shadow-sm hover:opacity-95 transition"
+                        {# No user-controlled data inside the JS string: inside an inline #}
+                        {# event handler the browser HTML-decodes &#x27; back to a real quote #}
+                        {# before the JS engine parses it, so autoescaping cannot protect it. #}
+                        onclick="return confirm('Approuver cette candidature ? Cette action est irréversible : un compte Membre va être créé et un email envoyé.');">
                         Approuver
                     </button>
                 </form>

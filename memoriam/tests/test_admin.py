@@ -203,3 +203,35 @@ def test_nomination_admin_prohibits_add(make_admin_user):
     admin = InMemoriamNominationAdmin(InMemoriamNomination, AdminSite())
     req = _admin_request(make_admin_user())
     assert admin.has_add_permission(req) is False
+
+
+@pytest.mark.django_db
+def test_delete_entry_removes_cloudinary_photo(
+    fake_cloudinary, make_admin_user, make_memoriam_entry
+):
+    """The detail page promises families 'toute famille souhaitant le retrait
+    de cette page peut écrire à…'. Deleting the fiche used to leave the
+    deceased's photo permanently fetchable at its res.cloudinary.com URL."""
+    from django.contrib.admin.sites import AdminSite
+    from django.test import RequestFactory
+
+    from alumni import cloudinary as cloud_mod
+    from memoriam.admin import InMemoriamEntryAdmin
+    from memoriam.models import InMemoriamEntry
+
+    cloud_mod.reset_fake_client()
+    entry = make_memoriam_entry(status="published")
+    entry.photo_public_id = "memoriam/deceased-photo"
+    entry.save()
+
+    admin_obj = InMemoriamEntryAdmin(InMemoriamEntry, AdminSite())
+    req = RequestFactory().post("/admin/")
+    req.user = make_admin_user()
+
+    from django.test import TestCase
+
+    with TestCase.captureOnCommitCallbacks(execute=True):
+        admin_obj.delete_model(req, entry)
+
+    client = cloud_mod.get_client()
+    assert "memoriam/deceased-photo" in client.delete_calls

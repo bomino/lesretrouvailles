@@ -6,12 +6,15 @@ import markdown as _markdown
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.core.validators import validate_email
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods
+from django_ratelimit.core import is_ratelimited
 from django_ratelimit.decorators import ratelimit
 
 from alumni.cloudinary import get_client, now_timestamp
@@ -33,9 +36,16 @@ DIRECTORY_EMPTY_STATE_SUGGESTIONS: list[tuple[str, str]] = [
 
 
 def _client_ip(request) -> str:
+    """Return the rightmost (= last trusted hop) IP from X-Forwarded-For.
+
+    XFF is a list where each proxy appends what *it* saw as the source. The
+    leftmost token is what the client claimed and is attacker-controlled.
+    Behind Railway's edge, the rightmost token is the IP Railway actually
+    observed — that's the value worth recording on ConsentRecord.ip_address.
+    """
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        return forwarded.split(",")[-1].strip()
     return request.META.get("REMOTE_ADDR", "0.0.0.0")
 
 
@@ -182,7 +192,10 @@ def directory_view(request):
             pass
 
     if city:
-        qs = qs.filter(city__iexact=city)
+        # show_city=False must actually hide the city: filtering over all
+        # members let anyone probe ~6 plausible cities and infer exactly
+        # what the privacy toggle promised to hide.
+        qs = qs.filter(city__iexact=city, show_city=True)
 
     if profession:
         qs = qs.filter(profession__icontains=profession)
@@ -253,6 +266,13 @@ def directory_view(request):
             params.pop(k, None)
         params.pop("page", None)  # always reset pagination on filter change
         return params.urlencode()
+
+    # Querystring for the paginator links: every current filter, URL-encoded,
+    # minus `page`. The template used to hand-roll '&{{k}}={{v}}', which
+    # HTML-escapes instead of URL-encoding — a value like 'M&M' rendered as
+    # '&q=M&amp;M' and the browser decoded it into a truncated filter plus a
+    # bogus extra param.
+    page_qs = _qs_without()
 
     active_filters: list[dict] = []
     if q:
@@ -332,8 +352,23 @@ def directory_view(request):
     # Log empty-result queries with a meaningful filter so a future bot
     # decision is data-driven. Only fire when the user actually searched
     # (q or any facet) — empty filters returning zero just means there
-    # are no active members yet.
-    if paginator.count == 0 and (q or year_raw or city or profession):
+    # are no active members yet. The 30/h cap is consumed only by actual
+    # log-write attempts (a view-level decorator counted every directory
+    # browse, silently dropping legitimate rows) — it exists so an
+    # authenticated abuser can't flood the audit table with arbitrary
+    # `q` values containing other members' names.
+    if (
+        paginator.count == 0
+        and (q or year_raw or city or profession)
+        and not is_ratelimited(
+            request,
+            group="directory.no_results",
+            key="user",
+            rate="30/h",
+            method="GET",
+            increment=True,
+        )
+    ):
         AuditLog.objects.create(
             actor=request.user,
             action="directory.query.no_results",
@@ -358,6 +393,7 @@ def directory_view(request):
         template,
         {
             "page": page,
+            "page_qs": page_qs,
             "members": page.object_list,
             "letter_groups": letter_groups,
             "is_alphabetical": is_alphabetical,
@@ -383,12 +419,19 @@ from .models import RemovalRequest  # noqa: E402
 def removal_request_form_view(request, entry_token: str):
     from .models import PublicSearchEntry
 
-    if getattr(request, "limited", False):
-        from django.http import HttpResponse
-
-        return HttpResponse(status=429, headers={"Retry-After": "3600"})
-
     entry = get_object_or_404(PublicSearchEntry, removal_token=entry_token)
+
+    if getattr(request, "limited", False):
+        # A bodiless 429 renders as a blank page — give the requester
+        # French copy and keep them on the form.
+        response = render(
+            request,
+            "members/removal_request_form.html",
+            {"entry": entry, "error": "Trop de demandes — merci de réessayer dans une heure."},
+            status=429,
+        )
+        response["Retry-After"] = "3600"
+        return response
 
     if request.method == "POST":
         email = (request.POST.get("email") or "").strip()[:254]
@@ -400,15 +443,23 @@ def removal_request_form_view(request, entry_token: str):
                 {"entry": entry, "error": "Email requis."},
                 status=400,
             )
-
-        forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-        ip = forwarded.split(",")[0].strip() if forwarded else request.META.get("REMOTE_ADDR")
+        try:
+            validate_email(email)
+        except ValidationError:
+            # A malformed address used to be persisted, then crash the
+            # confirmation send — a 500 after the rows were committed.
+            return render(
+                request,
+                "members/removal_request_form.html",
+                {"entry": entry, "error": "Adresse email invalide."},
+                status=400,
+            )
 
         rreq = RemovalRequest.objects.create(
             entry=entry,
             requester_email=email,
             reason=reason,
-            requester_ip=ip,
+            requester_ip=_client_ip(request),
         )
 
         from .models import AuditLog

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+{# Standalone ON PURPOSE: Django's csrf_failure view renders this WITHOUT a
+   request (t.render(c) with a plain dict), so context processors never run
+   and extending base.html would render a degraded shell. #}
+<html lang="fr">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noindex,nofollow">
+        <title>Session expirée — Les Retrouvailles</title>
+    </head>
+    <body style="margin:0;
+                 font-family:Georgia,'Times New Roman',serif;
+                 background:#faf7f2;
+                 color:#2d2a26">
+        <div style="max-width:36rem;
+                    margin:4rem auto;
+                    padding:2rem;
+                    text-align:center;
+                    background:#fff;
+                    border:1px solid #e5ddd0;
+                    border-radius:1rem">
+            <h1 style="font-size:1.5rem;margin:0 0 1rem;">Votre session a expiré</h1>
+            <p style="line-height:1.6;margin:0 0 0.75rem;">
+                La page était restée ouverte trop longtemps. Revenez en arrière
+                avec le bouton «&nbsp;Retour&nbsp;» de votre téléphone, puis
+                soumettez le formulaire à nouveau — vos informations saisies
+                sont normalement conservées.
+            </p>
+            <a href="/"
+               style="display:inline-block;
+                      padding:0.6rem 1.2rem;
+                      background:#7c5c3b;
+                      color:#fff;
+                      text-decoration:none;
+                      border-radius:0.5rem">Retour à l'accueil</a>
+        </div>
+    </body>
+</html>

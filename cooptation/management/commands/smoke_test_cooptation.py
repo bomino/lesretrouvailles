@@ -232,13 +232,27 @@ class Command(BaseCommand):
 
     def _cleanup(self, candidate_email: str) -> None:
         User = get_user_model()  # noqa: N806
-        # Candidate side: User + Member created by approve_application,
-        # plus the AdminApplication record itself.
-        AdminApplication.objects.filter(email=candidate_email).delete()
+        # Every deletion is gated on the SMOKE_TAG marker. This command is
+        # designed to run against live environments over `railway ssh`: an
+        # email typo (or the operator testing with their own address after
+        # registering) previously destroyed a real member's account and any
+        # genuine pending applications under that email, with no confirmation.
+        #
+        # approve_application splits full_name on whitespace, so the smoke
+        # candidate's Member.first_name is exactly SMOKE_TAG.
         AdminApplication.objects.filter(full_name__startswith=SMOKE_TAG).delete()
         candidate_user = User.objects.filter(email=candidate_email).first()
         if candidate_user is not None:
-            Member.objects.filter(user=candidate_user).delete()
+            smoke_member = Member.objects.filter(
+                user=candidate_user, first_name__startswith=SMOKE_TAG
+            ).first()
+            if smoke_member is None:
+                self.stderr.write(
+                    f"  SKIP cleanup: {candidate_email} belongs to a real account "
+                    f"(no {SMOKE_TAG} marker). Refusing to delete it.",
+                )
+                return
+            smoke_member.delete()
             candidate_user.delete()
         # Parrain side: delete Members first (FK on user) then the User rows.
         for email in (SMOKE_PARRAIN_1_EMAIL, SMOKE_PARRAIN_2_EMAIL):

@@ -100,3 +100,37 @@ def test_aide_empty_q_does_not_log(client_anon):
 def test_aide_q_with_results_does_not_log(client_anon):
     client_anon.get(reverse("aide:index"), {"q": "photo"})
     assert AuditLog.objects.filter(action="aide.query.no_results").count() == 0
+
+
+@pytest.mark.django_db
+def test_aide_q_no_results_log_is_rate_limited_per_ip(client_anon):
+    """Without a bound, any anonymous visitor can flood `members_auditlog`
+    by sending a curl loop with arbitrary `?q=` values. Cap writes per IP
+    per hour so the dataset remains useful and the table doesn't grow
+    without bound."""
+    # 35 distinct no-results queries from the same IP. The rate cap (30/h)
+    # must clamp the AuditLog write count at <= 30. Page itself stays 200.
+    for i in range(35):
+        response = client_anon.get(reverse("aide:index"), {"q": f"zzznoresult_{i}_zzz"})
+        assert response.status_code == 200
+
+    count = AuditLog.objects.filter(action="aide.query.no_results").count()
+    assert count <= 30, f"Expected at most 30 rows under per-IP limit, got {count}"
+    # Also assert the cap actually engaged — if it's 35 the limit isn't wired.
+    assert count >= 1
+
+
+@pytest.mark.django_db
+def test_plain_aide_gets_do_not_consume_no_results_budget(client_anon):
+    """Regression: the view-level decorator counted EVERY GET (page loads,
+    successful searches), so a member browsing the FAQ 30+ times silently
+    stopped no-results logging — the dataset under-collected exactly when
+    the page was in use. Only actual log-write attempts may consume."""
+    for _ in range(31):
+        assert client_anon.get(reverse("aide:index")).status_code == 200
+    # Successful searches don't consume either.
+    for _ in range(5):
+        client_anon.get(reverse("aide:index"), {"q": "mot de passe"})
+
+    client_anon.get(reverse("aide:index"), {"q": "zzz_definitely_no_match_zzz"})
+    assert AuditLog.objects.filter(action="aide.query.no_results").count() == 1

@@ -1,8 +1,13 @@
 """CLI wrapper for the RGPD admin-purge service.
 
 Usage:
-    python manage.py rgpd_purge_member <email> [--dry-run] [--yes]
+    python manage.py rgpd_purge_member <identifier> [--dry-run] [--yes]
                                        [--member-id N] [--actor USER_ID]
+
+`identifier` is the member's email OR their username (the WhatsApp digits
+for roster-imported members). The username path exists because ~80% of this
+platform's members have no email — an email-only lookup could not target
+the majority cohort at all.
 
 See docs/runbooks/rgpd-purge.md and members/services.py for the engine.
 """
@@ -13,7 +18,8 @@ import json
 import sys
 
 from django.contrib.auth import get_user_model
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
+from django.db.models import Q
 
 from members.models import Member
 from members.services import PurgeRefused, rgpd_purge_member
@@ -43,7 +49,10 @@ class Command(BaseCommand):
     help = "Hard-purge a member's PII (DB + Cloudinary + bucket + cross-domain refs). RGPD §17."
 
     def add_arguments(self, parser):
-        parser.add_argument("email", help="Email of the member to purge.")
+        parser.add_argument(
+            "email",
+            help="Email OR username (WhatsApp digits) of the member to purge.",
+        )
         parser.add_argument(
             "--dry-run",
             action="store_true",
@@ -68,21 +77,33 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        email = options["email"]
+        identifier = (options["email"] or "").strip()
         dry_run = options["dry_run"]
         skip_prompt = options["yes"]
         member_id = options["member_id"]
         actor_id = options["actor"]
 
+        # A blank identifier used to degenerate into email__iexact="" — which
+        # matches EVERY email-less member (~80% of the cohort). An unset shell
+        # variable must be an argument error, not a wildcard.
+        if not identifier:
+            raise CommandError(
+                "Identifier is required (email or username). Refusing to run with a blank value."
+            )
+
         # --- Resolve the member ---------------------------------------------
-        qs = Member.objects.filter(user__email__iexact=email)
+        # Email OR username: roster-imported members are mostly email-less,
+        # so an email-only lookup cannot reach the majority cohort.
+        qs = Member.objects.filter(
+            Q(user__email__iexact=identifier) | Q(user__username__iexact=identifier)
+        )
         if member_id is not None:
             qs = qs.filter(id=member_id)
 
         members = list(qs)
         if not members:
             self.stdout.write(
-                f"No member found with email {email!r}. Already purged?"
+                f"No member found with email {identifier!r}. Already purged?"
                 + (f" (member_id={member_id})" if member_id else ""),
             )
             return  # idempotent: exit 0
@@ -90,7 +111,7 @@ class Command(BaseCommand):
         if len(members) > 1:
             ids = ", ".join(str(m.id) for m in members)
             self.stderr.write(
-                f"Multiple members match {email!r}: ids=[{ids}]. "
+                f"Multiple members match {identifier!r}: ids=[{ids}]. "
                 "Re-run with --member-id <N> to disambiguate.",
             )
             sys.exit(2)
@@ -127,7 +148,7 @@ class Command(BaseCommand):
                 sys.exit(1)
             self.stdout.write(_format_summary(plan, dry_run=True))
             self.stdout.write("")
-            answer = input(f"Purge member {email!r}? Type 'yes' to confirm: ").strip()
+            answer = input(f"Purge member {identifier!r}? Type 'yes' to confirm: ").strip()
             if answer.lower() != "yes":
                 self.stdout.write("Aborted.")
                 return  # exit 0; not an error

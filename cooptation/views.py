@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 import unicodedata
 from datetime import timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
@@ -20,11 +21,21 @@ from . import emails
 from .forms import SignupForm
 from .models import AdminApplication, CooptationRequest
 
+logger = logging.getLogger(__name__)
+
 
 def _client_ip(request) -> str:
+    """Return the rightmost (= last trusted hop) IP from X-Forwarded-For.
+
+    XFF is a list where each proxy appends what *it* saw as the source. The
+    leftmost token is what the original client claimed and is therefore
+    attacker-controlled. Behind Railway's edge, the rightmost token is the IP
+    Railway actually observed — that's the value worth recording on
+    AdminApplication.source_ip and the 24h ip_badge admin filter.
+    """
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        return forwarded.split(",")[-1].strip()
     return request.META.get("REMOTE_ADDR")
 
 
@@ -48,8 +59,23 @@ def _sanitize_utm(value: str) -> str:
 
 
 @require_http_methods(["GET", "POST"])
-@ratelimit(key="ip", rate="5/h", method="POST", block=True)
+@ratelimit(key="ip", rate="5/h", method="POST", block=False)
 def signup_view(request):
+    # block=False: a limited candidate gets a French 429 with their typed
+    # form re-rendered, not django-ratelimit's bare English 403.
+    #
+    # An UNBOUND form seeded with the POST data: a bound form would run full
+    # validation the moment the template touches field.errors (two parrain
+    # lookups + the User-email check — DB work the throttle exists to
+    # prevent), and it would show validation errors next to the rate-limit
+    # banner, leaving the candidate unable to tell which problem to fix.
+    if request.method == "POST" and getattr(request, "limited", False):
+        return render(
+            request,
+            "cooptation/signup.html",
+            {"form": SignupForm(initial=request.POST.dict()), "rate_limited": True},
+            status=429,
+        )
     # Stash UTM on every GET so a visitor arriving at /inscription/?utm_source=…
     # has it preserved through the form-render → form-submit hop. Sanitization
     # happens here (not at write time) so what's in the session is already safe.
@@ -64,6 +90,31 @@ def signup_view(request):
         if form.is_valid():
             if form.cleaned_data.get("website_url"):
                 return HttpResponseRedirect("/inscription/merci/")
+
+            # .filter().first(), not .get(): User.email is not unique and a
+            # shared family email would raise MultipleObjectsReturned — a 500
+            # for the candidate on a submission the form already validated.
+            p1 = (
+                Member.objects.filter(
+                    user__email=form.cleaned_data["parrain1_email"], status="active"
+                )
+                .select_related("user")
+                .first()
+            )
+            p2 = (
+                Member.objects.filter(
+                    user__email=form.cleaned_data["parrain2_email"], status="active"
+                )
+                .select_related("user")
+                .first()
+            )
+            if p1 is None or p2 is None:
+                form.add_error(
+                    None,
+                    "Parrain inconnu ou inactif. Vérifiez les deux adresses email : "
+                    "chaque parrain doit être un membre actif.",
+                )
+                return render(request, "cooptation/signup.html", {"form": form})
 
             with transaction.atomic():
                 app = AdminApplication.objects.create(
@@ -81,12 +132,6 @@ def signup_view(request):
                     utm_campaign=request.session.pop("signup_utm_campaign", ""),
                     referrer=request.META.get("HTTP_REFERER", "")[:512],
                 )
-                p1 = Member.objects.get(
-                    user__email=form.cleaned_data["parrain1_email"], status="active"
-                )
-                p2 = Member.objects.get(
-                    user__email=form.cleaned_data["parrain2_email"], status="active"
-                )
                 expires = timezone.now() + timedelta(days=14)
                 req1 = CooptationRequest.objects.create(
                     application=app, parrain=p1, expires_at=expires
@@ -95,11 +140,22 @@ def signup_view(request):
                     application=app, parrain=p2, expires_at=expires
                 )
 
-            emails.send_application_received(app)
-            emails.send_cooptation_requests_sent(app, parrain_emails=[p1.user.email, p2.user.email])
-            emails.send_parrain_invitation(req1)
-            emails.send_parrain_invitation(req2)
-            emails.send_admin_new_application(app)
+            # The application is committed; the fan-out below is best-effort.
+            # A Resend outage must not 500 a recorded submission — the
+            # candidate would resubmit, creating duplicates.
+            for send in (
+                lambda: emails.send_application_received(app),
+                lambda: emails.send_cooptation_requests_sent(
+                    app, parrain_emails=[p1.user.email, p2.user.email]
+                ),
+                lambda: emails.send_parrain_invitation(req1),
+                lambda: emails.send_parrain_invitation(req2),
+                lambda: emails.send_admin_new_application(app),
+            ):
+                try:
+                    send()
+                except Exception:
+                    logger.exception("signup: post-commit email failed for application %s", app.pk)
 
             return HttpResponseRedirect("/inscription/merci/")
     else:
@@ -234,6 +290,23 @@ def questionnaire_view(request, token: str):
     except AdminApplication.DoesNotExist:
         return render(request, "cooptation/questionnaire_done.html", {"unknown": True}, status=410)
 
+    # The questionnaire exists solely for candidates whose cooptation expired
+    # and whose application is still in the review pipeline. Without this gate,
+    # an old emailed link could flip a rejected/approved/purged application
+    # back to awaiting_admin — silently reversing the admin's decision and
+    # escaping the 180-day retention purge (which filters status='rejected').
+    #
+    # awaiting_admin is deliberately allowed: _sweep_stale_questionnaires
+    # moves the application there 7 days after the questionnaire email, and a
+    # candidate who answers on day 8 must still be able to — telling them
+    # "vos réponses ont déjà été soumises" when they never submitted, and
+    # closing their only remaining path in, is not what this gate is for.
+    if (
+        application.status not in ("cooptation_pending", "awaiting_admin")
+        or application.cooptation_outcome != "expired"
+    ):
+        return render(request, "cooptation/questionnaire_done.html", {"unknown": False}, status=410)
+
     if application.questionnaire_responses.exists():
         return render(request, "cooptation/questionnaire_done.html", {"unknown": False}, status=410)
 
@@ -242,15 +315,24 @@ def questionnaire_view(request, token: str):
     questions = list(KnowledgeQuestion.objects.filter(is_active=True))
 
     if request.method == "POST":
-        with transaction.atomic():
-            for q in questions:
-                answer = (request.POST.get(f"q{q.position}") or "").strip()
-                grade = _grade_closed(answer, q.answer_keys) if q.kind == "closed" else None
-                QuestionnaireResponse.objects.create(
-                    application=application, question=q, candidate_answer=answer, auto_grade=grade
-                )
-            application.status = "awaiting_admin"
-            application.save()
+        try:
+            with transaction.atomic():
+                for q in questions:
+                    answer = (request.POST.get(f"q{q.position}") or "").strip()
+                    grade = _grade_closed(answer, q.answer_keys) if q.kind == "closed" else None
+                    QuestionnaireResponse.objects.create(
+                        application=application,
+                        question=q,
+                        candidate_answer=answer,
+                        auto_grade=grade,
+                    )
+                application.status = "awaiting_admin"
+                application.save()
+        except IntegrityError:
+            # Double-click race: the second POST passed the exists() check
+            # before the first committed, then hit unique_together. The
+            # answers WERE saved — show the done page, not a 500.
+            pass
         return HttpResponseRedirect(f"/questionnaire/{token}/")
 
     return render(

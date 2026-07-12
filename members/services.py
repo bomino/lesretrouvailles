@@ -111,13 +111,20 @@ def rgpd_purge_member(
     memory_count = Memory.objects.filter(created_by=member.user).count()
     cooptation_count = CooptationRequest.objects.filter(parrain=member).count()
     nomination_count = InMemoriamNomination.objects.filter(nominator=member).count()
-    application_count = (
-        AdminApplication.objects.filter(
-            email__iexact=member.user.email,
+    # Email-less members (~80% of the audience) have `user.email == ""`. A
+    # naked `email__iexact=""` filter would match every blank-email
+    # AdminApplication in the DB and anonymize them — unrelated rows.
+    # Guard the lookup so the purge stays scoped to this member's data.
+    if member.user.email:
+        application_count = (
+            AdminApplication.objects.filter(
+                email__iexact=member.user.email,
+            )
+            .exclude(status="purged")
+            .count()
         )
-        .exclude(status="purged")
-        .count()
-    )
+    else:
+        application_count = 0
 
     deleted_counts = {
         "memories": memory_count,
@@ -167,11 +174,15 @@ def rgpd_purge_member(
         # Step 6: hard-delete authored memories
         Memory.objects.filter(created_by=member.user).delete()
 
-        # Step 7: anonymize prior AdminApplications (calls .purge() each)
-        for app in AdminApplication.objects.filter(
-            email__iexact=member.user.email,
-        ).exclude(status="purged"):
-            app.purge()
+        # Step 7: anonymize prior AdminApplications (calls .purge() each).
+        # Skip entirely when the member has no email — see the pre-count
+        # guard above for the rationale (`email__iexact=""` would match
+        # every blank-email row in the DB).
+        if member.user.email:
+            for app in AdminApplication.objects.filter(
+                email__iexact=member.user.email,
+            ).exclude(status="purged"):
+                app.purge()
 
         # Step 8: cascade-delete via the User row (sweeps Member, prefs,
         # consent records, sessions; SET_NULLs the audit-log actor refs)

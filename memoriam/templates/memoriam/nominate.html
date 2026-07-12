@@ -16,6 +16,12 @@
         <form method="post"
               class="rounded-2xl bg-surface p-8 shadow-sm border border-secondary/15 space-y-4">
             {% csrf_token %}
+            {% if rate_limited %}
+                <div role="alert"
+                     class="rounded-lg bg-red-50 border border-red-300 p-3 text-sm text-red-800">
+                    {% trans "Vous avez déjà proposé une nomination aujourd'hui. Merci de réessayer demain." %}
+                </div>
+            {% endif %}
             {% if form.non_field_errors %}
                 <div class="rounded-lg bg-red-50 border border-red-300 p-3 text-sm text-red-800">{{ form.non_field_errors }}</div>
             {% endif %}

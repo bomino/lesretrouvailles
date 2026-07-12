@@ -140,3 +140,68 @@ def test_admin_save_model_skips_soft_deleted_member(
 
     admin.save_model(req, entry, form, change=True)
     assert fake_email.sent_messages == []
+
+
+@pytest.mark.django_db
+def test_publish_email_skips_email_less_members_and_sends_after_commit(
+    fake_email,
+    fake_cloudinary,
+    make_admin_user,
+    make_memoriam_entry,
+    authed_member_client,
+    django_capture_on_commit_callbacks,
+):
+    """~80% of members have no email: they must not produce doomed Resend
+    calls, and the fan-out must run after the publish is committed (admin
+    wraps save_model in a transaction)."""
+    from django.contrib.admin.sites import AdminSite
+    from django.contrib.auth import get_user_model
+    from django.test import RequestFactory
+
+    from members.models import Member
+    from memoriam.admin import InMemoriamEntryAdmin
+    from memoriam.forms import InMemoriamEntryAdminForm
+    from memoriam.models import InMemoriamEntry
+
+    _client, member_with_email = authed_member_client
+    User = get_user_model()  # noqa: N806
+    no_mail_user = User.objects.create_user(username="22790000001", email="", password="x")
+    Member.objects.create(
+        user=no_mail_user,
+        first_name="Sans",
+        last_name="Email",
+        years_attended=[1980],
+        classes=["6e"],
+        city="Niamey",
+        status="active",
+    )
+
+    admin = InMemoriamEntryAdmin(InMemoriamEntry, AdminSite())
+    user = make_admin_user()
+    entry = make_memoriam_entry(status="draft")
+
+    form = InMemoriamEntryAdminForm(
+        instance=entry,
+        data={
+            "full_name": entry.full_name,
+            "nickname": "",
+            "years_attended": "1980,1981",
+            "classes": "6e,5e",
+            "tribute": entry.tribute,
+            "family_consent_giver": entry.family_consent_giver,
+            "family_consent_date": entry.family_consent_date,
+            "family_consent_canal": entry.family_consent_canal,
+            "status": "published",
+        },
+    )
+    assert form.is_valid(), form.errors
+
+    req = RequestFactory().post("/admin/")
+    req.user = user
+
+    with django_capture_on_commit_callbacks(execute=True):
+        admin.save_model(req, entry, form, change=True)
+
+    sent = fake_email.sent_messages
+    assert len(sent) == 1
+    assert sent[0]["to"] == [member_with_email.user.email]

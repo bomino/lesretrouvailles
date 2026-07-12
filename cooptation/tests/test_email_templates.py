@@ -172,6 +172,12 @@ def test_each_template_includes_french_phrase(
     fake_backend, make_application, make_cooptation_request
 ):
     """Smoke test that French strings render."""
+    # An explicit staff recipient: send_admin_new_application no-ops without
+    # one. This test used to get its 10th message only because the shared
+    # parrain fixture accidentally built staff users (prod parrains are
+    # ordinary members) — make the dependency visible instead.
+    from django.contrib.auth import get_user_model
+
     from cooptation.emails import (
         send_admin_new_application,
         send_application_approved,
@@ -183,6 +189,13 @@ def test_each_template_includes_french_phrase(
         send_cooptation_requests_sent,
         send_parrain_invitation,
         send_parrain_reminder,
+    )
+
+    get_user_model().objects.create_user(
+        username="staff-recipient",
+        email="staff-recipient@example.test",
+        password="x",
+        is_staff=True,
     )
 
     app = make_application(email="c@example.test")

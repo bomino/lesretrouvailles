@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from django.contrib import admin
+from django.db import transaction
 from django.utils import timezone
 
 from alumni.cloudinary import get_client
@@ -94,25 +95,61 @@ class InMemoriamEntryAdmin(admin.ModelAdmin):
         # 6. Persist.
         super().save_model(request, obj, form, change)
 
-        # 7. Post-save: fire publish email to opted-in active members.
+        # 7. Post-commit: fire publish email to opted-in active members.
+        # on_commit because ModelAdmin wraps this in a transaction — sending
+        # inside it risks emailing about a publish that then rolls back.
+        # Email-less members (~80% of the audience) are excluded up front.
         if should_fire_publish_email:
-            from members.models import Member
+            transaction.on_commit(lambda: self._send_publish_emails(obj))
 
-            from .emails import send_fiche_published_to_member
+    def delete_model(self, request, obj):
+        """The detail page promises families the fiche can be withdrawn on
+        request. Deleting the DB row used to leave the deceased's photo
+        permanently fetchable at its res.cloudinary.com URL."""
+        self._delete_photo_on_commit(obj.photo_public_id)
+        super().delete_model(request, obj)
 
-            recipients = Member.objects.filter(
+    def delete_queryset(self, request, queryset):
+        for obj in queryset:
+            self._delete_photo_on_commit(obj.photo_public_id)
+        super().delete_queryset(request, queryset)
+
+    @staticmethod
+    def _delete_photo_on_commit(public_id: str) -> None:
+        if not public_id:
+            return
+
+        def _do_delete():
+            try:
+                get_client().delete(public_id)
+            except Exception:
+                logger.exception("Cloudinary delete failed for %s (orphaned asset)", public_id)
+
+        transaction.on_commit(_do_delete)
+
+    @staticmethod
+    def _send_publish_emails(obj):
+        from members.models import Member
+
+        from .emails import send_fiche_published_to_member
+
+        recipients = (
+            Member.objects.filter(
                 status="active",
                 preferences__in_memoriam_alerts=True,
-            ).select_related("user")
-            for member in recipients:
-                try:
-                    send_fiche_published_to_member(member, obj)
-                except Exception as e:  # noqa: BLE001
-                    logger.warning(
-                        "memoriam: failed to send publish email to %s: %s",
-                        member.user.email,
-                        e,
-                    )
+            )
+            .exclude(user__email="")
+            .select_related("user")
+        )
+        for member in recipients:
+            try:
+                send_fiche_published_to_member(member, obj)
+            except Exception as e:  # noqa: BLE001
+                logger.warning(
+                    "memoriam: failed to send publish email to %s: %s",
+                    member.user.email,
+                    e,
+                )
 
 
 @admin.register(InMemoriamNomination)

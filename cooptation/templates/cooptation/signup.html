@@ -12,6 +12,12 @@
                 {% trans "Réservée aux ancien·nes du CEG 1 Birni, promotions 1980 à 1985. Nommez deux parrains parmi les membres existants pour valider votre candidature." %}
             </p>
         </header>
+        {% if rate_limited %}
+            <div role="alert"
+                 class="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+                {% trans "Trop de demandes pour le moment. Merci de réessayer dans une heure — vos informations saisies restent affichées ci-dessous." %}
+            </div>
+        {% endif %}
         {% if form.non_field_errors %}
             <div role="alert"
                  class="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">

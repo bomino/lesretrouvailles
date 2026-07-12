@@ -129,7 +129,7 @@ DNS records (one-time, on Cloudflare for villageretrouvailles.com):
 - DKIM: TXT `resend._domainkey` with the value from Resend
 - SPF: TXT `send` with `v=spf1 include:amazonses.com ~all`
 - SPF MX: MX `send` with `feedback-smtp.us-east-1.amazonses.com` priority 10
-- DMARC: TXT `_dmarc` with `v=DMARC1; p=none;`
+- DMARC: TXT `_dmarc` — **see [`dmarc.md`](dmarc.md) §1.2, which is authoritative for this record.** Staging and production send from the *same* domain, so this is the same DNS record launch.md gates on at `p=quarantine`. `p=none` is acceptable only during initial onboarding; do not re-apply it here after DMARC has been hardened, or you silently downgrade the production policy.
 
 Verify in Resend dashboard before first deploy.
 

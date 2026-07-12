@@ -62,7 +62,10 @@ def test_member_edit_post_updates_basic_fields(client, coadmin_user, make_member
     assert member.first_name == "New"
     assert member.years_attended == [1980, 1981, 1982]
     assert member.classes == ["6e", "5e"]
-    assert member.city == "Newcity"  # Member.save() title-cases
+    # Member.save() only title-cases all-lowercase input, so a deliberately
+    # cased value like "NewCity" survives verbatim (it used to be mangled to
+    # "Newcity" on every save, unfixably).
+    assert member.city == "NewCity"
 
 
 @pytest.mark.django_db
@@ -237,3 +240,35 @@ def test_member_edit_rejects_bad_class(client, coadmin_user, make_member):
     )
     assert response.status_code == 200
     assert b"2nde" in response.content
+
+
+@pytest.mark.django_db
+def test_member_edit_rejects_email_already_used_by_another_user(
+    client, coadmin_user, make_member, make_user
+):
+    """ACCOUNT_LOGIN_METHODS includes 'email': two Users sharing an email
+    breaks email login for both, and approve_application / rgpd purge assume
+    uniqueness. Mirror clean_new_username's collision check."""
+    make_user(username="holder", email="taken@example.test")
+    member = make_member()
+
+    client.force_login(coadmin_user)
+    response = client.post(
+        f"/gestion/membres/{member.slug}/modifier/",
+        {
+            "email": "TAKEN@example.test",  # case-insensitive collision
+            "first_name": member.first_name,
+            "last_name": member.last_name,
+            "nickname": "",
+            "years_attended": "1980,1981,1982,1983",
+            "classes": "6e,5e,4e,3e",
+            "city": member.city,
+            "country": member.country or "Niger",
+            "profession": "",
+            "whatsapp": "",
+        },
+    )
+    assert response.status_code == 200  # form re-rendered with error
+    assert "déjà utilisé".encode() in response.content
+    member.user.refresh_from_db()
+    assert member.user.email != "TAKEN@example.test"

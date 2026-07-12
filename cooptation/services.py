@@ -9,6 +9,7 @@ from allauth.account.forms import default_token_generator as allauth_token_gener
 from allauth.account.utils import user_pk_to_url_str
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from members.models import VALID_WHATSAPP_PATTERN, Member
@@ -22,19 +23,44 @@ def _digits_only(phone: str) -> str:
     return re.sub(r"\D", "", phone or "")
 
 
+class ApprovalError(ValueError):
+    """Raised when an application cannot be safely approved."""
+
+
+APPROVABLE_STATUSES = frozenset({"cooptation_pending", "awaiting_admin"})
+
+
 @transaction.atomic
 def approve_application(application: AdminApplication, *, reviewed_by) -> tuple:
     """Create User+Member, mark application approved, send password-set email.
 
-    Idempotent on `application.email` — if a User already exists with that
-    email, we update its associated Member rather than crashing.
+    Refuses (ApprovalError) when the application is not in a reviewable
+    status, has a blank email (purged records), or when a User already
+    exists with that email — adopting an existing account would wipe its
+    password and overwrite its Member profile (account hijack).
     Returns (user, member).
     """
+    if application.status not in APPROVABLE_STATUSES:
+        raise ApprovalError(
+            f"Application {application.pk} has status {application.status!r}; "
+            "only cooptation_pending/awaiting_admin can be approved."
+        )
+    if not application.email:
+        raise ApprovalError(f"Application {application.pk} has no email; cannot approve.")
+
     User = get_user_model()  # noqa: N806
-    user, _ = User.objects.get_or_create(
-        email=application.email,
-        defaults={"username": application.email},
-    )
+    # Both fields matter: email is not unique, username IS. A coopted member
+    # whose email was later changed or blanked leaves a User whose *username*
+    # is still the old address — creating a second User with that username
+    # would raise IntegrityError, which callers don't catch (only
+    # ApprovalError), so it would 500 the gestion view and abort the admin
+    # bulk action mid-queryset.
+    if User.objects.filter(Q(email=application.email) | Q(username=application.email)).exists():
+        raise ApprovalError(
+            f"A user already exists with email or username {application.email!r}; "
+            "refusing to adopt an existing account."
+        )
+    user = User.objects.create(username=application.email, email=application.email)
     user.set_unusable_password()
     user.is_active = True
     user.save()

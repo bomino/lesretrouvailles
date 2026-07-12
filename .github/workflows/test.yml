@@ -44,6 +44,26 @@ jobs:
       - run: npm run css:build
       - run: ruff check .
       - run: ruff format --check .
-      - run: djlint templates/ --check
+      # App templates live under */templates/ — the old `djlint templates/`
+      # scope missed every one of them.
+      - run: djlint templates/ core/templates/ members/templates/ cooptation/templates/ gestion/templates/ memoires/templates/ memoriam/templates/ aide/templates/ --check
+      # The committed theme file must match a fresh export from DESIGN.md;
+      # otherwise CI builds CSS from the export while the Docker image builds
+      # it from the stale committed file, and token-derived styles silently
+      # vanish in prod.
+      - run: git diff --exit-code tailwind.theme.json
       - run: python manage.py compilemessages
+      # Model/migration drift must not merge (Makefile's `make check`).
+      - run: python manage.py check
+      - run: python manage.py makemigrations --dry-run --check
       - run: pytest -v
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Dockerfile/.dockerignore regressions (a new app missing from the COPY
+      # list, a directory excluded from the build context, a dependency in
+      # pyproject but not in the image's pip list) only surfaced at Railway
+      # deploy time. CI installs from pyproject, which masks them.
+      - run: docker build -t retrouvailles:ci .

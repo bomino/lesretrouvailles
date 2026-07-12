@@ -1,5 +1,8 @@
+import logging
+
 from django.conf import settings
 from django.contrib import admin, messages
+from django.db.models import Count
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.utils.html import format_html
@@ -14,6 +17,8 @@ from .models import (
     RemovalRequest,
 )
 from .services import PurgeRefused, rgpd_purge_member
+
+logger = logging.getLogger(__name__)
 
 
 @admin.register(Member)
@@ -149,12 +154,17 @@ class MemberAdmin(admin.ModelAdmin):
                 },
             )
 
-        # Validate all typed-emails before doing anything destructive.
+        # Validate all typed confirmations before doing anything destructive.
+        # For email-less members (~80% of the audience), fall back to comparing
+        # against User.username (= the WhatsApp digits for roster-imported
+        # accounts). Empty-string-vs-empty-string would otherwise match and
+        # bypass the type-to-confirm safety entirely.
         mismatches: list[Member] = []
         for plan in plans:
             m = plan["member"]
             typed = request.POST.get(f"confirm_email_{m.id}", "").strip()
-            if typed != m.user.email:
+            expected = m.user.email or m.user.username
+            if not typed or typed != expected:
                 mismatches.append(m)
 
         if mismatches or any(p["blocker"] for p in plans):
@@ -195,6 +205,7 @@ class MemberAdmin(admin.ModelAdmin):
 
 @admin.register(NotificationPreference)
 class NotificationPreferenceAdmin(admin.ModelAdmin):
+    list_select_related = ("member",)
     list_display = (
         "member",
         "digest_weekly",
@@ -208,6 +219,7 @@ class NotificationPreferenceAdmin(admin.ModelAdmin):
 
 @admin.register(ConsentRecord)
 class ConsentRecordAdmin(admin.ModelAdmin):
+    list_select_related = ("member",)
     list_display = ("member", "charter_version", "accepted_at", "ip_address")
     list_filter = ("charter_version",)
     search_fields = ("member__first_name", "member__last_name")
@@ -238,7 +250,6 @@ class GhostStatusFilter(admin.SimpleListFilter):
     def queryset(self, request, queryset):
         from datetime import timedelta
 
-        from django.db.models import Count
         from django.utils import timezone
 
         value = self.value()
@@ -248,13 +259,16 @@ class GhostStatusFilter(admin.SimpleListFilter):
         if value == "removed":
             return queryset.filter(removed_at__isnull=False)
 
-        qs = queryset.filter(removed_at__isnull=True).annotate(n=Count("added_by_admins"))
+        # signoff_n is annotated once by PublicSearchEntryAdmin.get_queryset;
+        # re-annotating the same Count here would put two identical aggregates
+        # over the same M2M join in every filtered changelist query.
+        qs = queryset.filter(removed_at__isnull=True)
         if value == "published":
             cutoff = timezone.now() - timedelta(days=365)
-            return qs.filter(n__gte=1, added_at__gt=cutoff)
+            return qs.filter(signoff_n__gte=1, added_at__gt=cutoff)
         if value == "stale":
             cutoff = timezone.now() - timedelta(days=365)
-            return qs.filter(n__gte=1, added_at__lte=cutoff)
+            return qs.filter(signoff_n__gte=1, added_at__lte=cutoff)
         return queryset
 
 
@@ -322,11 +336,20 @@ class PublicSearchEntryAdmin(admin.ModelAdmin):
         obj = form.instance
         if getattr(obj, "_is_new", False):
             obj.added_by_admins.add(request.user)
-            send_admin_ghost_added(obj, added_by=request.user)
+            try:
+                send_admin_ghost_added(obj, added_by=request.user)
+            except Exception:
+                # Best-effort FYI: a Resend outage must not roll back the
+                # entry creation inside the admin's atomic changeform.
+                logger.exception("ghost-added FYI email failed for entry %s", obj.pk)
+
+    def get_queryset(self, request):
+        # Annotate once instead of one COUNT per changelist row.
+        return super().get_queryset(request).annotate(signoff_n=Count("added_by_admins"))
 
     @admin.display(description="Signatures")
     def signoff_count(self, obj):
-        return obj.added_by_admins.count()
+        return obj.signoff_n
 
     @admin.display(description="Retiré le")
     def retrait_at(self, obj):
@@ -345,6 +368,7 @@ class RemovalRequestAdmin(admin.ModelAdmin):
         "requested_at",
         "expires_at",
     )
+    list_select_related = ("entry",)
     list_filter = ("status",)
     search_fields = ("requester_email", "entry__first_name", "entry__last_name_initial")
     readonly_fields = (
@@ -356,6 +380,11 @@ class RemovalRequestAdmin(admin.ModelAdmin):
         "requested_at",
         "confirmed_at",
         "expires_at",
+        # Status transitions belong to the public confirmation flow and the
+        # deadline cron. Editing it by hand either claims a removal that
+        # never executed, or moves a request out of 'pending_confirmation'
+        # so the pre_delete audit hook (signals.py) silently skips it.
+        "status",
     )
 
     def has_add_permission(self, request):
@@ -373,6 +402,9 @@ class AuditLogAdmin(admin.ModelAdmin):
         "target_type",
         "target_id",
     )
+    # AuditLog is the one table that grows without bound; "actor" in
+    # list_display meant one User query per row (100/page by default).
+    list_select_related = ("actor",)
     list_filter = ("action", "target_type")
     search_fields = ("action", "target_type", "target_id")
     readonly_fields = (

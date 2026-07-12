@@ -38,7 +38,10 @@
                     <strong>{{ plan.member.full_name }}</strong>
                 </legend>
                 <p>
-                    <strong>Email :</strong> <code>{{ plan.member.user.email }}</code>
+                    <strong>Email :</strong>
+                    <code>{{ plan.member.user.email|default:"(aucun)" }}</code>
+                    <br>
+                    <strong>Username :</strong> <code>{{ plan.member.user.username }}</code>
                     <br>
                     <strong>ID :</strong> {{ plan.member.id }}
                 </p>
@@ -60,7 +63,13 @@
                     <label for="confirm_email_{{ plan.member.id }}"
                            style="display: block;
                                   margin-top: 1em">
-                        <strong>Pour confirmer, saisissez l'email exact :</strong>
+                        <strong>
+                            {% if plan.member.user.email %}
+                                Pour confirmer, saisissez l'email exact :
+                            {% else %}
+                                Pour confirmer, saisissez le username exact (numéro WhatsApp) :
+                            {% endif %}
+                        </strong>
                     </label>
                     <input type="text"
                            id="confirm_email_{{ plan.member.id }}"
@@ -71,7 +80,7 @@
                                   max-width: 400px;
                                   padding: .5em;
                                   font-family: monospace"
-                           placeholder="{{ plan.member.user.email }}">
+                           placeholder="{{ plan.member.user.email|default:plan.member.user.username }}">
                 {% endif %}
             </fieldset>
         {% endfor %}

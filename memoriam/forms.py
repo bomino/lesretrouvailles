@@ -5,6 +5,8 @@ from __future__ import annotations
 from django import forms
 from django.contrib.postgres.forms import SimpleArrayField
 
+from members.models import VALID_YEARS
+
 from .models import InMemoriamEntry, InMemoriamNomination
 
 
@@ -64,6 +66,19 @@ class NominationForm(forms.ModelForm):
         required=False,
         help_text="Années au CEG, séparées par virgules (ex. : 1980,1981).",
     )
+
+    def clean_proposed_years(self):
+        """InMemoriamEntry.clean() validates years against VALID_YEARS but
+        this member-facing form applied no equivalent check — any integer
+        (negative, 99999) flowed verbatim into the admin-alert email and the
+        nomination admin."""
+        years = self.cleaned_data.get("proposed_years") or []
+        bad = [y for y in years if y not in VALID_YEARS]
+        if bad:
+            raise forms.ValidationError(
+                f"Années hors plage 1980-1985 : {', '.join(str(y) for y in bad)}."
+            )
+        return years
 
     class Meta:
         model = InMemoriamNomination

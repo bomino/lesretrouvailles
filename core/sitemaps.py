@@ -8,7 +8,12 @@ from django.urls import reverse
 
 
 class PublicSurfaceSitemap(Sitemap):
-    """Two static URLs: the landing and the cooptation signup form."""
+    """The four public URLs: landing, cooptation signup, FAQ, member guide.
+
+    /aide/ and /guide/ are login-exempt (LOGIN_REQUIRED_WHITELIST) precisely
+    so members without a session can reach them; leaving them out of the
+    sitemap meant a member searching for help found nothing.
+    """
 
     changefreq = "weekly"
     priority = 0.8
@@ -18,11 +23,15 @@ class PublicSurfaceSitemap(Sitemap):
     protocol = "https"
 
     def items(self):
-        return ["landing", "signup"]
+        return ["landing", "signup", "aide", "guide"]
 
     def location(self, item):
         if item == "landing":
             return "/"
         if item == "signup":
             return reverse("cooptation:signup")
+        if item == "aide":
+            return reverse("aide:index")
+        if item == "guide":
+            return reverse("member_guide")
         raise ValueError(f"Unknown sitemap item: {item}")

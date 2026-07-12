@@ -169,3 +169,49 @@ def test_admin_save_does_not_fire_email_on_edit(fake_backend, make_admin):
         },
     )
     assert len(fake_backend.sent_messages) == 0
+
+
+@pytest.mark.django_db
+def test_ghost_added_email_failure_does_not_break_entry_creation(
+    fake_backend, make_admin, monkeypatch
+):
+    """The FYI email is best-effort: a Resend outage during the admin create
+    must not roll back the entry or 500 the changeform."""
+    from members import admin as members_admin
+    from members.models import PublicSearchEntry
+
+    creator = make_admin()
+    make_admin()  # second admin so a recipient exists
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("resend down")
+
+    monkeypatch.setattr(members_admin, "send_admin_ghost_added", _boom)
+
+    client = Client()
+    client.force_login(creator)
+    response = client.post(
+        "/admin/members/publicsearchentry/add/",
+        {
+            "first_name": "Aissa",
+            "last_name_initial": "K.",
+            "years_at_ceg": "1980,1981",
+            "note": "",
+        },
+    )
+    assert response.status_code == 302
+    assert PublicSearchEntry.objects.filter(first_name="Aissa").exists()
+
+
+@pytest.mark.django_db
+def test_removal_request_status_is_readonly_in_admin(make_admin):
+    """Flipping status by hand either lies about a removal that never
+    happened, or skips the pre_delete audit hook that records a cancelled
+    pending request."""
+    from django.contrib.admin.sites import AdminSite
+
+    from members.admin import RemovalRequestAdmin
+    from members.models import RemovalRequest
+
+    admin_obj = RemovalRequestAdmin(RemovalRequest, AdminSite())
+    assert "status" in admin_obj.readonly_fields

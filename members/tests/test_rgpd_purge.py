@@ -429,3 +429,179 @@ def test_admin_action_intermediate_confirmation(fake_clients, make_member, clien
     assert resp.status_code in (200, 302)
     assert not Member.objects.filter(id=target_id).exists()
     assert AuditLog.objects.filter(action="rgpd.member.purged").count() == 1
+
+
+# -------- Email-less confirmation (regression: bypass when email is blank) --------
+
+
+@pytest.mark.django_db
+def test_admin_action_rejects_empty_confirm_for_email_less_member(
+    fake_clients, make_user, make_member, client
+):
+    """Regression: when the member has no email (~80% of the audience), an
+    empty `confirm_email_<id>` field used to match the empty `m.user.email`
+    and trigger the purge with NO real confirmation. The bypass must be
+    closed."""
+    from members.models import Member
+
+    user = make_user(username="22790000123", email="")
+    target = make_member(user=user, photo_public_id="members/admin/no-email")
+    target_id = target.id
+
+    admin = _make_admin_user()
+    client.force_login(admin)
+
+    resp = client.post(
+        "/admin/members/member/",
+        {
+            "action": "rgpd_purge_action",
+            "_selected_action": [str(target_id)],
+            "apply": "1",
+            # Empty confirmation — must NOT purge an email-less member.
+            f"confirm_email_{target_id}": "",
+        },
+    )
+    assert resp.status_code == 200
+    assert Member.objects.filter(id=target_id).exists(), (
+        "Empty confirm must NOT purge email-less member (bypass regression)"
+    )
+
+
+@pytest.mark.django_db
+def test_admin_action_accepts_username_confirm_for_email_less_member(
+    fake_clients, make_user, make_member, client
+):
+    """For email-less members, operator types the username (= WhatsApp digits
+    for roster-imported members) to confirm. CLAUDE.md auth section: username
+    is the login identity that doubles as the meaningful identifier for the
+    email-less ~80%."""
+    from members.models import AuditLog, Member
+
+    user = make_user(username="22790000456", email="")
+    target = make_member(user=user, photo_public_id="members/admin/by-username")
+    target_id = target.id
+
+    admin = _make_admin_user()
+    client.force_login(admin)
+
+    resp = client.post(
+        "/admin/members/member/",
+        {
+            "action": "rgpd_purge_action",
+            "_selected_action": [str(target_id)],
+            "apply": "1",
+            f"confirm_email_{target_id}": "22790000456",
+        },
+    )
+    assert resp.status_code in (200, 302)
+    assert not Member.objects.filter(id=target_id).exists()
+    assert AuditLog.objects.filter(action="rgpd.member.purged").count() == 1
+
+
+@pytest.mark.django_db
+def test_admin_action_rejects_wrong_username_for_email_less_member(
+    fake_clients, make_user, make_member, client
+):
+    from members.models import Member
+
+    user = make_user(username="22790000789", email="")
+    target = make_member(user=user, photo_public_id="members/admin/wrong-username")
+    target_id = target.id
+
+    admin = _make_admin_user()
+    client.force_login(admin)
+
+    client.post(
+        "/admin/members/member/",
+        {
+            "action": "rgpd_purge_action",
+            "_selected_action": [str(target_id)],
+            "apply": "1",
+            f"confirm_email_{target_id}": "22799999999",  # wrong digits
+        },
+    )
+    assert Member.objects.filter(id=target_id).exists()
+
+
+# -------- Service-level: blank-email filter must not nuke unrelated rows --------
+
+
+@pytest.mark.django_db
+def test_purge_email_less_member_does_not_anonymize_unrelated_blank_email_applications(
+    fake_clients, make_user, make_member
+):
+    """Regression: services.py filtered AdminApplications with
+    `email__iexact=member.user.email`. When `member.user.email == ""`, the
+    filter matched every blank-email AdminApplication and called `.purge()`
+    on each — anonymizing unrelated rows. Guard the filter with a non-empty
+    email check so an email-less member's purge touches only its own data."""
+    from cooptation.models import AdminApplication
+    from members.services import rgpd_purge_member
+
+    user = make_user(username="22790001111", email="")
+    target = make_member(user=user)
+
+    # Two unrelated applications with blank email — must survive the purge
+    # of the email-less member.
+    AdminApplication.objects.create(
+        full_name="Candidate Blank One",
+        nickname="",
+        years_attended=[1980],
+        classes=["6e"],
+        city="Niamey",
+        country="Niger",
+        profession="",
+        email="",
+        whatsapp="+22790000001",
+    )
+    AdminApplication.objects.create(
+        full_name="Candidate Blank Two",
+        nickname="",
+        years_attended=[1980],
+        classes=["6e"],
+        city="Niamey",
+        country="Niger",
+        profession="",
+        email="",
+        whatsapp="+22790000002",
+    )
+    initial_count = AdminApplication.objects.count()
+    assert initial_count == 2
+
+    actor = _make_admin_user()
+    result = rgpd_purge_member(target, actor=actor)
+
+    # All unrelated applications still exist, with their original full_names.
+    assert AdminApplication.objects.count() == 2
+    assert AdminApplication.objects.filter(full_name="Candidate Blank One").exists()
+    assert AdminApplication.objects.filter(full_name="Candidate Blank Two").exists()
+    assert result["deleted_counts"]["admin_applications_anonymized"] == 0
+
+
+@pytest.mark.django_db
+def test_rgpd_cli_rejects_blank_email_instead_of_matching_all_email_less_members():
+    """`rgpd_purge_member "$EMAIL" --yes` with an unset variable used to
+    resolve email='' against the ~80% of members who have no email."""
+    from django.core.management import call_command
+    from django.core.management.base import CommandError
+
+    with pytest.raises(CommandError):
+        call_command("rgpd_purge_member", "", "--yes")
+
+
+@pytest.mark.django_db
+def test_rgpd_cli_resolves_email_less_member_by_username(make_member, make_user):
+    """The documented CLI could not target the majority cohort at all:
+    lookup was email-only. Accept the WhatsApp-digits username too."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    user = make_user(username="22790000999", email="")
+    member = make_member(user=user)
+
+    out = StringIO()
+    call_command("rgpd_purge_member", "22790000999", "--dry-run", stdout=out)
+    output = out.getvalue()
+    assert "No member found" not in output, "email-less members must be targetable by username"
+    assert str(member.pk) in output

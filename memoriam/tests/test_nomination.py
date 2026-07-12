@@ -74,7 +74,8 @@ def test_nomination_rate_limit_blocks_second_post_within_24h(authed_member_clien
     assert r1.status_code == 302  # success
 
     r2 = client.post("/in-memoriam/nominer/", {**payload, "proposed_name": "Bar"})
-    assert r2.status_code == 403  # ratelimit blocks
+    assert r2.status_code == 429  # French rate-limit page, not a bare English 403
+    assert "réessayer demain" in r2.content.decode("utf-8")
 
 
 @pytest.mark.django_db
@@ -83,3 +84,77 @@ def test_thanks_page_renders(authed_member_client):
     resp = client.get("/in-memoriam/nominer/merci/")
     assert resp.status_code == 200
     assert b"Merci" in resp.content
+
+
+@pytest.mark.django_db
+def test_invalid_nomination_post_does_not_consume_daily_quota(authed_member_client, fake_email):
+    """One typo plus a retry used to lock the member out for 24h: the
+    counter incremented on every POST, valid or not. Only a successful
+    save may consume the 1/d quota."""
+    client, _ = authed_member_client
+
+    bad = {
+        "proposed_name": "Foo",
+        "proposed_nickname": "",
+        "proposed_years": "1980",
+        "personal_memory": "",  # required — form invalid
+        "family_contact_hint": "",
+    }
+    r1 = client.post("/in-memoriam/nominer/", bad)
+    assert r1.status_code == 200  # re-rendered with errors
+
+    good = {**bad, "personal_memory": "Un souvenir précis."}
+    r2 = client.post("/in-memoriam/nominer/", good)
+    assert r2.status_code == 302  # the retry succeeds
+
+
+@pytest.mark.django_db
+def test_nomination_admin_email_failure_does_not_500_after_save(
+    authed_member_client, fake_email, monkeypatch, settings
+):
+    """The nomination is saved before the admin alert goes out; a Resend
+    outage must not show the member an error for a recorded nomination."""
+    from memoriam.models import InMemoriamNomination
+
+    client, _ = authed_member_client
+    settings.MEMORIAM_ADMIN_EMAILS = ["admin1@test"]
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("resend down")
+
+    monkeypatch.setattr("memoriam.views.send_nomination_received_to_admins", _boom)
+
+    payload = {
+        "proposed_name": "Résilient",
+        "proposed_nickname": "",
+        "proposed_years": "1980",
+        "personal_memory": "Mémoire.",
+        "family_contact_hint": "",
+    }
+    response = client.post("/in-memoriam/nominer/", payload)
+    assert response.status_code == 302
+    assert InMemoriamNomination.objects.filter(proposed_name="Résilient").exists()
+
+
+@pytest.mark.django_db
+def test_nomination_rejects_years_outside_1980_1985(authed_member_client, fake_email):
+    """InMemoriamEntry.clean() validates years against VALID_YEARS but the
+    member-facing NominationForm applied no equivalent check: garbage flowed
+    verbatim into the admin-alert email and the nomination admin."""
+    client, _ = authed_member_client
+    response = client.post(
+        "/in-memoriam/nominer/",
+        {
+            "proposed_name": "Hors Plage",
+            "proposed_nickname": "",
+            "proposed_years": "1975,99999",
+            "personal_memory": "Mémoire.",
+            "family_contact_hint": "",
+        },
+    )
+    assert response.status_code == 200  # re-rendered with errors
+    assert "1980" in response.content.decode("utf-8")
+
+    from memoriam.models import InMemoriamNomination
+
+    assert not InMemoriamNomination.objects.filter(proposed_name="Hors Plage").exists()

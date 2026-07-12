@@ -18,10 +18,12 @@ Use `--reset` to wipe + recreate only the demo objects.
 
 from __future__ import annotations
 
+import os
 from datetime import date, timedelta
 
+from django.conf import settings as django_settings
 from django.contrib.auth import get_user_model
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
@@ -223,6 +225,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        self._require_dev_environment()
         if options["reset"]:
             self._reset()
         with transaction.atomic():
@@ -232,6 +235,25 @@ class Command(BaseCommand):
             self._ensure_inmemoriam(coadmin)
             self._ensure_cooptation(parrains=[members[0], members[5]])
         self.stdout.write(self.style.SUCCESS("seed_handbook_demo OK"))
+
+    @staticmethod
+    def _require_dev_environment() -> None:
+        """The command creates an is_staff account whose password is
+        hardcoded in this repo, plus 12 fake active members. members/ ships
+        inside the production image, so an operator slip would create a
+        working /gestion/ login with a committed password and pollute the
+        real directory. The docstring's 'local-only fixture' claim is now
+        enforced, not just asserted."""
+        module = getattr(django_settings, "SETTINGS_MODULE", "") or os.environ.get(
+            "DJANGO_SETTINGS_MODULE", ""
+        )
+        if django_settings.DEBUG or module.endswith((".dev", ".staging")):
+            return
+        raise CommandError(
+            "seed_handbook_demo refuses to run outside dev/staging "
+            f"(DEBUG={django_settings.DEBUG}, settings={module!r}) — it creates a staff "
+            "account with a password committed to the repository."
+        )
 
     def _reset(self) -> None:
         # Delete in dependency order:

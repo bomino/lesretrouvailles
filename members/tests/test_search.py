@@ -177,6 +177,21 @@ def test_annuaire_trigram_fallback_for_typo(consenting_client, make_member):
 
 
 @pytest.mark.django_db
+def test_annuaire_no_results_log_is_rate_limited_per_user(consenting_client):
+    """Regression: any authenticated member could flood `members_auditlog`
+    by repeatedly searching for nonsense; the raw `q` (which may contain
+    another member's full name) was retained forever. Bound to N/h per user
+    so logs stay useful and storage stays bounded."""
+    for i in range(35):
+        response = consenting_client.get(f"/annuaire/?q=zzznoresult_{i}_zzz")
+        assert response.status_code == 200
+
+    count = AuditLog.objects.filter(action="directory.query.no_results").count()
+    assert count <= 30, f"Expected at most 30 rows under per-user limit, got {count}"
+    assert count >= 1
+
+
+@pytest.mark.django_db
 def test_annuaire_no_results_writes_auditlog(consenting_client, make_member):
     make_member(first_name="Alpha", last_name="One", city="Niamey")
     assert AuditLog.objects.filter(action="directory.query.no_results").count() == 0

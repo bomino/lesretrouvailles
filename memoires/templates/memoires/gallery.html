@@ -31,6 +31,20 @@
                     </a>
                 {% endfor %}
             </div>
+            {% if page.paginator.num_pages > 1 %}
+                <nav class="mt-8 flex items-center justify-center gap-2"
+                     aria-label="{% trans 'Pagination' %}">
+                    {% if page.has_previous %}
+                        <a href="?page={{ page.previous_page_number }}"
+                           class="inline-flex items-center justify-center rounded-lg border border-secondary/20 bg-base-200 px-4 py-2 text-sm font-medium hover:border-tertiary/40 hover:text-tertiary min-h-tap min-w-tap">‹</a>
+                    {% endif %}
+                    <span class="px-3 text-sm text-secondary">{{ page.number }} / {{ page.paginator.num_pages }}</span>
+                    {% if page.has_next %}
+                        <a href="?page={{ page.next_page_number }}"
+                           class="inline-flex items-center justify-center rounded-lg border border-secondary/20 bg-base-200 px-4 py-2 text-sm font-medium hover:border-tertiary/40 hover:text-tertiary min-h-tap min-w-tap">›</a>
+                    {% endif %}
+                </nav>
+            {% endif %}
         {% else %}
             <div class="rounded-2xl border border-secondary/15 bg-surface/70 p-8 text-center shadow-sm">
                 <p class="text-base text-secondary">{% trans "Le mur sera enrichi au lancement. Revenez bientôt." %}</p>

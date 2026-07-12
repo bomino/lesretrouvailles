@@ -135,8 +135,11 @@
                     {% csrf_token %}
                     <input type="hidden" name="target_status" value="suspended">
                     <button type="submit"
-                            class="w-full rounded-lg border border-ceremonial-gold/50 px-4 py-2 min-h-tap text-sm font-medium text-on-ceremonial-gold hover:bg-ceremonial-gold/10 transition"
-                            onclick="return confirm('Suspendre {{ member.full_name }} ? Le membre ne pourra plus se connecter jusqu’à réactivation.');">
+                        class="w-full rounded-lg border border-ceremonial-gold/50 px-4 py-2 min-h-tap text-sm font-medium text-on-ceremonial-gold hover:bg-ceremonial-gold/10 transition"
+                        {# No user-controlled data inside the JS string: names like N'Diaye #}
+                        {# break out of the quoted confirm() because the browser HTML-decodes #}
+                        {# the attribute before the JS engine parses it. #}
+                        onclick="return confirm('Suspendre ce membre ? Le membre ne pourra plus se connecter jusqu’à réactivation.');">
                         Suspendre le compte
                     </button>
                 </form>

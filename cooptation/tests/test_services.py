@@ -93,17 +93,71 @@ def test_approve_handles_full_name_with_one_token(make_application, staff_user):
 
 
 @pytest.mark.django_db
-def test_approve_idempotent_on_email(make_application, staff_user):
-    """Re-approving the same email (perhaps via a duplicate application)
-    does not error and updates the existing Member."""
-    from cooptation.services import approve_application
+def test_approve_refuses_email_of_existing_user(make_application, staff_user):
+    """Security regression: an application whose email matches a pre-existing
+    User (e.g. the superuser, who has no Member row and therefore passes the
+    signup-form check) must be refused. The old get_or_create path adopted the
+    account, wiped its password, and overwrote/attached a Member profile."""
+    from cooptation.services import ApprovalError, approve_application
+    from members.models import Member
 
-    app1 = make_application(full_name="Same Person", email="same@example.test")
+    app = make_application(full_name="Evil Candidate", email=staff_user.email)
+    with pytest.raises(ApprovalError):
+        approve_application(app, reviewed_by=staff_user)
+
+    staff_user.refresh_from_db()
+    assert staff_user.has_usable_password(), "existing user's password must not be wiped"
+    assert not Member.objects.filter(user=staff_user).exists()
+    app.refresh_from_db()
+    assert app.status != "approved"
+
+
+@pytest.mark.django_db
+def test_approve_refuses_duplicate_application_email(make_application, staff_user, settings):
+    """A second application reusing an already-approved email is refused and
+    the first member's profile is left untouched (previously it was silently
+    overwritten via update_or_create)."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from cooptation.services import ApprovalError, approve_application
+    from members.models import Member
+
+    app1 = make_application(full_name="Same Person", email="same@example.test", city="Niamey")
     approve_application(app1, reviewed_by=staff_user)
 
     app2 = make_application(full_name="Same Person", email="same@example.test", city="Paris")
-    user2, member2 = approve_application(app2, reviewed_by=staff_user)
-    assert member2.city == "Paris"
+    with pytest.raises(ApprovalError):
+        approve_application(app2, reviewed_by=staff_user)
+
+    member = Member.objects.get(user__email="same@example.test")
+    assert member.city == "Niamey"
+
+
+@pytest.mark.django_db
+def test_approve_refuses_blank_email(make_application, staff_user):
+    """A purged application has email='' — approving it must be refused
+    instead of get_or_create()-ing among the ~80% of blank-email users."""
+    from cooptation.services import ApprovalError, approve_application
+
+    app = make_application()
+    app.email = ""
+    app.status = "awaiting_admin"
+    app.save()
+    with pytest.raises(ApprovalError):
+        approve_application(app, reviewed_by=staff_user)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("status", ["approved", "rejected", "purged"])
+def test_approve_refuses_terminal_status(make_application, staff_user, status):
+    """approve_application only acts on applications still in the review
+    pipeline (cooptation_pending / awaiting_admin)."""
+    from cooptation.services import ApprovalError, approve_application
+
+    app = make_application(email=f"{status}@example.test")
+    app.status = status
+    app.save()
+    with pytest.raises(ApprovalError):
+        approve_application(app, reviewed_by=staff_user)
 
 
 @pytest.mark.django_db
@@ -191,3 +245,51 @@ def test_purge_clears_pii_and_sets_status(make_application):
     assert app.email == ""
     assert app.whatsapp == ""
     assert app.source_ip is None
+
+
+@pytest.mark.django_db
+def test_purge_clears_related_pii_and_kills_questionnaire_token(
+    make_application, make_cooptation_request
+):
+    """RGPD regression: purge() cleared AdminApplication fields only —
+    questionnaire free-text answers, parrain comments, and the live
+    questionnaire token survived the 180-day retention purge."""
+    from cooptation.models import KnowledgeQuestion, QuestionnaireResponse
+    from cooptation.services import purge_application
+
+    app = make_application(full_name="Purge Me", email="p@example.test")
+    app.questionnaire_token = "purge-tok"
+    app.save()
+    req = make_cooptation_request(application=app, comment="Je le connais bien, famille X.")
+    q = KnowledgeQuestion.objects.create(position=1, kind="open", text="Souvenir ?")
+    QuestionnaireResponse.objects.create(
+        application=app,
+        question=q,
+        candidate_answer="Souvenir très personnel avec détails privés.",
+    )
+
+    purge_application(app)
+    app.refresh_from_db()
+    req.refresh_from_db()
+
+    assert app.questionnaire_token is None
+    assert req.comment == ""
+    resp = QuestionnaireResponse.objects.get(application=app)
+    assert resp.candidate_answer == ""
+
+
+@pytest.mark.django_db
+def test_approve_refuses_when_username_taken_even_if_email_free(make_application, staff_user):
+    """User.username is unique but User.email is not. A coopted member whose
+    email was later changed/blanked leaves a User whose USERNAME is the old
+    address — approving a new application with that address must raise
+    ApprovalError, not an uncaught IntegrityError (which the gestion view
+    and the admin action do not catch)."""
+    from cooptation.services import ApprovalError, approve_application
+
+    User = get_user_model()  # noqa: N806
+    User.objects.create(username="alice@example.test", email="")  # email changed away
+
+    app = make_application(full_name="New Alice", email="alice@example.test")
+    with pytest.raises(ApprovalError):
+        approve_application(app, reviewed_by=staff_user)

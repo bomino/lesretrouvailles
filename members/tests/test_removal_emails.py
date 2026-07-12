@@ -105,3 +105,50 @@ def test_all_three_templates_use_french(fake_backend, removal_request):
     for m in fake_backend.sent_messages:
         body = m["text"].lower()
         assert any(marker in body for marker in french_markers), m["subject"]
+
+
+@pytest.mark.django_db
+def test_admin_removal_notification_filters_blank_staff_emails(fake_backend, removal_request):
+    """~80% of this platform's users (including plausible co-admins) have no
+    email. A blank string in the Resend 'to' list fails the API call every
+    time, 500ing the removal-confirm view AFTER the removal committed and
+    silencing the only admin tripwire on the public removal flow."""
+    from members.emails import send_admin_removal_notification
+
+    User = get_user_model()  # noqa: N806
+    User.objects.create_user(username="22790000001", email="", password="x", is_staff=True)
+    User.objects.create_user(
+        username="coadmin@example.test", email="coadmin@example.test", password="x", is_staff=True
+    )
+
+    send_admin_removal_notification(removal_request)
+    assert len(fake_backend.sent_messages) == 1
+    assert fake_backend.sent_messages[0]["to"] == ["coadmin@example.test"]
+
+
+@pytest.mark.django_db
+def test_admin_removal_notification_noop_when_only_blank_email_staff(fake_backend, removal_request):
+    from members.emails import send_admin_removal_notification
+
+    User = get_user_model()  # noqa: N806
+    User.objects.create_user(username="22790000001", email="", password="x", is_staff=True)
+
+    send_admin_removal_notification(removal_request)
+    assert fake_backend.sent_messages == []
+
+
+@pytest.mark.django_db
+def test_quarterly_ghost_digest_filters_blank_staff_emails(fake_backend):
+    from django.utils import timezone
+
+    from members.emails import send_admin_quarterly_ghost_digest
+
+    User = get_user_model()  # noqa: N806
+    User.objects.create_user(username="22790000002", email="", password="x", is_staff=True)
+    User.objects.create_user(
+        username="digest@example.test", email="digest@example.test", password="x", is_staff=True
+    )
+
+    send_admin_quarterly_ghost_digest(purged_logs=[], currently_listed=[], since=timezone.now())
+    assert len(fake_backend.sent_messages) == 1
+    assert fake_backend.sent_messages[0]["to"] == ["digest@example.test"]

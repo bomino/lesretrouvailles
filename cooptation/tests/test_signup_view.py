@@ -168,6 +168,32 @@ def test_signup_rejects_email_matching_existing_member(client, active_member, se
 
 
 @pytest.mark.django_db
+def test_signup_rejects_email_matching_existing_user_without_member(
+    client, active_member, second_active_member
+):
+    """Security regression: the superuser (and any staff account) has a User
+    but no Member row, so the Member-only check let a candidate apply with
+    that email — and approval would then hijack the account. Emails matching
+    ANY existing User must be rejected."""
+    from django.contrib.auth import get_user_model
+
+    from cooptation.models import AdminApplication
+
+    User = get_user_model()  # noqa: N806
+    User.objects.create_superuser(
+        username="bominomla",
+        email="admin@example.test",
+        password="x",
+    )
+
+    payload = _form_payload(active_member, second_active_member, email="admin@example.test")
+    response = client.post("/inscription/", payload)
+    assert response.status_code == 200
+    assert b"correspond" in response.content or b"compte" in response.content
+    assert AdminApplication.objects.count() == 0
+
+
+@pytest.mark.django_db
 def test_signup_honeypot_silently_rejects(client, active_member, second_active_member):
     """Honeypot field non-empty → render success page but do not create application."""
     from cooptation.models import AdminApplication
@@ -189,6 +215,33 @@ def test_signup_records_source_ip(client, active_member, second_active_member):
     )
     app = AdminApplication.objects.get()
     assert app.source_ip == "203.0.113.5"
+
+
+@pytest.mark.django_db
+def test_signup_uses_rightmost_xff_token_not_spoofable_leftmost(
+    client, active_member, second_active_member
+):
+    """Regression: X-Forwarded-For is a list where each hop appends what it
+    saw as the source. The leftmost token is whatever the original client
+    *claimed* (and is therefore spoofable). Behind Railway's edge, the
+    rightmost token is what Railway actually saw — that's the one we trust.
+
+    Without this guard, a spammer sending `X-Forwarded-For: 1.1.1.1` would
+    have `1.1.1.1` recorded as source_ip and the 24h ip_badge in
+    `/admin/cooptation/adminapplication/` would key off the spoofed value.
+    """
+    from cooptation.models import AdminApplication
+
+    client.post(
+        "/inscription/",
+        _form_payload(active_member, second_active_member),
+        HTTP_X_FORWARDED_FOR="1.1.1.1, 203.0.113.5",
+        REMOTE_ADDR="10.0.0.1",
+    )
+    app = AdminApplication.objects.get()
+    assert app.source_ip == "203.0.113.5", (
+        "Must take rightmost XFF (Railway's view) — not leftmost (client-claimed)"
+    )
 
 
 @pytest.mark.django_db
@@ -244,3 +297,128 @@ def test_signup_rejects_invalid_class_formats(
     assert response.status_code == 200  # form re-rendered with error
     assert AdminApplication.objects.count() == 0
     assert b"Classe inconnue" in response.content
+
+
+@pytest.mark.django_db
+def test_admin_new_application_filters_blank_staff_emails(settings, active_member):
+    """A co-admin without an email must not land a blank string in the
+    Resend 'to' list — that fails the API call on every signup."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from django.contrib.auth import get_user_model
+
+    from alumni.email import FakeResendBackend
+    from cooptation.emails import send_admin_new_application
+    from cooptation.models import AdminApplication
+
+    User = get_user_model()  # noqa: N806
+    User.objects.create_user(username="22790000001", email="", password="x", is_staff=True)
+    User.objects.create_user(
+        username="staff@example.test", email="staff@example.test", password="x", is_staff=True
+    )
+
+    app = AdminApplication.objects.create(
+        full_name="X Y",
+        years_attended=[1980],
+        classes=[],
+        city="Niamey",
+        country="Niger",
+        email="cand@example.test",
+    )
+    FakeResendBackend.sent_messages.clear()
+    send_admin_new_application(app)
+    assert len(FakeResendBackend.sent_messages) == 1
+    assert FakeResendBackend.sent_messages[0]["to"] == ["staff@example.test"]
+
+
+@pytest.mark.django_db
+def test_signup_email_failure_after_commit_does_not_500(
+    client, active_member, second_active_member, settings, monkeypatch
+):
+    """The application is committed before the email fan-out runs. A Resend
+    outage must not turn a recorded submission into a 500 — the candidate
+    would resubmit, creating duplicates."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from cooptation import views as cooptation_views
+    from cooptation.models import AdminApplication
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("resend down")
+
+    monkeypatch.setattr(cooptation_views.emails, "send_admin_new_application", _boom)
+
+    response = client.post("/inscription/", _form_payload(active_member, second_active_member))
+    assert response.status_code == 302
+    assert response.url == "/inscription/merci/"
+    assert AdminApplication.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_signup_rate_limit_returns_french_429_not_english_403(client):
+    """The 6th POST in an hour must keep the candidate on a French page,
+    not Django's bare English '403 Forbidden'."""
+    for _ in range(5):
+        client.post("/inscription/", {})  # invalid form still consumes the bucket
+    response = client.post("/inscription/", {})
+    assert response.status_code == 429
+    assert b"Trop de demandes" in response.content
+
+
+@pytest.mark.django_db
+def test_signup_rate_limit_buckets_on_real_client_ip_not_shared_proxy(client):
+    """Behind Railway's proxy every client shares REMOTE_ADDR. The limiter
+    must bucket on the rightmost X-Forwarded-For token so one abuser cannot
+    block all signups platform-wide."""
+    for _ in range(6):
+        blocked = client.post("/inscription/", {}, HTTP_X_FORWARDED_FOR="1.1.1.1, 203.0.113.5")
+    assert blocked.status_code == 429
+
+    other = client.post("/inscription/", {}, HTTP_X_FORWARDED_FOR="1.1.1.1, 198.51.100.9")
+    assert other.status_code == 200  # different real client, own bucket
+
+
+@pytest.mark.django_db
+def test_signup_survives_two_users_sharing_parrain_email(
+    client, active_member, second_active_member, settings
+):
+    """User.email is not unique; a shared family email must not turn the
+    candidate's signup into a MultipleObjectsReturned 500."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from django.contrib.auth import get_user_model
+
+    from cooptation.models import AdminApplication
+    from members.models import Member
+
+    User = get_user_model()  # noqa: N806
+    twin = User.objects.create_user(
+        username="twin-user",
+        email=active_member.user.email,  # same email as parrain 1
+        password="x",
+    )
+    Member.objects.create(
+        user=twin,
+        first_name="Twin",
+        last_name="Same-Email",
+        years_attended=[1980],
+        classes=["6e"],
+        city="Niamey",
+    )
+
+    response = client.post("/inscription/", _form_payload(active_member, second_active_member))
+    assert response.status_code == 302
+    assert AdminApplication.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_unknown_parrain_error_does_not_echo_email_or_confirm_membership_state(
+    client, active_member
+):
+    """Privacy: 'Email parrain inconnu ou inactif : <email>' let outsiders
+    probe which addresses belong to active members of this private
+    community. The message must be generic and must not echo the probe."""
+    payload = _form_payload(active_member, active_member, parrain2_email="probe@example.test")
+    response = client.post("/inscription/", payload)
+    assert response.status_code == 200
+    body = response.content.decode("utf-8")
+    # The old message echoed the probed address back inside the error text.
+    assert "inactif : probe@example.test" not in body
+    assert "inconnu ou inactif : probe@example.test" not in body

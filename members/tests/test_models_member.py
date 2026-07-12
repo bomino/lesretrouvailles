@@ -168,3 +168,30 @@ def test_member_full_clean_accepts_empty_classes(make_member):
     m.save()
     m.refresh_from_db()
     assert m.classes == []
+
+
+@pytest.mark.django_db
+def test_save_does_not_mangle_correctly_cased_city_country(make_member):
+    """str.title() capitalizes after every non-letter, so save() silently
+    rewrote 'USA'->'Usa', 'RDC'->'Rdc', "Côte d'Ivoire"->"Côte D'Ivoire",
+    'Aix-en-Provence'->'Aix-En-Provence' — on EVERY save, so an operator
+    could never fix it."""
+    member = make_member(city="Aix-en-Provence", country="USA")
+    member.refresh_from_db()
+    assert member.city == "Aix-en-Provence"
+    assert member.country == "USA"
+
+    member.country = "Côte d'Ivoire"
+    member.save()
+    member.refresh_from_db()
+    assert member.country == "Côte d'Ivoire"
+
+
+@pytest.mark.django_db
+def test_save_still_title_cases_all_lowercase_input(make_member):
+    """The normalization that motivated .title() is still applied to
+    all-lowercase operator input."""
+    member = make_member(city="niamey", country="niger")
+    member.refresh_from_db()
+    assert member.city == "Niamey"
+    assert member.country == "Niger"

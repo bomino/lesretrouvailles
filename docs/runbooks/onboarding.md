@@ -43,6 +43,25 @@ Members without a pre-loaded photo: leave `photo_filename` blank. They'll see a 
 
 ### Step 1 — Dry run (mandatory)
 
+> **Targeting production.** The import reads a CSV and photo directory that
+> live on *your* machine, so it must run locally — but against the production
+> database. `railway run` injects prod env vars but keeps the internal
+> `postgres.railway.internal` host, which does not resolve outside Railway's
+> network. Export the **public** proxy URL instead (Railway dashboard →
+> Postgres → Variables → `DATABASE_PUBLIC_URL`):
+>
+> ```bash
+> export DJANGO_SETTINGS_MODULE=alumni.settings.prod
+> export DATABASE_URL="$(railway variables --service Postgres --json | jq -r .DATABASE_PUBLIC_URL)"
+> export SITE_URL=https://villageretrouvailles.com
+> # plus the Resend + Cloudinary vars the import needs:
+> export RESEND_API_KEY=... CLOUDINARY_URL=... SECRET_KEY=...
+> ```
+>
+> Without `SITE_URL`, every magic link in the output CSV is built from the
+> `http://localhost:8000` default and every DM'd link is dead. Verify with a
+> one-row CSV before the full run.
+
 ```bash
 python manage.py import_whatsapp_roster roster.csv \
     --photos-dir roster_photos \
@@ -125,6 +144,6 @@ To generate the new link: `python manage.py reissue_login_link <whatsapp-digits>
 ## Edge cases
 
 - **Member with email but the email bounces.** The Resend dashboard will show the bounce. Treat them as email-less: re-run `reissue_login_link` for their username and DM them the link.
-- **Member whose phone changed since you collected the roster.** Update their `User.username` via Django admin → Auth → Users. They'll log in with the new number afterwards.
+- **Member whose phone changed since you collected the roster.** Update **both** `User.username` (the login identity) **and** `Member.whatsapp` (the messaging identity used for wa.me links and magic-link DMs). The two are decoupled on purpose, and updating only the username leaves every future WhatsApp DM pointed at the dead number. Easiest path: `/gestion/membres/<slug>/` → « Modifier le profil » for the WhatsApp field, and the « (modifier) » link next to the identifier for the username.
 - **Two CSV rows with the same phone.** The second one is skipped (idempotent). Check whether one was a typo and re-run after fixing.
 - **You imported a member you shouldn't have.** Use `python manage.py rgpd_purge_member <email>` (P6b). Cleanly removes the member, their cascading rows, and their photos from Cloudinary + the bucket. Audit-logged.

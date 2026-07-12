@@ -2,13 +2,34 @@
 
 from __future__ import annotations
 
+import logging
+
 from django.contrib import admin
+from django.db import transaction
 from django.utils.html import format_html
 
 from alumni.cloudinary import get_client, memory_thumbnail_url
 
 from .forms import MemoryAdminForm
 from .models import Memory
+
+logger = logging.getLogger(__name__)
+
+
+def _delete_photo_on_commit(public_id: str) -> None:
+    """Schedule a Cloudinary delete for after the DB delete commits.
+    Failures are logged, never raised — a Cloudinary outage must not roll
+    back the admin's delete."""
+    if not public_id:
+        return
+
+    def _do_delete():
+        try:
+            get_client().delete(public_id)
+        except Exception:
+            logger.exception("Cloudinary delete failed for %s (orphaned asset)", public_id)
+
+    transaction.on_commit(_do_delete)
 
 
 @admin.register(Memory)
@@ -62,3 +83,16 @@ class MemoryAdmin(admin.ModelAdmin):
         if not change:
             obj.created_by = request.user
         super().save_model(request, obj, form, change)
+
+    def delete_model(self, request, obj):
+        """Hard delete is this admin's remaining purpose (every other op moved
+        to /gestion/souvenirs/). Drop the Cloudinary asset too, after the DB
+        delete commits — otherwise the photo stays permanently fetchable at
+        its res.cloudinary.com URL."""
+        _delete_photo_on_commit(obj.photo_public_id)
+        super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        for obj in queryset:
+            _delete_photo_on_commit(obj.photo_public_id)
+        super().delete_queryset(request, queryset)

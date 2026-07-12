@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from django import forms
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 
 from members.models import VALID_CLASS_PATTERN, VALID_YEARS, Member
 
@@ -72,20 +74,29 @@ class SignupForm(forms.Form):
             raise ValidationError("Vous ne pouvez pas vous parrainer (parrain n°1).")
         if email and p2 and email == p2:
             raise ValidationError("Vous ne pouvez pas vous parrainer (parrain n°2).")
-        if email and Member.objects.filter(user__email=email).exists():
-            # Any Member (incl. suspended/deleted) blocks reuse — without this,
-            # approve_application's `update_or_create` would silently overwrite
-            # the existing Member's profile. Generic message avoids leaking
-            # whether the email is on file.
+        if email and get_user_model().objects.filter(Q(email=email) | Q(username=email)).exists():
+            # ANY existing User blocks reuse, not just Members — staff and the
+            # superuser have no Member row, and approving an application with
+            # their email would hijack the account (password wiped, Member
+            # profile attached). The username check matters too: coopted
+            # members have username == their original email, which survives a
+            # later email change and would collide at approval time.
+            # Generic message avoids leaking whether the email is on file.
             raise ValidationError(
                 "Cet email correspond déjà à un compte. Connectez-vous ou utilisez un autre email."
             )
         if p1 and p2 and p1 == p2:
             raise ValidationError("Veuillez nommer deux parrains différents.")
-        if p1 and not Member.objects.filter(user__email=p1, status="active").exists():
-            raise ValidationError(f"Email parrain inconnu ou inactif : {p1}")
-        if p2 and not Member.objects.filter(user__email=p2, status="active").exists():
-            raise ValidationError(f"Email parrain inconnu ou inactif : {p2}")
+        # One generic message, never echoing the address: the old per-email
+        # error ("inconnu ou inactif : <email>") let outsiders probe which
+        # addresses belong to active members of this private community.
+        p1_bad = p1 and not Member.objects.filter(user__email=p1, status="active").exists()
+        p2_bad = p2 and not Member.objects.filter(user__email=p2, status="active").exists()
+        if p1_bad or p2_bad:
+            raise ValidationError(
+                "Parrain inconnu ou inactif. Vérifiez les deux adresses email : "
+                "chaque parrain doit être un membre actif."
+            )
         return data
 
 

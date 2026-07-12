@@ -35,6 +35,24 @@ def test_charter_post_records_consent_and_redirects(member_client):
 
 
 @pytest.mark.django_db
+def test_charter_post_consent_uses_rightmost_xff_token(member_client):
+    """Regression: members.views._client_ip used `xff.split(",")[0]` (leftmost
+    = client-claimed = spoofable). ConsentRecord.ip_address was therefore
+    attacker-controlled. Take the rightmost token — Railway's view of the
+    source IP."""
+    response = member_client.post(
+        "/charte/",
+        HTTP_X_FORWARDED_FOR="1.1.1.1, 203.0.113.5",
+        REMOTE_ADDR="10.0.0.1",
+    )
+    assert response.status_code == 302
+    rec = ConsentRecord.objects.get(member=member_client.member)
+    assert rec.ip_address == "203.0.113.5", (
+        "Must take rightmost XFF (Railway's view) — not leftmost (client-claimed)"
+    )
+
+
+@pytest.mark.django_db
 def test_charter_post_default_redirect_is_root(member_client):
     response = member_client.post("/charte/")
     assert response.status_code == 302

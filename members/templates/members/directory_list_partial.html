@@ -89,12 +89,12 @@
     <nav class="mt-8 flex items-center justify-center gap-2"
          aria-label="{% trans 'Pagination' %}">
         {% if page.has_previous %}
-            <a href="?page={{ page.previous_page_number }}{% for k, v in request.GET.items %}{% if k != 'page' %}&{{ k }}={{ v }}{% endif %}{% endfor %}"
+            <a href="?page={{ page.previous_page_number }}{% if page_qs %}&{{ page_qs }}{% endif %}"
                class="inline-flex items-center justify-center rounded-lg border border-secondary/20 bg-base-200 px-4 py-2 text-sm font-medium hover:border-tertiary/40 hover:text-tertiary min-h-tap min-w-tap">‹</a>
         {% endif %}
         <span class="px-3 text-sm text-secondary">{{ page.number }} / {{ page.paginator.num_pages }}</span>
         {% if page.has_next %}
-            <a href="?page={{ page.next_page_number }}{% for k, v in request.GET.items %}{% if k != 'page' %}&{{ k }}={{ v }}{% endif %}{% endfor %}"
+            <a href="?page={{ page.next_page_number }}{% if page_qs %}&{{ page_qs }}{% endif %}"
                class="inline-flex items-center justify-center rounded-lg border border-secondary/20 bg-base-200 px-4 py-2 text-sm font-medium hover:border-tertiary/40 hover:text-tertiary min-h-tap min-w-tap">›</a>
         {% endif %}
     </nav>

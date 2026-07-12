@@ -114,8 +114,11 @@
 
                 if (!upResp.ok) {
                     const err = await upResp.json().catch(() => ({}));
-                    const msg = (err && err.error && err.error.message) || "Échec du téléversement.";
-                    showStatus(msg, "error");
+                    // Cloudinary's error text is English ("File size too large.
+                    // Got 11534336…"); every other branch of this script speaks
+                    // French. Log it for debugging, show French to the member.
+                    console.error("Cloudinary upload failed:", err && err.error && err.error.message);
+                    showStatus("Échec du téléversement. Réessayez ou choisissez une autre photo.", "error");
                     return;
                 }
 

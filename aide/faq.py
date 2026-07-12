@@ -142,10 +142,12 @@ FAQ_ENTRIES: list[FAQEntry] = [
             "Formats acceptés : **JPG, PNG, WebP**. Taille maximale : **5 Mo**. La photo est "
             "automatiquement recadrée et publiée. Choisissez une photo nette de votre visage — "
             "elle apparaîtra dans l'annuaire et sur votre profil.\n\n"
-            "🔒 **Vie privée** : les métadonnées EXIF de votre photo (coordonnées GPS du lieu "
-            "où elle a été prise, modèle d'appareil, date de prise de vue) sont **retirées "
-            "automatiquement** avant la publication. Personne ne peut remonter à votre "
-            "adresse à partir de votre photo de profil."
+            "🔒 **Vie privée** : par prudence, évitez une photo prise chez vous si votre "
+            "téléphone enregistre la position GPS dans ses images — pour les photos que "
+            "vous téléversez vous-même, ces métadonnées ne sont pas encore retirées "
+            "automatiquement. Le plus sûr est de recadrer un portrait existant, ou de "
+            "demander à un administrateur de téléverser la photo à votre place (ce "
+            "chemin-là, lui, nettoie les métadonnées)."
         ),
         related_links=[("Mon profil", "/profil/")],
     ),
@@ -255,7 +257,7 @@ FAQ_ENTRIES: list[FAQEntry] = [
         question="Comment proposer une nomination In Memoriam ?",
         answer_md=(
             "Allez à la page **In Memoriam 🕊️** dans le menu, puis cliquez sur "
-            "*« Nominer un·e ancien·ne »*. Renseignez le nom, les années au CEG, un souvenir "
+            "*« Nominer un camarade »*. Renseignez le nom, les années au CEG, un souvenir "
             "personnel, et un point de contact pour la famille (si possible).\n\n"
             "Un administrateur examinera votre nomination et engagera la procédure d'accord "
             "familial avant de créer la fiche officielle. Cela peut prendre plusieurs "
@@ -272,16 +274,16 @@ FAQ_ENTRIES: list[FAQEntry] = [
         category="Cooptation",
         question="On me demande de parrainer un·e candidat·e — que dois-je faire ?",
         answer_md=(
-            "Quand un·e candidat·e cite votre email comme parrain, vous recevez un message "
-            "*« [Les Retrouvailles] {Nom} sollicite votre parrainage »*. Pour répondre :\n\n"
+            "Quand un·e candidat·e cite votre email comme parrain, vous recevez un email "
+            "*« Demande de cooptation pour {Nom} »*. Pour répondre :\n\n"
             "1. Connectez-vous à la plateforme.\n"
             "2. Allez dans **Cooptations à valider** dans le menu (un badge avec le nombre "
             "de demandes en attente s'affiche).\n"
             "3. Cliquez sur la demande pour voir les informations du candidat.\n"
             "4. Vérifiez : est-ce bien un·e ancien·ne du CEG 1 Birni ? Connaissez-vous ses "
             "années / sa famille ?\n"
-            "5. Cliquez sur *« Accorder le parrainage »* ou *« Refuser »* (avec un mot "
-            "d'explication facultatif)."
+            "5. Choisissez *« J'accepte de coopter »* ou *« Je refuse »*, ajoutez un "
+            "commentaire facultatif, puis cliquez *« Envoyer ma réponse »*."
         ),
         related_links=[("Cooptations à valider", "/cooptations-a-valider/")],
     ),

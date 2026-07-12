@@ -117,6 +117,13 @@ class AdminApplication(models.Model):
         self.review_note = ""
         self.source_ip = None
         self.referrer = ""
+        # Related PII: free-text questionnaire answers routinely contain
+        # personal details; parrain comments are remarks about the candidate.
+        # Clearing the token also kills the still-live public questionnaire
+        # URL (auto_grade and row counts survive as aggregate state).
+        self.questionnaire_responses.update(candidate_answer="")
+        self.cooptation_requests.update(comment="")
+        self.questionnaire_token = None
         self.status = "purged"
         self.purged_at = timezone.now()
         self.save()

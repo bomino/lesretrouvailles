@@ -26,7 +26,7 @@ def test_admin_redirects_anonymous_to_login(client):
     response = client.get("/admin/")
     assert response.status_code == 302
     assert "/accounts/login/" in response["Location"]
-    assert "next=/admin/" in response["Location"]
+    assert "next=%2Fadmin%2F" in response["Location"]  # URL-encoded (see LoginRequiredMiddleware)
 
 
 @pytest.mark.django_db
