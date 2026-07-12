@@ -158,6 +158,26 @@ def test_application_approve_refused_redirects_with_flash_not_500(
     assert b"Approbation impossible" in follow.content
 
 
+@pytest.mark.django_db
+def test_application_approve_confirm_does_not_interpolate_candidate_name(
+    client, coadmin_user, make_application
+):
+    """Stored-XSS regression: full_name comes from the public /inscription/
+    form. Inside an inline onclick attribute the browser HTML-decodes
+    &#x27; back to a real quote BEFORE the JS engine parses it, so
+    HTML-escaping does not protect a JS string. The candidate's name must
+    not appear inside the confirm() call at all."""
+    app = make_application(
+        full_name="x');alert(document.domain);('",
+        status="awaiting_admin",
+    )
+    client.force_login(coadmin_user)
+    response = client.get(f"/gestion/cooptations/{app.pk}/")
+    body = response.content.decode("utf-8")
+    assert "confirm('Approuver cette candidature ?" in body
+    assert "confirm('Approuver x" not in body
+
+
 # ---------- Reject action ----------
 
 

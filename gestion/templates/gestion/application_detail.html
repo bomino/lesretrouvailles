@@ -140,8 +140,11 @@
                       action="{% url 'gestion:application_approve' pk=application.pk %}">
                     {% csrf_token %}
                     <button type="submit"
-                            class="w-full rounded-lg bg-whatsapp-green px-4 py-2 min-h-tap text-sm font-medium text-on-whatsapp-green shadow-sm hover:opacity-95 transition"
-                            onclick="return confirm('Approuver {{ application.full_name }} ? Cette action est irréversible : un compte Membre va être créé et un email envoyé.');">
+                        class="w-full rounded-lg bg-whatsapp-green px-4 py-2 min-h-tap text-sm font-medium text-on-whatsapp-green shadow-sm hover:opacity-95 transition"
+                        {# No user-controlled data inside the JS string: inside an inline #}
+                        {# event handler the browser HTML-decodes &#x27; back to a real quote #}
+                        {# before the JS engine parses it, so autoescaping cannot protect it. #}
+                        onclick="return confirm('Approuver cette candidature ? Cette action est irréversible : un compte Membre va être créé et un email envoyé.');">
                         Approuver
                     </button>
                 </form>
