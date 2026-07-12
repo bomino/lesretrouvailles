@@ -9,10 +9,9 @@ redirects to /admin/login/, which we want hidden from co-admins.
 from __future__ import annotations
 
 from functools import wraps
+from urllib.parse import urlencode
 
-from django.http import HttpResponseForbidden
-from django.shortcuts import redirect
-from django.template.loader import render_to_string
+from django.shortcuts import redirect, render
 
 
 def staff_required(view_func):
@@ -22,14 +21,14 @@ def staff_required(view_func):
     def wrapper(request, *args, **kwargs):
         user = request.user
         if not user.is_authenticated:
-            next_path = request.get_full_path()
-            return redirect(f"/accounts/login/?next={next_path}")
+            qs = urlencode({"next": request.get_full_path()})
+            return redirect(f"/accounts/login/?{qs}")
         if not (user.is_active and user.is_staff):
-            html = render_to_string(
-                "gestion/403.html",
-                {"request": request},
-            )
-            return HttpResponseForbidden(html)
+            # render() (not render_to_string with request-as-variable) so the
+            # full RequestContext applies: without it the csrf token in
+            # base.html's logout form rendered empty and logging out from
+            # the 403 page failed with a second CSRF error.
+            return render(request, "gestion/403.html", status=403)
         return view_func(request, *args, **kwargs)
 
     return wrapper

@@ -251,3 +251,27 @@ CLOUDFLARE_ANALYTICS_TOKEN = env("CLOUDFLARE_ANALYTICS_TOKEN", default="")
 
 # Resend email
 RESEND_API_KEY = env("RESEND_API_KEY", default="")
+
+# Logging: without this dict, Django's DEFAULT_LOGGING discards every
+# django.request ERROR under DEBUG=False (console handler carries
+# RequireDebugTrue; mail_admins no-ops on empty ADMINS) — prod 500
+# tracebacks and django.security warnings never reached Railway's log
+# stream, and app loggers fell through to Python's bare lastResort
+# handler (INFO records dropped, WARNINGs unformatted).
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {"handlers": ["console"], "level": "INFO"},
+    "loggers": {
+        "django": {"handlers": ["console"], "level": "INFO", "propagate": False},
+    },
+}
