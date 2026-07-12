@@ -71,3 +71,9 @@ docs/runbooks/*pilot*.csv
 
 # Claude Code /init session transcripts dumped to repo root
 *-command-message*.txt
+
+# Private roster data — REAL NAMES of living alumni. This repo is PUBLIC.
+# Never commit the class rosters, the WhatsApp roster, or anything derived
+# from them. Operators keep these locally and import from their own machine.
+*.xlsx
+/private-data/
