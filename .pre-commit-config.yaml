@@ -6,7 +6,10 @@ repos:
         args: [--fix]
       - id: ruff-format
   - repo: https://github.com/Riverside-Healthcare/djLint
-    rev: v1.34.1
+    # Must match the djlint pin in pyproject.toml [dev] — CI runs
+    # `djlint --check` with the pyproject version against files this hook
+    # formatted, so a version skew fails the build.
+    rev: v1.36.4
     hooks:
       - id: djlint-django
         args: [--reformat]
