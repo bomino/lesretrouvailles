@@ -110,14 +110,24 @@ class Command(BaseCommand):
                 # every day until they submit.
                 if app.cooptation_expired_at is not None:
                     continue
+                # Persist outcome + token BEFORE the send so the emailed URL
+                # resolves; stamp cooptation_expired_at only AFTER a
+                # successful send. A failed send leaves expired_at None, so
+                # the app is retried on the next run instead of being
+                # permanently skipped, and one outage doesn't abort the run.
                 app.cooptation_outcome = "expired"
                 if not app.questionnaire_token:
                     app.questionnaire_token = secrets.token_urlsafe(32)
-                app.cooptation_expired_at = now
                 app.save()
                 site_url = getattr(settings, "SITE_URL", "https://staging.villageretrouvailles.com")
                 qurl = f"{site_url}/questionnaire/{app.questionnaire_token}/"
-                emails.send_cooptation_expired(app, questionnaire_url=qurl)
+                try:
+                    emails.send_cooptation_expired(app, questionnaire_url=qurl)
+                except Exception as e:  # noqa: BLE001
+                    self.stderr.write(f"  ERROR expired-email app={app.pk}: {e}")
+                    continue
+                app.cooptation_expired_at = now
+                app.save()
                 count += 1
                 time.sleep(PACING_SECONDS)
             else:
@@ -150,6 +160,10 @@ class Command(BaseCommand):
     @staticmethod
     def _derive_outcome(requests) -> str:
         responses = [r.response for r in requests]
+        if not responses:
+            # Zero CooptationRequest rows (deleted via /admin/): all() over an
+            # empty list is True, which used to mislabel this "all_accepted".
+            return "pending"
         if all(r == "accepted" for r in responses):
             return "all_accepted"
         if all(r == "refused" for r in responses):
