@@ -91,8 +91,14 @@ class Member(models.Model):
 
     photo_public_id = models.CharField(max_length=200, blank=True)
 
-    show_email = models.BooleanField(default=True)
-    show_whatsapp = models.BooleanField(default=True)
+    # Contact visibility is opt-IN, which is what guide_membre.md and the FAQ
+    # have always told members ("décoché par défaut"). It used to default to
+    # True, so the launch roster import would have published ~200 alumni's
+    # WhatsApp numbers to the whole directory on day one — the opposite of the
+    # promise. Migration 0023 flips the rows that were created under the old
+    # default. City stays opt-OUT: the docs promise that one IS checked.
+    show_email = models.BooleanField(default=False)
+    show_whatsapp = models.BooleanField(default=False)
     show_city = models.BooleanField(default=True)
 
     status = models.CharField(

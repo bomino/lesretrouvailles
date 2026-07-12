@@ -423,6 +423,29 @@ renseignant le champ **Member**.
 
 ---
 
+## 8ter. « Mon numéro n'apparaît plus sur mon profil »
+
+Depuis la mise en conformité **F-02**, l'affichage de l'email et du numéro WhatsApp
+est **désactivé par défaut** — c'est ce que le guide membre et la FAQ ont toujours
+annoncé (« décoché par défaut »), mais le code faisait l'inverse.
+
+Deux conséquences :
+
+1. **Les membres existants ont été repassés en « masqué »** par la migration. On ne
+   pouvait pas distinguer « j'ai choisi de publier mon numéro » de « je n'ai jamais
+   touché à ce réglage », donc on a masqué tout le monde : masquer quelqu'un qui
+   voulait être visible est un désagrément, publier quelqu'un à qui on avait promis
+   la confidentialité est une faute.
+2. **Les membres importés du roster WhatsApp ne publient pas leur numéro.** C'est
+   voulu : sans cela, les ~200 numéros du groupe seraient devenus visibles dans
+   l'annuaire dès le premier jour.
+
+**Réponse à donner au membre :** « Va dans **Mon profil → Modifier**, section
+*Confidentialité*, et coche **Afficher mon numéro WhatsApp**. » C'est une case,
+il la coche lui-même — n'allez pas la cocher à sa place dans `/admin/`.
+
+---
+
 ## 9. Surveillance et maintenance
 
 Tâches récurrentes (cadence trimestrielle pour la plupart). Posez-vous des rappels calendrier.

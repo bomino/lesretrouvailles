@@ -65,10 +65,15 @@ def test_member_clean_accepts_classes_with_section_letters(make_member):
 
 
 @pytest.mark.django_db
-def test_member_show_flags_default_true(make_member):
+def test_member_show_flags_defaults_are_opt_in_for_contact(make_member):
+    """F-02: contact visibility is opt-IN — guide_membre.md and the FAQ have
+    always said so ("décoché par défaut"). This test previously asserted the
+    opposite, locking in the bug: the launch roster import would have published
+    ~200 alumni's phone numbers to the directory on day one. City stays on,
+    which is what the docs promise for that one."""
     m = make_member()
-    assert m.show_email is True
-    assert m.show_whatsapp is True
+    assert m.show_email is False
+    assert m.show_whatsapp is False
     assert m.show_city is True
 
 
