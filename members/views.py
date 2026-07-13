@@ -525,8 +525,18 @@ def removal_request_done_view(request):
     return render(request, "members/removal_request_done.html")
 
 
-@require_http_methods(["GET"])
+@require_http_methods(["GET", "POST"])
 def removal_confirm_view(request, confirm_token: str):
+    """Confirm a ghost-entry removal.
+
+    GET is SAFE: it renders a page with a confirm button. Only POST executes.
+
+    This used to execute the removal on GET, which meant any link scanner that
+    follows URLs in email — Outlook Safe Links, Gmail's proxy, antivirus
+    gateways — would remove someone's entry without the person ever clicking.
+    A GET that mutates is a bug even when the token is secret, because the
+    token travels through exactly the systems that prefetch it.
+    """
     from .models import AuditLog, RemovalRequest
 
     try:
@@ -540,7 +550,7 @@ def removal_confirm_view(request, confirm_token: str):
         return render(request, "members/removal_expired_or_invalid.html", status=200)
 
     if rreq.status == "confirmed":
-        # Idempotent: clicking again shows success without re-running side effects
+        # Idempotent: revisiting shows success without re-running side effects
         return render(
             request,
             "members/removal_confirmed.html",
@@ -553,8 +563,16 @@ def removal_confirm_view(request, confirm_token: str):
         rreq.save(update_fields=["status"])
         return render(request, "members/removal_expired_or_invalid.html", status=200)
 
-    # Execute the removal — set entry.removed_at, write 2 AuditLog entries,
-    # send 2 emails, mark request as confirmed.
+    if request.method == "GET":
+        # Safe: just ask. The removal only happens on the POST below.
+        return render(
+            request,
+            "members/removal_confirm_prompt.html",
+            {"entry": rreq.entry, "confirm_token": confirm_token},
+        )
+
+    # POST — execute the removal: set entry.removed_at, write 2 AuditLog
+    # entries, send 2 emails, mark the request confirmed.
     entry = rreq.entry
     entry.removed_at = now
     entry.removed_reason = (rreq.reason or "Retrait demandé par la personne concernée")[:200]

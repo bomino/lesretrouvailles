@@ -115,7 +115,7 @@ def test_confirm_valid_pending_executes_removal(client, entry, settings):
     rreq = RemovalRequest.objects.create(entry=entry, requester_email="x@y.test")
     FakeResendBackend.sent_messages.clear()
 
-    response = client.get(f"/retrait/confirme/{rreq.confirm_token}/")
+    response = client.post(f"/retrait/confirme/{rreq.confirm_token}/")
     assert response.status_code == 200
 
     entry.refresh_from_db()
@@ -140,7 +140,7 @@ def test_confirm_writes_two_audit_entries(client, entry, settings):
         action__in=["ghost.removal.confirmed", "ghost.removal.executed"]
     ).delete()
 
-    client.get(f"/retrait/confirme/{rreq.confirm_token}/")
+    client.post(f"/retrait/confirme/{rreq.confirm_token}/")
     assert AuditLog.objects.filter(action="ghost.removal.confirmed").count() == 1
     assert AuditLog.objects.filter(action="ghost.removal.executed").count() == 1
 
@@ -228,7 +228,7 @@ def test_entry_not_in_public_queryset_after_confirm(client, entry, settings, db)
     assert e in qs
 
     rreq = RemovalRequest.objects.create(entry=e, requester_email="x@y.test")
-    client.get(f"/retrait/confirme/{rreq.confirm_token}/")
+    client.post(f"/retrait/confirme/{rreq.confirm_token}/")
 
     # Verify gone after removal
     qs = (
@@ -302,3 +302,56 @@ def test_removal_request_rejects_malformed_email_before_any_write(client, entry,
     assert b"invalide" in response.content
     assert RemovalRequest.objects.count() == 0
     assert not AuditLog.objects.filter(action="ghost.removal.requested").exists()
+
+
+# ---------- confirmation must not execute on GET ----------
+
+
+@pytest.mark.django_db
+def test_confirm_get_does_not_execute_the_removal(client, entry, settings):
+    """A GET must be safe. Outlook Safe Links, Gmail's proxy and antivirus
+    scanners all follow links in email — with a state-changing GET they would
+    remove someone's entry without the person ever clicking."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from members.models import RemovalRequest
+
+    rreq = RemovalRequest.objects.create(entry=entry, requester_email="r@x.test")
+
+    response = client.get(f"/retrait/confirme/{rreq.confirm_token}/")
+    assert response.status_code == 200
+
+    entry.refresh_from_db()
+    rreq.refresh_from_db()
+    assert entry.removed_at is None, "a link scanner must not be able to remove an entry"
+    assert rreq.status == "pending_confirmation"
+    # The page asks the human to confirm.
+    assert b"<form" in response.content
+
+
+@pytest.mark.django_db
+def test_confirm_post_executes_the_removal(client, entry, settings):
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from members.models import AuditLog, RemovalRequest
+
+    rreq = RemovalRequest.objects.create(entry=entry, requester_email="r@x.test")
+
+    response = client.post(f"/retrait/confirme/{rreq.confirm_token}/")
+    assert response.status_code == 200
+
+    entry.refresh_from_db()
+    rreq.refresh_from_db()
+    assert entry.removed_at is not None
+    assert rreq.status == "confirmed"
+    assert AuditLog.objects.filter(action="ghost.removal.executed").exists()
+
+
+@pytest.mark.django_db
+def test_confirm_post_is_idempotent(client, entry, settings):
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from members.models import AuditLog, RemovalRequest
+
+    rreq = RemovalRequest.objects.create(entry=entry, requester_email="r@x.test")
+    client.post(f"/retrait/confirme/{rreq.confirm_token}/")
+    client.post(f"/retrait/confirme/{rreq.confirm_token}/")
+
+    assert AuditLog.objects.filter(action="ghost.removal.executed").count() == 1

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block robots %}<meta name="robots" content="noindex,nofollow">{% endblock %}
+{% block title %}
+    {% trans "Confirmer le retrait" %} — {{ block.super }}
+{% endblock %}
+{% block content %}
+    <section class="mx-auto max-w-xl rounded-2xl border border-secondary/15 bg-surface p-8 text-center shadow-sm">
+        <h1 class="font-display text-2xl font-semibold tracking-tight">{% trans "Confirmer le retrait" %}</h1>
+        <p class="mt-4 text-secondary">
+            {% blocktrans with name=entry.first_name initial=entry.last_name_initial %}
+                Vous êtes sur le point de retirer <strong>{{ name }} {{ initial }}</strong> de la liste
+                publique « Nous recherchons aussi… ».
+            {% endblocktrans %}
+        </p>
+        <p class="mt-2 text-sm text-secondary">{% trans "Cette action est définitive." %}</p>
+        {# The removal happens ONLY on this POST. A GET must stay safe: email link #}
+        {# scanners (Outlook Safe Links, antivirus gateways) follow URLs in email, #}
+        {# and would otherwise execute the removal with nobody having clicked. #}
+        <form method="post" class="mt-6">
+            {% csrf_token %}
+            <button type="submit"
+                    class="inline-flex items-center rounded-lg bg-tertiary px-5 py-2 min-h-tap text-sm font-medium text-on-tertiary shadow-sm transition hover:opacity-95">
+                {% trans "Oui, retirer mon nom" %}
+            </button>
+        </form>
+        <a href="/"
+           class="mt-4 inline-block text-sm text-secondary hover:text-tertiary">{% trans "Annuler" %}</a>
+    </section>
+{% endblock %}

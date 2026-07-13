@@ -59,6 +59,25 @@ jobs:
       - run: python manage.py makemigrations --dry-run --check
       - run: pytest -v
 
+  # Known-vulnerable dependencies should fail the build, not wait for someone to
+  # notice. This is what let Django sit on an EOL 5.0 with open advisories.
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e "." pip-audit
+      - run: pip-audit --desc
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+      # Dev-only JS (Tailwind toolchain) never reaches production, so a dev
+      # advisory should not block a deploy — but it should be visible.
+      - run: npm audit --omit=dev || true
+
   docker-build:
     runs-on: ubuntu-latest
     steps:

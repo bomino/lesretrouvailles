@@ -624,3 +624,45 @@ def test_derive_outcome_empty_requests_is_pending_not_all_accepted():
     from cooptation.management.commands.process_cooptation_deadlines import Command
 
     assert Command._derive_outcome([]) == "pending"
+
+
+@pytest.mark.django_db
+def test_old_removal_requests_are_purged(make_admin, settings):
+    """Review M4: RemovalRequest keeps the requester's email, IP, reason and a
+    live confirm token forever. The cron purged AuditLog but never these.
+
+    A ghost-removal request is transactional data: once it is confirmed or
+    expired, keeping the requester's email and IP serves no purpose. Purge them
+    after the retention window; pending ones are left alone (still actionable).
+    """
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from django.core.management import call_command as cc
+
+    from members.models import PublicSearchEntry, RemovalRequest
+
+    entry = PublicSearchEntry.objects.create(
+        first_name="Ghost", last_name_initial="G", years_at_ceg=[1980]
+    )
+    old_confirmed = RemovalRequest.objects.create(
+        entry=entry, requester_email="old@x.test", status="confirmed"
+    )
+    RemovalRequest.objects.filter(pk=old_confirmed.pk).update(
+        requested_at=timezone.now() - timedelta(days=200)
+    )
+    recent = RemovalRequest.objects.create(
+        entry=entry, requester_email="recent@x.test", status="confirmed"
+    )
+    pending_old = RemovalRequest.objects.create(
+        entry=entry, requester_email="pending@x.test", status="pending_confirmation"
+    )
+    RemovalRequest.objects.filter(pk=pending_old.pk).update(
+        requested_at=timezone.now() - timedelta(days=200)
+    )
+
+    cc("process_cooptation_deadlines")
+
+    assert not RemovalRequest.objects.filter(pk=old_confirmed.pk).exists()
+    assert RemovalRequest.objects.filter(pk=recent.pk).exists()
+    assert RemovalRequest.objects.filter(pk=pending_old.pk).exists(), (
+        "a still-pending request is actionable — do not purge it"
+    )

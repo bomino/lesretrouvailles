@@ -47,6 +47,13 @@ GHOST_STALE_REMOVED_REASON = "Périmée — non renouvelée par les admins"
 # keeping a subset longer, filter by action in a follow-up phase.
 AUDIT_LOG_RETENTION_DAYS = 365
 
+# RemovalRequest holds the requester's email, IP, free-text reason and a live
+# confirm token. Once the request is settled (confirmed or expired) that data is
+# spent — it identifies a person who asked to be *removed* from a public list, so
+# keeping it forever is the opposite of the point. Pending requests are left
+# alone: they are still actionable by the person who made them.
+REMOVAL_REQUEST_RETENTION_DAYS = 180
+
 
 class Command(BaseCommand):
     help = "Daily processor for cooptation deadlines (J+7, J+14, retention purge)."
@@ -62,12 +69,13 @@ class Command(BaseCommand):
             digest_sent = self._send_quarterly_ghost_digest(now)
         purged_apps = self._purge_old_rejections(now)
         purged_audit = self._purge_old_audit_logs(now)
+        purged_removals = self._purge_old_removal_requests(now)
         self.stdout.write(
             self.style.SUCCESS(
                 f"Done. reminders={sent_reminders} expired={expired_apps} "
                 f"stale={stale_apps} ghosts_purged={ghosts_purged} "
                 f"digest_sent={digest_sent} purged={purged_apps} "
-                f"audit_purged={purged_audit}"
+                f"audit_purged={purged_audit} removals_purged={purged_removals}"
             )
         )
 
@@ -244,6 +252,23 @@ class Command(BaseCommand):
             services.purge_application(app)
             count += 1
         return count
+
+    def _purge_old_removal_requests(self, now) -> int:
+        """Delete settled ghost-removal requests past the retention window.
+
+        These rows carry requester_email, requester_ip, a free-text reason and a
+        confirm token. Nothing purged them before — the audit-log purge covered
+        AuditLog only. Pending requests are untouched: someone may still click
+        their confirmation link.
+        """
+        from members.models import RemovalRequest
+
+        cutoff = now - timedelta(days=REMOVAL_REQUEST_RETENTION_DAYS)
+        deleted, _ = RemovalRequest.objects.filter(
+            status__in=("confirmed", "expired"),
+            requested_at__lt=cutoff,
+        ).delete()
+        return deleted
 
     def _purge_old_audit_logs(self, now) -> int:
         """Delete AuditLog entries older than AUDIT_LOG_RETENTION_DAYS.

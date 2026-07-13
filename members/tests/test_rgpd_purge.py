@@ -298,7 +298,13 @@ def test_audit_log_entry_redacted(fake_clients, make_member):
     assert target_email not in serialized
 
     assert "email_hash" in audit.metadata
-    assert len(audit.metadata["email_hash"]) == 12
+    # Keyed HMAC-SHA256, not a bare SHA1: a 12-char SHA1 of an email is
+    # dictionary-reversible in a 200-person community. Length is an
+    # implementation detail; what matters is that it is not reversible.
+    assert len(audit.metadata["email_hash"]) >= 12
+    import hashlib as _h
+
+    assert audit.metadata["email_hash"] != _h.sha1(target_email.encode()).hexdigest()[:12]
     assert "deleted_counts" in audit.metadata
 
 
@@ -655,3 +661,59 @@ def test_purge_keeps_community_memories_and_anonymizes_the_uploader(
     assert "memoires/cour-1983" not in deleted, "community media must not be deleted"
 
     assert summary["deleted_counts"]["memories_anonymized"] == 1
+
+
+# ---------- external security review: purge must not lie ----------
+
+
+@pytest.mark.django_db
+def test_purge_aborts_when_cloudinary_delete_fails(make_member, fake_clients, monkeypatch):
+    """F-05 / review H2: Cloudinary and bucket failures were swallowed, then the
+    DB identity was deleted and `rgpd.member.purged` written anyway.
+
+    That is the worst possible outcome: the photo is still served from
+    Cloudinary, and we have just destroyed the only record of which public_id
+    belonged to whom — so nobody can ever clean it up. Abort BEFORE touching the
+    DB, so the operator can retry (Cloudinary delete is idempotent).
+    """
+    from alumni import cloudinary as cloud_mod
+    from members.models import AuditLog, Member
+    from members.services import PurgeIncomplete, rgpd_purge_member
+
+    cloud_mod.reset_fake_client()
+    member = make_member()
+    member.photo_public_id = "members/x/portrait"
+    member.save()
+
+    def _boom(public_id):
+        raise RuntimeError("cloudinary down")
+
+    monkeypatch.setattr(cloud_mod.get_client(), "delete", _boom)
+
+    with pytest.raises(PurgeIncomplete):
+        rgpd_purge_member(member, actor=None)
+
+    # Nothing destroyed: the member — and the link to the orphan asset — survive.
+    assert Member.objects.filter(pk=member.pk).exists()
+    assert not AuditLog.objects.filter(action="rgpd.member.purged").exists()
+
+
+@pytest.mark.django_db
+def test_purge_audit_hash_is_not_a_reversible_sha1(make_member, fake_clients):
+    """Review L1: SHA1(email)[:12] is dictionary-reversible — for a 200-person
+    community you can just hash every plausible address. Use a keyed HMAC so the
+    audit reference cannot be reversed without SECRET_KEY."""
+    import hashlib
+
+    from django.conf import settings
+
+    from members.services import rgpd_purge_member
+
+    member = make_member()
+    email = member.user.email
+    summary = rgpd_purge_member(member, actor=None)
+
+    naive = hashlib.sha1(email.encode()).hexdigest()[:12]
+    assert summary["email_hash"] != naive, "hash must not be a bare SHA1 of the email"
+    assert settings.SECRET_KEY not in summary["email_hash"]
+    assert len(summary["email_hash"]) >= 12

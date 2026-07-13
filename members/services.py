@@ -13,6 +13,7 @@ _collect_blockers() below or risk being silently cascaded.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import logging
 from typing import Any
 
@@ -40,26 +41,45 @@ def _name_tokens(*parts: str) -> set[str]:
 
 
 def can_claim(entry: ClassRosterEntry, member: Member) -> bool:
-    """Does `member`'s name plausibly match this roster entry?
+    """Does `member`'s name identify them as this roster entry?
 
-    Without a guard, « C'est moi » would let any member attach ANY classmate's
-    name to their own profile. Requiring at least one shared name token blocks
-    casually claiming an unrelated person while staying lenient about the
-    spelling drift you get across 45 years and a transcription (accents, "ou"
-    vs "u", a dropped middle name).
+    Requires **two** matching name tokens, not one.
 
-    Deliberately a speed bump, not a wall: every claim is audited with both
-    names and staff can unlink anything. A member whose registered name shares
-    nothing with the roster (e.g. a married name) is told to ask an admin.
+    One shared token was a security review finding, and rightly: "Moussa
+    Issoufou" could claim "Moussa Harouna" purely because both are Moussa. In a
+    Sahelian cohort, given names (Moussa, Mariama, Ibrahim, Zeinabou) repeat
+    constantly — one shared token is a coincidence, not an identity. Two is a
+    person.
+
+    Consequences, both deliberate:
+      * A roster row with ONLY a given name (20 of them) can never be
+        self-claimed. It identifies nobody, so an admin must make the link.
+      * A member whose registered surname differs entirely from the roster
+        (marriage, a transcription that dropped a name) is sent to an admin.
+        That is the right failure direction: a claim is an identity assertion,
+        and an over-eager one is worse than a manual step.
+
+    Nicknames count as a token because surnoms are strong identifiers in this
+    community — « Bomino » is exactly one person.
+
+    Still not a wall: every claim is audited with both names and staff can
+    unlink anything. But it is no longer a speed bump either.
     """
     entry_tokens = _name_tokens(entry.first_name, entry.last_name, entry.nickname)
     member_tokens = _name_tokens(member.first_name, member.last_name, member.nickname)
-    return bool(entry_tokens & member_tokens)
+    return len(entry_tokens & member_tokens) >= 2
 
 
 @transaction.atomic
 def claim_entry(entry: ClassRosterEntry, *, member: Member, actor) -> ClassRosterEntry:
-    """Link a roster entry to the member who says it is them."""
+    """Link a roster entry to the member who says it is them.
+
+    select_for_update: two concurrent claims on the same row would otherwise
+    both pass the "already claimed?" check and the last writer would win
+    silently. Lock the row for the duration.
+    """
+    entry = ClassRosterEntry.objects.select_for_update().get(pk=entry.pk)
+
     if entry.member_id == member.pk:
         return entry  # idempotent
     if entry.member_id is not None:
@@ -67,6 +87,20 @@ def claim_entry(entry: ClassRosterEntry, *, member: Member, actor) -> ClassRoste
     if not can_claim(entry, member):
         raise ClaimRefused(
             "Ce nom ne correspond pas au vôtre. Demandez à un administrateur de faire le lien."
+        )
+
+    # A pupil sits in ONE class per school year. Claiming a second entry for the
+    # same year is either a mistake or someone hoovering up identities. Claiming
+    # one entry in 1980 AND one in 1981 is legitimate — that is a repeated 6ème,
+    # and 12 people in these rosters did exactly that.
+    already = ClassRosterEntry.objects.filter(
+        member=member,
+        school_year_start=entry.school_year_start,
+    ).exclude(pk=entry.pk)
+    if already.exists():
+        raise ClaimRefused(
+            "Vous avez déjà revendiqué une fiche pour l'année "
+            f"{entry.school_year_label}. Demandez à un administrateur si c'est une erreur."
         )
 
     entry.member = member
@@ -112,6 +146,17 @@ def unclaim_entry(entry: ClassRosterEntry, *, member: Member, actor) -> ClassRos
     return entry
 
 
+class PurgeIncomplete(Exception):  # noqa: N818 — a refusal to proceed, not a crash
+    """External (Cloudinary / bucket) deletion failed, so nothing was purged.
+
+    Raised BEFORE any DB mutation. Retrying is safe and expected: both external
+    deletes are idempotent, and no row has been touched. The alternative — the
+    old behavior — was to log a warning, delete the DB identity anyway, and
+    write `rgpd.member.purged`: the media stays live while the only record of
+    who owned it is destroyed.
+    """
+
+
 class PurgeRefused(Exception):  # noqa: N818 — semantically a refusal, not an error
     """Precondition violation that blocks a clean cascade.
 
@@ -120,6 +165,26 @@ class PurgeRefused(Exception):  # noqa: N818 — semantically a refusal, not an 
     `Error` suffix on purpose — it signals "the operation was refused,"
     not "something went wrong" (cf. stdlib `StopIteration`).
     """
+
+
+def _audit_email_hash(email: str) -> str:
+    """A correlation reference for the purge audit row — not a stored email.
+
+    Was `sha1(email)[:12]`, which is dictionary-reversible: this is a ~200-person
+    community, so an attacker simply hashes every plausible address and matches.
+    That turned the "anonymous" audit trail into a lookup table.
+
+    HMAC-SHA256 keyed with SECRET_KEY: still stable (the same member always maps
+    to the same reference, so a purge can be correlated across audit rows) but
+    not reversible without the key.
+    """
+    from django.conf import settings as django_settings
+
+    return hmac.new(
+        django_settings.SECRET_KEY.encode("utf-8"),
+        email.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()[:16]
 
 
 def _collect_blockers(member: Member) -> list[str]:
@@ -195,7 +260,7 @@ def rgpd_purge_member(
     storage = storage_mod.get_client()
 
     member_id = member.id
-    email_hash = hashlib.sha1(member.user.email.encode("utf-8")).hexdigest()[:12]
+    email_hash = _audit_email_hash(member.user.email)
 
     # Pre-count for the dry-run summary
     memory_count = Memory.objects.filter(created_by=member.user).count()
@@ -243,11 +308,13 @@ def rgpd_purge_member(
 
     # --- Step 3 + 4: external systems first --------------------------------
     bucket_versions_deleted = 0
+    failures: list[str] = []
     for pid in public_ids:
         try:
             cloud.delete(pid)
-        except Exception as e:  # noqa: BLE001 — best-effort; log and continue
+        except Exception as e:  # noqa: BLE001 — collected, then raised below
             logger.warning("rgpd_purge: cloudinary delete failed for %s — %s", pid, e)
+            failures.append(f"cloudinary:{pid} ({e})")
         for version in storage.list_versions(prefix=pid):
             try:
                 storage.delete_version(version["path"], version["file_id"])
@@ -259,6 +326,23 @@ def rgpd_purge_member(
                     version.get("file_id"),
                     e,
                 )
+                failures.append(f"bucket:{version.get('path')}/{version.get('file_id')} ({e})")
+
+    # ABORT before touching the DB. These failures used to be swallowed: the
+    # media stayed live on Cloudinary, the DB identity was deleted anyway, and
+    # `rgpd.member.purged` was written as if it had all worked. That is the worst
+    # outcome available — the photo is still served, and the only record of which
+    # public_id belonged to whom is gone, so nobody can ever clean it up.
+    #
+    # Aborting here is safe to retry: Cloudinary's destroy and the bucket's
+    # delete_version are both idempotent, and no DB row has been touched yet
+    # (external calls deliberately run BEFORE the transaction).
+    if failures:
+        raise PurgeIncomplete(
+            f"{len(failures)} external deletion(s) failed; nothing was purged. "
+            "Fix the cause and re-run — the operation is idempotent. "
+            f"Failures: {'; '.join(failures[:5])}"
+        )
 
     deleted_counts["bucket_versions"] = bucket_versions_deleted
 

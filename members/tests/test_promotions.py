@@ -301,3 +301,101 @@ def test_populated_archive_renders_the_count(consenting_client, make_roster_entr
     make_roster_entry()
     body = consenting_client.get("/promotions/").content.decode("utf-8")
     assert "2 camarades" in body
+
+
+# ---------- claim hardening (external security review) ----------
+
+
+@pytest.mark.django_db
+def test_sharing_one_common_first_name_is_not_enough_to_claim(
+    consenting_client, make_roster_entry, make_member, make_user
+):
+    """The reviewer's case: "Moussa Issoufou" could claim "Moussa Harouna"
+    because they share the token "moussa". In a Sahelian cohort, given names
+    like Moussa/Mariama/Ibrahim repeat constantly — one shared token is not
+    identity, it is a coincidence."""
+    from members.services import can_claim
+
+    user = make_user()
+    member = make_member(user=user, first_name="Moussa", last_name="Issoufou")
+    entry = make_roster_entry(first_name="Moussa", last_name="Harouna")
+
+    assert can_claim(entry, member) is False
+
+
+@pytest.mark.django_db
+def test_full_name_match_still_claims(make_roster_entry, make_member, make_user):
+    from members.services import can_claim
+
+    member = make_member(user=make_user(), first_name="Mahamadou", last_name="Laouali")
+    entry = make_roster_entry(first_name="Mahamadou", last_name="Laouali")
+    assert can_claim(entry, member) is True
+
+
+@pytest.mark.django_db
+def test_single_name_roster_entry_needs_the_surname_to_match_too(
+    make_roster_entry, make_member, make_user
+):
+    """20 roster rows carry only a given name. Those must NOT become a free
+    claim for anyone sharing that given name."""
+    from members.services import can_claim
+
+    member = make_member(user=make_user(), first_name="Fernande", last_name="Bonkoungou")
+    entry = make_roster_entry(first_name="Fernande", last_name="")
+    # A lone given name identifies nobody — an admin must make this link.
+    assert can_claim(entry, member) is False
+
+
+@pytest.mark.django_db
+def test_nickname_match_counts_as_a_second_signal(make_roster_entry, make_member, make_user):
+    """Surnoms are strong identifiers here — «Bomino» is one person."""
+    from members.services import can_claim
+
+    member = make_member(user=make_user(), first_name="Mahamadou", last_name="Laouali")
+    entry = make_roster_entry(first_name="Mahamadou", last_name="Sani", nickname="Laouali")
+    assert can_claim(entry, member) is True
+
+
+@pytest.mark.django_db
+def test_member_cannot_claim_two_entries_from_the_same_school_year(
+    consenting_client, make_roster_entry
+):
+    """A pupil sits in ONE class per year. Claiming several entries for the same
+    year is either a mistake or someone hoovering up identities."""
+    from members.services import ClaimRefused, claim_entry
+
+    member = consenting_client.member
+    first = make_roster_entry(
+        first_name=member.first_name, last_name=member.last_name, class_label="6eB"
+    )
+    second = make_roster_entry(
+        first_name=member.first_name, last_name=member.last_name, class_label="6eC"
+    )
+
+    claim_entry(first, member=member, actor=member.user)
+    with pytest.raises(ClaimRefused):
+        claim_entry(second, member=member, actor=member.user)
+
+    second.refresh_from_db()
+    assert second.member is None
+
+
+@pytest.mark.django_db
+def test_member_may_claim_one_entry_per_year(consenting_client, make_roster_entry):
+    """Repeating 6ème is legitimate — one entry in 1980 AND one in 1981."""
+    from members.services import claim_entry
+
+    member = consenting_client.member
+    a = make_roster_entry(
+        first_name=member.first_name, last_name=member.last_name, school_year_start=1980
+    )
+    b = make_roster_entry(
+        first_name=member.first_name, last_name=member.last_name, school_year_start=1981
+    )
+
+    claim_entry(a, member=member, actor=member.user)
+    claim_entry(b, member=member, actor=member.user)
+
+    a.refresh_from_db()
+    b.refresh_from_db()
+    assert a.member_id == member.pk and b.member_id == member.pk
