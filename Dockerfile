@@ -45,7 +45,7 @@ WORKDIR /app
 # source tree present at install time. The Django app runs from /app via the
 # default working dir; no editable install needed.
 RUN pip install --upgrade pip && pip install \
-    "django>=5.0,<5.1" \
+    "django>=5.2,<5.3" \
     "psycopg[binary]>=3.1" \
     "django-allauth>=65.0" \
     "django-environ>=0.11" \

@@ -19,10 +19,15 @@ PORT="${PORT:-8000}"
 WEB_CONCURRENCY="${WEB_CONCURRENCY:-2}"
 GUNICORN_TIMEOUT="${GUNICORN_TIMEOUT:-60}"
 
+# --logger-class: the access log records the full request line, and this platform
+# carries single-use tokens in URL PATHS (password reset, parrain vouch,
+# questionnaire, ghost removal). Without redaction every one of them lands in
+# Railway's logs in plaintext, replayable by anyone with log access.
 exec gunicorn alumni.wsgi:application \
     --bind "0.0.0.0:${PORT}" \
     --workers "${WEB_CONCURRENCY}" \
     --timeout "${GUNICORN_TIMEOUT}" \
+    --logger-class alumni.logging.RedactingGunicornLogger \
     --access-logfile - \
     --error-logfile - \
     --log-level info

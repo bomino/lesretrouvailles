@@ -7,7 +7,7 @@
 # Keep in sync with pyproject.toml manually until we either drop Railpack
 # entirely (force Dockerfile) or move to a single-source via pip-compile.
 
-django>=5.0,<5.1
+django>=5.2,<5.3
 psycopg[binary]>=3.1
 django-allauth>=65.0
 django-environ>=0.11

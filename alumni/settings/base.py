@@ -271,10 +271,17 @@ LOGGING = {
     "formatters": {
         "verbose": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
     },
+    "filters": {
+        # Password-reset / vouch / questionnaire / removal tokens live in URL
+        # PATHS on this platform, and django.request prints the path on every
+        # 500. Scrub them before anything is emitted.
+        "token_redaction": {"()": "alumni.logging.TokenRedactingFilter"},
+    },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "verbose",
+            "filters": ["token_redaction"],
         },
     },
     "root": {"handlers": ["console"], "level": "INFO"},
