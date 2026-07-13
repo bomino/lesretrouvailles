@@ -26,7 +26,7 @@
                      data-photo-uploader
                      data-cloud-name="{{ cloudinary_cloud_name }}"
                      data-csrf-token="{{ csrf_token }}"
-                     data-sign-endpoint="/api/cloudinary/sign/">
+                     data-upload-endpoint="/api/photo/upload/">
                     <div class="shrink-0 relative">
                         {% if member.photo_public_id %}
                             {% member_photo_url member.photo_public_id 96 as current_photo_url %}

@@ -280,9 +280,9 @@ Le Mur des souvenirs est curé par les administrateurs (les membres ne peuvent p
    - `Publiée` — visible par tous les membres
 7. Cliquez **« Créer »**. Vous êtes ramené à la liste avec un bandeau de confirmation.
 
-> 🔒 **Protection vie privée automatique :** depuis 2026-05-10, les métadonnées EXIF (coordonnées GPS, modèle d'appareil, date de prise de vue) sont **retirées côté serveur** avant l'envoi à Cloudinary pour toutes les photos que **vous** téléversez : Mur des souvenirs, fiches In Memoriam, photos importées avec le roster, et photos de membres déposées depuis `/gestion/`.
+> 🔒 **Protection vie privée automatique :** les métadonnées EXIF (coordonnées GPS, modèle d'appareil, date de prise de vue) sont **retirées côté serveur** avant l'envoi à Cloudinary, sur **tous** les chemins de téléversement : Mur des souvenirs, fiches In Memoriam, import du roster, photos déposées depuis `/gestion/`, **et la photo que le membre téléverse lui-même depuis « Profil → Modifier »**.
 >
-> ⚠️ **Exception connue :** la photo qu'un membre téléverse lui-même depuis « Profil → Modifier » part directement de son navigateur vers Cloudinary et **ne passe pas** par ce nettoyage (tech-debt F-03). Tant que ce n'est pas corrigé, ne promettez pas aux membres que leur photo de profil est nettoyée — et si un membre s'en inquiète, re-téléversez sa photo à sa place depuis `/gestion/`.
+> L'ancienne exception (F-03 : la photo de profil partait directement du navigateur vers Cloudinary, sans nettoyage) est **corrigée** — tout passe désormais par le serveur.
 
 ### Modifier la légende, remplacer la photo, ou changer le statut
 

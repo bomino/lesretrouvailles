@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import time
 from importlib import import_module
 from io import BytesIO
 from typing import Any, Protocol
@@ -16,12 +15,10 @@ logger = logging.getLogger(__name__)
 # MIME types we know how to strip via Pillow's resave.
 _STRIPPABLE_MIME_TYPES = frozenset({"image/jpeg", "image/png", "image/webp"})
 
-# Signed-upload policy. These go INSIDE the Cloudinary signature (see
-# RealCloudinary.sign_upload) — Cloudinary only enforces what it can verify,
-# so an unsigned restriction is decoration. Cloudinary expects
-# allowed_formats as a comma-joined string in the signed payload.
+# Upload policy. Enforced SERVER-SIDE in members.views.photo_upload_view, which
+# is the only path to Cloudinary now: the signed direct-to-browser upload was
+# removed with F-03 because it skipped the EXIF strip entirely.
 UPLOAD_MAX_BYTES = 5 * 1024 * 1024
-UPLOAD_ALLOWED_FORMATS = "jpg,jpeg,png,webp"
 
 
 def _strip_exif_metadata(file_obj: Any, *, content_type: str) -> BytesIO:
@@ -101,8 +98,6 @@ def _strip_exif_metadata(file_obj: Any, *, content_type: str) -> BytesIO:
 
 
 class CloudinaryClient(Protocol):
-    def sign_upload(self, *, folder: str, timestamp: int) -> dict[str, Any]: ...
-
     def upload_file(self, file_obj: Any, *, folder: str) -> str: ...
 
     def delete(self, public_id: str) -> None: ...
@@ -128,32 +123,6 @@ class RealCloudinary:
 
         cloudinary.config(secure=True)
         self._cloudinary = cloudinary
-
-    def sign_upload(self, *, folder: str, timestamp: int) -> dict[str, Any]:
-        """Signed direct-upload params for the browser.
-
-        The size/format restrictions are INSIDE the signature. Cloudinary only
-        enforces the parameters it can verify, so returning them alongside an
-        unsigned signature (as this did) was cosmetic: a member could skip the
-        JS and POST a 50 MB file of any type straight into the account. Because
-        they are signed, the browser must send them back verbatim — tampering
-        with either value invalidates the signature and Cloudinary rejects the
-        upload.
-        """
-        api_key = self._cloudinary.config().api_key
-        api_secret = self._cloudinary.config().api_secret
-        params = {
-            "folder": folder,
-            "timestamp": timestamp,
-            "max_file_size": UPLOAD_MAX_BYTES,
-            "allowed_formats": UPLOAD_ALLOWED_FORMATS,
-        }
-        signature = self._cloudinary.utils.api_sign_request(params, api_secret)
-        return {
-            "api_key": api_key,
-            "signature": signature,
-            **params,
-        }
 
     def upload_file(self, file_obj: Any, *, folder: str) -> str:
         """Server-side upload via Cloudinary's REST API. Returns the public_id.
@@ -197,32 +166,32 @@ class FakeCloudinary:
     """In-memory client used in tests. Records calls; never hits the network."""
 
     def __init__(self) -> None:
-        self.sign_calls: list[dict[str, Any]] = []
         self.delete_calls: list[str] = []
         self.upload_calls: list[dict[str, Any]] = []
         self.download_calls: list[str] = []
 
-    def sign_upload(self, *, folder: str, timestamp: int) -> dict[str, Any]:
-        # Same payload SHAPE as RealCloudinary (incl. the comma-joined
-        # allowed_formats), or tests would pass against a contract production
-        # does not have — the trap that hid the Cloudinary submodule bug.
-        self.sign_calls.append({"folder": folder, "timestamp": timestamp})
-        digest = hashlib.sha1(f"{folder}:{timestamp}".encode()).hexdigest()[:16]
-        return {
-            "api_key": "fake-key",
-            "timestamp": timestamp,
-            "signature": f"fake-sig-{digest}",
-            "folder": folder,
-            "max_file_size": UPLOAD_MAX_BYTES,
-            "allowed_formats": UPLOAD_ALLOWED_FORMATS,
-        }
-
     def upload_file(self, file_obj: Any, *, folder: str) -> str:
-        """Test stub: records the call and returns a deterministic fake public_id."""
+        """Test stub: records the call and returns a deterministic fake public_id.
+
+        Runs the SAME EXIF strip as RealCloudinary.upload_file and records the
+        resulting bytes as `file_bytes`. Without that, a caller could reopen the
+        GPS-leak hole (F-03) and every test would still pass — the fake would be
+        asserting a contract production does not have. That is exactly how the
+        Cloudinary submodule bug hid in this codebase for months.
+        """
+        content_type = getattr(file_obj, "content_type", "image/jpeg")
+        stripped = _strip_exif_metadata(file_obj, content_type=content_type)
         name = getattr(file_obj, "name", "upload")
         digest = hashlib.sha1(f"{folder}:{name}".encode()).hexdigest()[:12]
         public_id = f"{folder}/fake-{digest}"
-        self.upload_calls.append({"folder": folder, "name": name, "public_id": public_id})
+        self.upload_calls.append(
+            {
+                "folder": folder,
+                "name": name,
+                "public_id": public_id,
+                "file_bytes": stripped.getvalue(),
+            }
+        )
         return public_id
 
     def delete(self, public_id: str) -> None:
@@ -265,10 +234,6 @@ def reset_fake_client() -> FakeCloudinary:
     global _fake_singleton  # noqa: PLW0603
     _fake_singleton = FakeCloudinary()
     return _fake_singleton
-
-
-def now_timestamp() -> int:
-    return int(time.time())
 
 
 def member_thumbnail_url(public_id: str, size: int = 240) -> str:

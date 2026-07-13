@@ -33,7 +33,7 @@ def _format_summary(summary: dict, *, dry_run: bool) -> str:
         header,
         f"  member_id              : {summary['member_id']}",
         f"  email_hash             : {summary['email_hash']}",
-        f"  memories               : {counts['memories']}",
+        f"  memories_anonymized    : {counts['memories_anonymized']}",
         f"  cooptation_requests    : {counts['cooptation_requests']}",
         f"  memoriam_nominations   : {counts['memoriam_nominations']}",
         f"  admin_apps_anonymized  : {counts['admin_applications_anonymized']}",

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import markdown as _markdown
 from django.conf import settings
 from django.contrib import messages
@@ -18,16 +20,20 @@ from django.views.decorators.http import require_http_methods
 from django_ratelimit.core import is_ratelimited
 from django_ratelimit.decorators import ratelimit
 
-from alumni.cloudinary import get_client, now_timestamp
+from alumni.cloudinary import UPLOAD_MAX_BYTES, get_client
 
 from .charters import CHARTER_CURRENT_VERSION, get_charter_text
 from .forms import NotificationPreferenceForm, ProfileEditForm
 from .models import AuditLog, ConsentRecord, Member
 from .search import search_members
 
+logger = logging.getLogger(__name__)
+
 # Hardcoded suggestion chips rendered in the empty-state when /annuaire/
 # returns zero results post-fallback. Tuneable; a future enhancement
 # could derive these from top-N city/year counts in real data.
+ALLOWED_UPLOAD_TYPES = frozenset({"image/jpeg", "image/png", "image/webp"})
+
 DIRECTORY_EMPTY_STATE_SUGGESTIONS: list[tuple[str, str]] = [
     ("Niamey", "/annuaire/?city=Niamey"),
     ("Zinder", "/annuaire/?city=Zinder"),
@@ -142,22 +148,49 @@ def profile_edit_view(request):
 @login_required
 @require_http_methods(["POST"])
 @ratelimit(key="user", rate="10/m", method="POST", block=False)
-def cloudinary_sign_view(request):
+def photo_upload_view(request):
+    """Upload a member photo THROUGH the server, so the EXIF strip runs.
+
+    Replaces the old signed direct-to-Cloudinary upload (F-03). That path never
+    touched `_strip_exif_metadata`, so a profile photo taken at home kept its
+    GPS coordinates in the stored original — while the FAQ told members the
+    metadata was removed. CLAUDE.md is explicit: an uploader that talks to
+    Cloudinary directly reopens the privacy hole.
+
+    The signing endpoint is deleted, not merely unused: leaving it up would keep
+    the bypass one curl away for any logged-in member.
+
+    Cost: the photo (≤5 MB, uploaded once) transits Django instead of going
+    browser-to-edge. That is the price of a guarantee we can actually test.
+    """
     if getattr(request, "limited", False):
         return JsonResponse(
-            {"error": "rate limit exceeded"},
+            {"error": "Trop de tentatives. Réessayez dans une minute."},
             status=429,
             headers={"Retry-After": "60"},
         )
 
-    # Staff can upload on behalf of any member by passing member_slug.
-    # Regular members always upload to their own folder; the slug field is
-    # ignored if the requester is not staff.
+    upload = request.FILES.get("file")
+    if upload is None:
+        return JsonResponse({"error": "Aucun fichier reçu."}, status=400)
+
+    # Enforced HERE, server-side. The old policy lived in the JS and in the
+    # Cloudinary upload params — both of which a member could simply skip.
+    if upload.size > UPLOAD_MAX_BYTES:
+        return JsonResponse({"error": "Photo trop lourde. Maximum : 5 Mo."}, status=400)
+    if (upload.content_type or "") not in ALLOWED_UPLOAD_TYPES:
+        return JsonResponse(
+            {"error": "Format non supporté. Utilisez JPG, PNG ou WebP."}, status=400
+        )
+
+    # Staff may upload on behalf of any member via member_slug. For everyone
+    # else the folder is pinned to their OWN slug, so a member cannot overwrite
+    # someone else's photo by passing a slug.
     target_slug = (request.POST.get("member_slug") or "").strip()
     if target_slug and request.user.is_staff:
         try:
             target = Member.objects.get(slug=target_slug)
-        except (Member.DoesNotExist, ValueError):
+        except (Member.DoesNotExist, ValidationError, ValueError):
             return JsonResponse({"error": "unknown member"}, status=400)
         folder = f"members/{target.slug}/"
     else:
@@ -166,9 +199,14 @@ def cloudinary_sign_view(request):
             return JsonResponse({"error": "no member"}, status=400)
         folder = f"members/{member.slug}/"
 
-    timestamp = now_timestamp()
-    payload = get_client().sign_upload(folder=folder, timestamp=timestamp)
-    return JsonResponse(payload)
+    try:
+        # upload_file runs _strip_exif_metadata before the bytes leave us.
+        public_id = get_client().upload_file(upload, folder=folder)
+    except Exception:
+        logger.exception("photo upload failed for folder %s", folder)
+        return JsonResponse({"error": "Échec du téléversement. Réessayez."}, status=502)
+
+    return JsonResponse({"public_id": public_id})
 
 
 @login_required

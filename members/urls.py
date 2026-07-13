@@ -8,7 +8,7 @@ urlpatterns = [
     path("charte/", views.charter_view, name="charter"),
     path("membres/<uuid:slug>/", views.profile_detail_view, name="profile_detail"),
     path("profil/", views.profile_edit_view, name="profile_edit"),
-    path("api/cloudinary/sign/", views.cloudinary_sign_view, name="cloudinary_sign"),
+    path("api/photo/upload/", views.photo_upload_view, name="photo_upload"),
     path("annuaire/", views.directory_view, name="directory"),
     path("promotions/", views.promotions_index_view, name="promotions_index"),
     path(

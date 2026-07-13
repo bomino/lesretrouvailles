@@ -142,17 +142,20 @@ def _collect_blockers(member: Member) -> list[str]:
 
 
 def _collect_public_ids(member: Member) -> set[str]:
-    """All Cloudinary public_ids tied to this member (profile + authored memories)."""
-    from memoires.models import Memory
+    """Cloudinary public_ids that are the MEMBER'S OWN personal data.
 
+    Their profile photo, and nothing else. Memories they uploaded to the Mur des
+    souvenirs are deliberately excluded: those are photos OF the community, not
+    personal data OF the uploader, and deleting them would erase shared history
+    because the person who happened to upload it exercised their erasure right
+    (F-06). The rows survive with `created_by` nulled — see the purge below.
+
+    Residual, and it is a real one: if a retained photo *depicts* the purged
+    person, an admin must remove it by hand. The purge summary says so.
+    """
     public_ids: set[str] = set()
     if member.photo_public_id:
         public_ids.add(member.photo_public_id)
-    public_ids.update(
-        Memory.objects.filter(created_by=member.user)
-        .exclude(photo_public_id="")
-        .values_list("photo_public_id", flat=True),
-    )
     return public_ids
 
 
@@ -220,7 +223,7 @@ def rgpd_purge_member(
     roster_count = ClassRosterEntry.objects.filter(member=member).count()
 
     deleted_counts = {
-        "memories": memory_count,
+        "memories_anonymized": memory_count,
         "cooptation_requests": cooptation_count,
         "memoriam_nominations": nomination_count,
         "admin_applications_anonymized": application_count,
@@ -265,8 +268,12 @@ def rgpd_purge_member(
         CooptationRequest.objects.filter(parrain=member).delete()
         InMemoriamNomination.objects.filter(nominator=member).delete()
 
-        # Step 6: hard-delete authored memories
-        Memory.objects.filter(created_by=member.user).delete()
+        # Step 6: keep the community's memories, drop the link to the person.
+        # These are photos OF the community (Mur des souvenirs, admin-curated),
+        # not personal data OF the uploader. Hard-deleting them meant a purged
+        # co-admin took the shared gallery down with them (F-06). The Cloudinary
+        # assets are likewise retained — see _collect_public_ids.
+        Memory.objects.filter(created_by=member.user).update(created_by=None)
 
         # Step 7: anonymize prior AdminApplications (calls .purge() each).
         # Skip entirely when the member has no email — see the pre-count

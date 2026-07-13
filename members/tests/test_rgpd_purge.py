@@ -140,6 +140,10 @@ def test_purge_member_with_profile_photo(fake_clients, make_member):
 
 @pytest.mark.django_db
 def test_purge_member_who_authored_memories(fake_clients, make_member):
+    """F-06: this test used to assert the memories were DELETED and their
+    Cloudinary assets destroyed — it locked in the bug. The Mur des souvenirs is
+    community history; a purged co-admin must not take the gallery with them.
+    The rows survive with created_by nulled, and their media is untouched."""
     from alumni import cloudinary as cloud_mod
     from members.services import rgpd_purge_member
 
@@ -151,11 +155,13 @@ def test_purge_member_who_authored_memories(fake_clients, make_member):
     rgpd_purge_member(target, actor=actor)
 
     cloud = cloud_mod.get_client()
-    assert sorted(cloud.delete_calls) == ["memoires/m1", "memoires/m2"]
+    assert "memoires/m1" not in cloud.delete_calls
+    assert "memoires/m2" not in cloud.delete_calls
 
     from memoires.models import Memory
 
-    assert Memory.objects.count() == 0
+    assert Memory.objects.count() == 2
+    assert Memory.objects.filter(created_by__isnull=True).count() == 2
 
 
 @pytest.mark.django_db
@@ -268,7 +274,7 @@ def test_dry_run_makes_no_changes(fake_clients, make_member):
     assert storage.delete_calls == []
     assert not AuditLog.objects.filter(action="rgpd.member.purged").exists()
     # Plan still reports counts
-    assert result["deleted_counts"]["memories"] == 1
+    assert result["deleted_counts"]["memories_anonymized"] == 1
 
 
 @pytest.mark.django_db
@@ -605,3 +611,47 @@ def test_rgpd_cli_resolves_email_less_member_by_username(make_member, make_user)
     output = out.getvalue()
     assert "No member found" not in output, "email-less members must be targetable by username"
     assert str(member.pk) in output
+
+
+# ---------- F-06: purging a co-admin must not destroy community content ----------
+
+
+@pytest.mark.django_db
+def test_purge_keeps_community_memories_and_anonymizes_the_uploader(
+    make_member, settings, fake_clients
+):
+    """F-06: the purge hard-deleted every Memory the member had uploaded.
+
+    The Mur des souvenirs is admin-curated community history — photos OF the
+    community, not personal data OF the uploader. Purging a co-admin would have
+    wiped the gallery. Retain the memory, null out created_by, and leave its
+    Cloudinary asset alone.
+    """
+    from alumni import cloudinary as cloud_mod
+    from members.services import rgpd_purge_member
+    from memoires.models import Memory
+
+    cloud_mod.reset_fake_client()
+
+    member = make_member()
+    member.photo_public_id = "members/self/portrait"
+    member.save()
+
+    memory = Memory.objects.create(
+        caption="La cour du CEG, 1983",
+        photo_public_id="memoires/cour-1983",
+        created_by=member.user,
+    )
+
+    summary = rgpd_purge_member(member, actor=None)
+
+    memory.refresh_from_db()
+    assert memory.pk is not None, "community photo must survive the purge"
+    assert memory.created_by is None, "the uploader must be anonymized"
+    assert memory.photo_public_id == "memoires/cour-1983"
+
+    deleted = cloud_mod.get_client().delete_calls
+    assert "members/self/portrait" in deleted, "the member's OWN photo is still purged"
+    assert "memoires/cour-1983" not in deleted, "community media must not be deleted"
+
+    assert summary["deleted_counts"]["memories_anonymized"] == 1

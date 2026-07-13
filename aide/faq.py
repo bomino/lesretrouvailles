@@ -142,12 +142,12 @@ FAQ_ENTRIES: list[FAQEntry] = [
             "Formats acceptés : **JPG, PNG, WebP**. Taille maximale : **5 Mo**. La photo est "
             "automatiquement recadrée et publiée. Choisissez une photo nette de votre visage — "
             "elle apparaîtra dans l'annuaire et sur votre profil.\n\n"
-            "🔒 **Vie privée** : par prudence, évitez une photo prise chez vous si votre "
-            "téléphone enregistre la position GPS dans ses images — pour les photos que "
-            "vous téléversez vous-même, ces métadonnées ne sont pas encore retirées "
-            "automatiquement. Le plus sûr est de recadrer un portrait existant, ou de "
-            "demander à un administrateur de téléverser la photo à votre place (ce "
-            "chemin-là, lui, nettoie les métadonnées)."
+            "🔒 **Vie privée** : les métadonnées EXIF de votre photo (coordonnées GPS du "
+            "lieu où elle a été prise, modèle d'appareil, date de prise de vue) sont "
+            "**retirées automatiquement** avant la publication — quel que soit le "
+            "chemin : que vous la téléversiez vous-même ou qu'un administrateur le "
+            "fasse pour vous. Personne ne peut remonter à votre adresse à partir de "
+            "votre photo de profil."
         ),
         related_links=[("Mon profil", "/profil/")],
     ),

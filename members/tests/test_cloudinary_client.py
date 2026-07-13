@@ -3,14 +3,6 @@ from django.test import override_settings
 from alumni.cloudinary import FakeCloudinary, get_client, member_thumbnail_url
 
 
-def test_fake_cloudinary_records_sign_calls():
-    fake = FakeCloudinary()
-    out = fake.sign_upload(folder="members/abc/", timestamp=1700000000)
-    assert out["folder"] == "members/abc/"
-    assert out["signature"].startswith("fake-sig-")
-    assert fake.sign_calls == [{"folder": "members/abc/", "timestamp": 1700000000}]
-
-
 def test_fake_cloudinary_records_delete_calls():
     fake = FakeCloudinary()
     fake.delete("members/abc/photo123")

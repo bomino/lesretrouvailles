@@ -176,7 +176,7 @@ def test_real_cloudinary_init_loads_required_submodules():
         "cloudinary.uploader not loaded — RealCloudinary.upload_file() / .delete() will crash"
     )
     assert hasattr(cloudinary, "utils"), (
-        "cloudinary.utils not loaded — RealCloudinary.sign_upload() will crash"
+        "cloudinary.uploader not loaded — RealCloudinary.upload_file() will crash"
     )
     # And the actual callables we use must resolve
     assert callable(cloudinary.api.resource)
@@ -215,50 +215,3 @@ class TestExifOrientation:
             "pixels must be transposed to display orientation before EXIF is dropped"
         )
         assert out.getexif().get(0x0112) is None  # tag still gone
-
-
-def test_signed_upload_covers_the_size_and_format_restrictions(request):
-    """F-04: max_file_size / allowed_formats were returned to the browser but
-    NOT part of the signed params. Cloudinary only enforces what is signed, so
-    a member could skip the JS and POST a 50 MB file of any type straight into
-    the account. The signature must cover them."""
-    import cloudinary
-    import cloudinary.utils
-
-    from alumni.cloudinary import RealCloudinary
-
-    # Configure an explicit dummy credential: signing needs an api_secret, and
-    # relying on whatever happens to be in the local .env made this test pass on
-    # a dev box and fail in CI (which has none). Hermetic now.
-    secret = "test-secret-not-real"  # noqa: S105
-    prior = {
-        "cloud_name": cloudinary.config().cloud_name,
-        "api_key": cloudinary.config().api_key,
-        "api_secret": cloudinary.config().api_secret,
-    }
-    cloudinary.config(cloud_name="test-cloud", api_key="test-key", api_secret=secret)
-    request.addfinalizer(lambda: cloudinary.config(**prior))  # no cross-test bleed
-
-    client = RealCloudinary()
-    payload = client.sign_upload(folder="members/abc/", timestamp=1700000000)
-
-    assert payload["max_file_size"] == 5 * 1024 * 1024
-    assert payload["allowed_formats"] == "jpg,jpeg,png,webp"
-
-    expected = cloudinary.utils.api_sign_request(
-        {
-            "folder": "members/abc/",
-            "timestamp": 1700000000,
-            "max_file_size": 5 * 1024 * 1024,
-            "allowed_formats": "jpg,jpeg,png,webp",
-        },
-        secret,
-    )
-    assert payload["signature"] == expected, "restrictions must be inside the signature"
-
-    # Sanity: signing WITHOUT the restrictions must produce a different
-    # signature — otherwise this test would pass even if they were dropped.
-    unrestricted = cloudinary.utils.api_sign_request(
-        {"folder": "members/abc/", "timestamp": 1700000000}, secret
-    )
-    assert payload["signature"] != unrestricted

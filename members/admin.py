@@ -97,7 +97,7 @@ class MemberAdmin(admin.ModelAdmin):
             "<div data-photo-uploader "
             'data-cloud-name="{cloud}" '
             'data-member-slug="{slug}" '
-            'data-sign-endpoint="/api/cloudinary/sign/" '
+            'data-upload-endpoint="/api/photo/upload/" '
             'style="display:flex; align-items:center; gap:1rem; padding:.5rem 0;">'
             '  <input type="file" accept="image/jpeg,image/png,image/webp" '
             '         style="display:none;">'

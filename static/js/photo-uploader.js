@@ -2,13 +2,18 @@
  * Profile photo uploader.
  *
  * Flow:
- *   1. User picks a file → client-side validation (type, size).
- *   2. POST /api/cloudinary/sign/ → get signature (server-pinned folder).
- *   3. POST file directly to Cloudinary's upload endpoint with that signature.
- *   4. On success, write Cloudinary's public_id into the hidden form field
- *      and update the on-screen preview.
+ *   1. User picks a file → client-side validation (type, size) for fast feedback.
+ *   2. POST the file to /api/photo/upload/ (our server).
+ *   3. Django strips EXIF/GPS via Pillow, then uploads to Cloudinary and returns
+ *      the public_id.
+ *   4. Write that public_id into the hidden form field, update the preview.
  *   5. User clicks "Enregistrer" → Django form POSTs as normal; the backend
  *      validates that public_id is under members/<slug>/ before persisting.
+ *
+ * The photo deliberately transits our server: uploading straight to Cloudinary
+ * (the old flow) skipped the EXIF strip, so a photo taken at home kept its GPS
+ * coordinates while the FAQ told members the metadata was removed (F-03). The
+ * client-side checks below are UX, not security — the server enforces both.
  *
  * No framework. The widget activates whenever an element with
  * [data-photo-uploader] is present and wires itself to the hidden
@@ -27,11 +32,11 @@
         const previewEl = root.querySelector("[data-photo-preview]");
         const hidden = document.querySelector('input[name="photo_public_id"]');
         const cloudName = root.dataset.cloudName;
-        const signEndpoint = root.dataset.signEndpoint || "/api/cloudinary/sign/";
+        const uploadEndpoint = root.dataset.uploadEndpoint || "/api/photo/upload/";
         const csrfToken = root.dataset.csrfToken || readCsrfFromCookie();
         // Optional: when present, the uploader runs in admin-on-behalf-of mode.
-        // The sign endpoint pins the Cloudinary folder to this member's slug
-        // (only honored if the requester is staff).
+        // The server pins the Cloudinary folder to this member's slug — and
+        // only honors it when the requester is staff.
         const memberSlug = root.dataset.memberSlug || "";
 
         if (!fileInput || !trigger || !hidden || !cloudName || !csrfToken) {
@@ -76,56 +81,32 @@
             showStatus("Préparation…", "info");
 
             try {
-                const signBody = new FormData();
-                if (memberSlug) {
-                    signBody.append("member_slug", memberSlug);
-                }
-                const signResp = await fetch(signEndpoint, {
-                    method: "POST",
-                    headers: { "X-CSRFToken": csrfToken, "Accept": "application/json" },
-                    credentials: "same-origin",
-                    body: signBody,
-                });
-
-                if (signResp.status === 429) {
-                    showStatus("Trop de tentatives. Réessayez dans une minute.", "error");
-                    return;
-                }
-                if (!signResp.ok) {
-                    showStatus("Impossible d'obtenir l'autorisation. Réessayez.", "error");
-                    return;
-                }
-
-                const sig = await signResp.json();
-
                 showStatus("Téléversement…", "info");
 
                 const fd = new FormData();
                 fd.append("file", file);
-                fd.append("api_key", sig.api_key);
-                fd.append("timestamp", String(sig.timestamp));
-                fd.append("signature", sig.signature);
-                fd.append("folder", sig.folder);
-                // max_file_size and allowed_formats are part of the SIGNATURE, so
-                // they must be echoed back verbatim — Cloudinary recomputes the
-                // signature over what it receives and rejects any mismatch. That
-                // is what makes the 5 MB / image-only policy actually enforced
-                // rather than a client-side suggestion.
-                fd.append("max_file_size", String(sig.max_file_size));
-                fd.append("allowed_formats", sig.allowed_formats);
+                if (memberSlug) {
+                    fd.append("member_slug", memberSlug);
+                }
 
-                const upResp = await fetch(
-                    `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-                    { method: "POST", body: fd },
-                );
+                const upResp = await fetch(uploadEndpoint, {
+                    method: "POST",
+                    headers: { "X-CSRFToken": csrfToken, "Accept": "application/json" },
+                    credentials: "same-origin",
+                    body: fd,
+                });
 
+                if (upResp.status === 429) {
+                    showStatus("Trop de tentatives. Réessayez dans une minute.", "error");
+                    return;
+                }
                 if (!upResp.ok) {
+                    // The server speaks French; surface its message when it has one.
                     const err = await upResp.json().catch(() => ({}));
-                    // Cloudinary's error text is English ("File size too large.
-                    // Got 11534336…"); every other branch of this script speaks
-                    // French. Log it for debugging, show French to the member.
-                    console.error("Cloudinary upload failed:", err && err.error && err.error.message);
-                    showStatus("Échec du téléversement. Réessayez ou choisissez une autre photo.", "error");
+                    showStatus(
+                        (err && err.error) || "Échec du téléversement. Réessayez ou choisissez une autre photo.",
+                        "error",
+                    );
                     return;
                 }
 
@@ -133,7 +114,8 @@
                 hidden.value = result.public_id;
 
                 if (previewEl) {
-                    previewEl.src = result.secure_url;
+                    // Cloudinary delivery URL for the stripped asset we just stored.
+                    previewEl.src = `https://res.cloudinary.com/${cloudName}/image/upload/c_fill,g_face,h_128,w_128/${result.public_id}`;
                     // Show the preview regardless of how it was hidden — Tailwind
                     // class on member-facing pages, inline style in Django admin.
                     previewEl.classList.remove("hidden");
