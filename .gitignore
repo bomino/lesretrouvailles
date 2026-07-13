@@ -77,3 +77,10 @@ docs/runbooks/*pilot*.csv
 # from them. Operators keep these locally and import from their own machine.
 *.xlsx
 /private-data/
+
+# Security / tech-debt audits. These enumerate OPEN weaknesses with exact
+# file:line references and reproduction detail. This repo is PUBLIC, so
+# committing them would publish a roadmap of what is still soft on a live
+# site. Keep them local; revisit once the remaining findings are closed.
+CODE_REVIEW.md
+TECH_DEBT_AUDIT.md
