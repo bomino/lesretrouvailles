@@ -77,6 +77,22 @@ Manual checks the audit can't do:
 - [ ] **DMARC** — follow [`dmarc.md`](dmarc.md) §1.1-§1.3 if you haven't yet. `dig TXT _dmarc.villageretrouvailles.com` should show `p=quarantine` (or stricter) + `rua=`.
 - [ ] **`backup_media` last run** — Railway dashboard → `media-backup-cron` → Deploys; confirm a successful run within the last 8 days.
 - [ ] **Restore drill** — first 90-day drill if not done yet, per [`restore.md`](restore.md) §4.
+- [ ] **Promotions archive loaded** — the class-roster archive at `/promotions/` should already hold **352 entries across 11 classes** (6ème 1980-81 A-F, 6ème 1981-82 A-E). It was imported once and is **not** part of the per-launch flow; this is a verification, not a step to run.
+
+  Log in as an admin and open **`/promotions/`** — it lists the 11 classes with a headcount each; they should total 352.
+
+  > ⚠️ Don't try to check this with `railway ssh ... python manage.py shell -c "..."`. `railway ssh` strips quote characters before the remote shell sees them, so any command containing quotes or parentheses fails with a confusing bash syntax error. Pipes and redirects survive, so the working pattern for a real prod query is to base64 a script in and decode it on the other side:
+
+  ```bash
+  B64=$(base64 -w0 probe.py)
+  railway ssh --service lesretrouvailles -- \
+    "cd /app && echo $B64 | base64 -d > _probe.py && python _probe.py; rm -f _probe.py"
+  ```
+
+  (The script needs `import django; django.setup()` at the top, and must be written into `/app` — `python /tmp/x.py` puts `/tmp` on `sys.path`, not the app, so `import alumni` fails.)
+
+  If you ever need to re-import: the command is `import_class_roster <csv_path>` (`--dry-run` supported), and it takes the CSV as a **required positional argument**. That CSV lives in gitignored `private-data/` and is deliberately **not** baked into the Docker image — the repo is public and these are 335 real living people. So the import does not run inside the container: run it **locally against the prod DB** via `DATABASE_PUBLIC_URL` (the internal DB host does not resolve outside Railway). The import is idempotent on `source_ref`, so re-running updates in place rather than duplicating.
+- [ ] **Understand what members will and won't see of each other.** Since `47a19aa`, `show_email` and `show_whatsapp` default to **False** — contact details are opt-IN, which is what the member guide always promised. So right after the bulk import, the directory shows names, city, promotion and photo, but **no phone numbers or emails** until each member ticks the boxes on their own profile. This is correct and deliberate; don't "fix" it by flipping the defaults. If you want members to share contacts, say so in the WhatsApp announcement (Step 7) and point them at « Paramètres de confidentialité » in the guide.
 
 ---
 

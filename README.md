@@ -10,7 +10,7 @@
 
 ## Statut
 
-**v1.2.1-member-guide** — feature-complete, en production sur https://villageretrouvailles.com/. Au programme depuis le soft launch : console de gestion mobile-first pour les co-administrateurs (Gestion v1, `v1.1.0-gestion-console`), page d'aide publique avec recherche d'annuaire améliorée (P8, `v1.2.0-self-service-help`), et page guide membre publique rendue en HTML stylisé depuis le markdown canonique (P8.1, `v1.2.1-member-guide`).
+**v1.2.1-member-guide** — feature-complete, en production sur https://villageretrouvailles.com/. Au programme depuis le soft launch : console de gestion mobile-first pour les co-administrateurs (Gestion v1, `v1.1.0-gestion-console`), page d'aide publique avec recherche d'annuaire améliorée (P8, `v1.2.0-self-service-help`), page guide membre publique rendue en HTML stylisé depuis le markdown canonique (P8.1, `v1.2.1-member-guide`), et l'archive **Promotions** — les listes de classe 1980-82 (352 noms, 11 classes), réservées aux membres connectés, avec revendication de sa propre ligne. Une passe de durcissement pré-lancement a suivi : Django 5.2 LTS, coordonnées masquées par défaut, métadonnées EXIF supprimées à l'upload. Suite de tests : 954.
 
 | Phase | Description | Statut |
 |---|---|---|
@@ -34,7 +34,7 @@ Suite (Phase 2 — backlog dans [`docs/superpowers/STATUS.md`](docs/superpowers/
 
 ## Stack technique
 
-- **Backend** : Django 5.x, PostgreSQL, [django-allauth](https://django-allauth.readthedocs.io/) (auth + magic links)
+- **Backend** : Django 5.2 LTS, PostgreSQL, [django-allauth](https://django-allauth.readthedocs.io/) (auth + magic links)
 - **Frontend** : Tailwind CSS + DaisyUI, [HTMX](https://htmx.org/), Playfair Display + Inter (Google Fonts), Vanilla JS (~10 lignes pour le hamburger mobile)
 - **Médias** : Cloudinary (upload signé direct + transforms), bucket Railway/Tigris S3-compatible (sauvegarde hebdomadaire)
 - **Email** : [Resend](https://resend.com/) avec SPF/DKIM/DMARC sur villageretrouvailles.com

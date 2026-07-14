@@ -8,7 +8,7 @@ If something here contradicts what you'd reach for by default, **trust this file
 
 ## Project context (the 30-second version)
 
-- **What:** Private alumni platform for CEG 1 Birni (Zinder, Niger), promotions 1980-1985. Production at https://villageretrouvailles.com/. Tags: `v1.0.0-soft-launch`, `v1.1.0-gestion-console`, `v1.2.0-self-service-help`.
+- **What:** Private alumni platform for CEG 1 Birni (Zinder, Niger), promotions 1980-1985. Production at https://villageretrouvailles.com/. Tags: `v1.0.0-soft-launch`, `v1.1.0-gestion-console`, `v1.2.0-self-service-help`, `v1.2.1-member-guide`. Since then (untagged, on `main`): the **Promotions** class-roster archive and a pre-launch hardening sweep (Django 5.2 LTS, contact visibility opt-in, EXIF strip on the self-service upload).
 - **Audience:** ~200 alumni from a WhatsApp group, ages 55-65. **~80% have no email.** Mobile-first (Android 7+ + low-end devices). The launch onboarding imports them en masse from a WhatsApp roster.
 - **Tone:** All user-facing copy is **French**. Code, comments, and commit messages are **English**.
 - **Owner:** Single bilingual super-admin (Bomino, `bominomla`). Plus 0-3 co-admins via `is_staff=True` (see admin-tiers section below).
@@ -22,12 +22,12 @@ The `Makefile` is the source of truth — these are the wrappers worth knowing:
 | Command | What it does |
 |---|---|
 | `make dev` | `python manage.py runserver` (http://localhost:8000) |
-| `make test` | Builds CSS, then runs full pytest suite (~3 min, ~650 tests post-Gestion-v1) |
+| `make test` | Builds CSS, then runs full pytest suite (~12 min, 954 tests) |
 | `make migrate` | `python manage.py migrate` |
 | `make check` | `manage.py check` + `makemigrations --dry-run --check` (pre-push sanity) |
 | `make lint` | `ruff check .` + `ruff format --check .` (read-only) |
 | `make format` | `ruff check --fix .` + `ruff format .` (writes) |
-| `make css` / `make css-watch` | Tailwind one-shot / watch — only when classes changed; CSS is committed in `static/` |
+| `make css` / `make css-watch` | Tailwind one-shot / watch. **`static/css/output.css` is generated, NOT committed** (it's gitignored) — a fresh clone renders unstyled until you run this. The Dockerfile and CI build it themselves. |
 | `make db-up` / `make db-down` | Local Postgres via `docker-compose.yml` (alumni/alumni/alumni on :5432) |
 | `make seed` | `loaddata seed_members` |
 | `make docker-run` | Builds and runs the **staging-shaped** stack at :8000 (basic-auth `admin / compose-test-pw`); useful for reproducing prod-like middleware behavior |
@@ -44,7 +44,7 @@ pytest --lf                                               # last failed only
 
 `pyproject.toml` sets `DJANGO_SETTINGS_MODULE = "alumni.settings.dev"` for pytest, so tests don't need `--ds=...`. `addopts = "-q"` is the default; pass `-v` to override.
 
-Custom `manage.py` commands worth knowing (see `members/management/commands/` and `cooptation/management/commands/`): `reissue_login_link`, `import_whatsapp_roster`, `rgpd_purge_member`, `audit_launch_readiness`, `process_cooptation_deadlines`, `backup_media`, `seed_questions`, `smoke_test_cooptation`, `create_member`.
+Custom `manage.py` commands worth knowing (see `members/management/commands/` and `cooptation/management/commands/`): `reissue_login_link`, `import_whatsapp_roster`, `import_class_roster`, `rgpd_purge_member`, `audit_launch_readiness`, `process_cooptation_deadlines`, `backup_media`, `seed_questions`, `smoke_test_cooptation`, `create_member`.
 
 ---
 
@@ -128,8 +128,8 @@ Since `feat/member-whatsapp-field` (post-Gestion-v1), `Member.whatsapp` is the c
 
 `members.models.AuditLog` is the cross-domain event log. Two conventions worth following when you write to it:
 
-- **Action string namespace:** `<domain>.<entity>.<verb>`. Currently in use: `ghost.*`, `memoriam.*`, `rgpd.*`, `gestion.*`. Always extend `AuditLog.ACTION_CHOICES` when you add a new action — the field has `choices=` so a Form-level write would otherwise reject. ORM `objects.create()` ignores choices but the `/admin/auditlog/` list filter relies on it.
-- **Metadata always includes a human-readable name** (e.g. `member_full_name`, `candidate_full_name`) so the audit log stays readable after a member is purged or renamed. Don't store raw IDs only.
+- **Action string namespace:** `<domain>.<entity>.<verb>`. Currently in use: `ghost.*`, `memoriam.*`, `rgpd.*`, `gestion.*`, `memoires.*`, `promotions.*`, `aide.*`, `directory.*`. Always extend `AuditLog.ACTION_CHOICES` when you add a new action — the field has `choices=` so a Form-level write would otherwise reject. ORM `objects.create()` ignores choices but the `/admin/auditlog/` list filter relies on it.
+- **Metadata always includes a human-readable name** (e.g. `member_full_name`, `candidate_full_name`) so the audit log stays readable after a member is purged or renamed. Don't store raw IDs only. This is not decorative: the memoriam nomination row stored only `nominator_id` and went unreadable the moment that member was purged (fixed in `b4d86d8`).
 
 ---
 
@@ -184,6 +184,27 @@ Hard CHECK constraints at the DB level become footguns when the format evolves. 
 - DB-level CHECK is acceptable as defense-in-depth, but only when the format is genuinely fixed forever (e.g. `status IN ('active', 'suspended', 'deleted')`).
 
 For `last_name_initial` on `PublicSearchEntry`: we have `max_length=2` (browser maxlength cap) + `Model.clean()` (friendly message) + DB CHECK regex (defense). Three layers; the user never sees the raw constraint name.
+
+---
+
+## Directory search is NOT indexed — and don't "fix" it by re-adding the old indexes
+
+Migration `0004` created three btree indexes on `LOWER(unaccent_immutable(<col>))`. Migration `0024` **dropped** them, because Postgres could never use a single one:
+
+1. **Wrong function.** `members/search.py` builds its predicate with Django's `Unaccent`, which emits `UNACCENT(...)` — the extension's own function. The index was on `unaccent_immutable(...)`, the local wrapper `0004` defined. To the planner those are unrelated expressions.
+2. **Wrong access method.** The predicate is `LIKE '%needle%'`. A btree cannot answer a leading-wildcard LIKE even if the names matched.
+
+So they cost write amplification on every member INSERT/UPDATE (including the bulk roster import) and bought nothing, while making the schema *look* like search was optimized.
+
+**If you make search indexed, the whole job is:** switch `search.py` to a custom `Func` calling `unaccent_immutable` (the extension's `unaccent()` is STABLE, and Postgres refuses to build an expression index on a non-immutable function — that wrapper exists precisely for this), then add GIN + `gin_trgm_ops` indexes on that same expression, which serves both the `%contains%` path and `_trigram_fallback`. `unaccent_immutable` and the `pg_trgm` extension are both deliberately retained so this stays a one-file change.
+
+**It is not worth doing at ~200 members** — the seq scan is sub-millisecond and this sits on the hot path of the most-used page. Revisit when the member count makes it measurable. `members/tests/test_search_indexes.py` asserts the dead indexes stay gone.
+
+---
+
+## Query-count guardrails
+
+`members/tests/test_query_budgets.py` renders `/annuaire/` and both `/promotions/` pages twice — once with one row, once with N — and asserts the query count is **identical**. A dropped `select_related` stays correct, stays green everywhere else, and only shows up as a slow page on a low-end Android over a Niger mobile connection. If you add a list page, add its budget test.
 
 ---
 
@@ -245,6 +266,16 @@ If you need to interact with prod:
 
 Never paste a production secret into a tool call's stdout/argv.
 
+**`railway ssh` strips quote characters.** The remote shell never sees your quotes, so anything containing `"`, `'`, or `(` — including `manage.py shell -c "..."` — dies with a bash syntax error that looks like your Python is malformed. It isn't. Pipes, redirects and `&&` *do* survive. So the working pattern for a real prod query is to base64 a script in:
+
+```bash
+B64=$(base64 -w0 probe.py)
+railway ssh --service lesretrouvailles -- \
+  "cd /app && echo $B64 | base64 -d > _probe.py && python _probe.py; rm -f _probe.py"
+```
+
+Two more traps in that one line: the script must `import django; django.setup()` itself (bypassing `manage.py shell`, which swallows piped stdout), and it must be written into `/app` — `python /tmp/x.py` puts `/tmp` on `sys.path`, not the working directory, so `import alumni` raises `ModuleNotFoundError`.
+
 ---
 
 ## Windows-specific gotchas
@@ -265,7 +296,7 @@ The owner develops on Windows. The repo is cross-platform but:
 - Use `@pytest.mark.django_db` for DB tests.
 - Use `settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"` to avoid real sends in email-related tests.
 - Use `settings.CLOUDINARY_CLIENT_PATH = "alumni.cloudinary.FakeCloudinary"` and `settings.STORAGE_CLIENT_PATH = "alumni.storage.FakeStorage"` (call `reset_fake_client()` between tests for clean call lists).
-- Target full-suite count: `~520` at v1.0.0-soft-launch, `~622` at v1.1.0-gestion-console, `~650` at the post-Gestion polish round, `~683` at v1.2.0-self-service-help. New work should add tests; the count should grow, not shrink.
+- Target full-suite count: `~520` at v1.0.0-soft-launch, `~622` at v1.1.0-gestion-console, `~683` at v1.2.0-self-service-help, `789` after the active-nav indicator, `869` after Promotions, **`954`** after the pre-launch hardening + hygiene sweep. New work should add tests; the count should grow, not shrink.
 
 ---
 
@@ -289,8 +320,9 @@ The owner develops on Windows. The repo is cross-platform but:
 | Frontend admin console (gestion) | `gestion/` — views, forms, decorators, templates, tests |
 | Co-admin Mur des souvenirs CRUD | `gestion/views.py::memory_{list,create,edit,status}_view` + `gestion/templates/gestion/memory_*.html` |
 | Public FAQ (`/aide/`) | `aide/` — `faq.py` (typed entries), `views.py`, single accordion template |
-| Member directory search composition | `members/search.py` — multi-token AND + pg_trgm trigram fallback |
-| Promotions (class-roster archive) | `members/models.py::ClassRosterEntry` + `members/views.py::promotions_*` — members-only, noindex; source data lives in gitignored `private-data/` (the repo is PUBLIC) |
+| Member directory search composition | `members/search.py` — **two entry points, one engine.** `search_members()` for the member-facing `/annuaire/` (multi-token AND + pg_trgm trigram fallback + `show_city` gate). `search_members_staff()` for `/gestion/` (same multi-token AND, no `show_city` gate, plus `user.username` / `user.email` / `Member.whatsapp`, no fuzzy fallback). **Don't hand-roll a third one** — the console had its own single-substring copy until it was folded in, and a full name returned zero hits for two months. |
+| Promotions (class-roster archive) | `members/models.py::ClassRosterEntry` + `members/views.py::promotions_*` — members-only, noindex; source data lives in gitignored `private-data/` (the repo is PUBLIC). Import: `import_class_roster` (stdlib csv, idempotent on `source_ref`, `--dry-run`); the xlsx→csv converter is dev-only in `scripts/convert_class_rosters.py`. |
+| Member photo upload (self-service) | `members/views.py::photo_upload_view` → `/api/photo/upload/`. Goes through `RealCloudinary.upload_file`, so it inherits the EXIF strip. Any new upload path must too — see the EXIF bullet below. |
 | Custom AdminSite (locks /admin/ to superuser) | `alumni/admin.py` |
 | Cooptation services (approve/reject/purge) | `cooptation/services.py` |
 | Member purge (RGPD) engine | `members/services.py::rgpd_purge_member` |
@@ -337,6 +369,10 @@ When the user reports a bug:
 - **Don't** bypass `_strip_exif_metadata` if you add a new server-side upload path. The EXIF strip lives in `RealCloudinary.upload_file` — it sees every JPEG/PNG/WebP and re-encodes via Pillow to drop GPS/camera/timestamp metadata before Cloudinary receives the bytes. If you build a new uploader that calls Cloudinary directly (or a signed-direct-browser-upload flow), wire the same Pillow strip in or you're reopening a privacy hole. Regression test: `alumni/tests/test_cloudinary_extensions.py::TestStripExifMetadata`. Mini-phase planned for a `restrip_existing_memories` management command to reprocess pre-2026-05-10 uploads.
 - **Don't** add DB CHECK constraints for fields whose format might evolve. Use Python `clean()` instead.
 - **Don't** add a new `AuditLog.action` value without also adding it to `ACTION_CHOICES`. Forms validate against choices; ORM `create()` doesn't, but list filters in `/admin/auditlog/` rely on the enum.
+- **Don't** write a new member-search query by hand. Call `search_members()` or `search_members_staff()` from `members/search.py`. The gestion console kept its own single-substring copy and silently returned zero hits for any full name typed into it.
+- **Don't** delete a Cloudinary asset inside the request transaction. Use `transaction.on_commit` (`members/views.py::_delete_photo_on_commit` is the pattern). Deleting inline means a Cloudinary outage rolls back a profile the member already saved; deferring it means a failure orphans an asset instead of losing the write.
+- **Don't** add a fail-fast guard to `staging.py`/`prod.py` without also giving the **Docker build** a dummy value. Both `RUN` blocks in the `Dockerfile` load staging settings for `compilemessages` / `collectstatic` with no real config — the `SITE_URL` and `RESEND_API_KEY` guards broke the image build on their first push (`ecc9bae`). The guard must fire on a real boot, not on a build step that sends no mail.
+- **Don't** re-add the `LOWER(unaccent_immutable(...))` btree indexes dropped in migration `0024`. They were unusable. See the search-index section above.
 - **Don't** commit anything derived from the class rosters or the WhatsApp roster. The GitHub repo is **public** and those files carry the real names of ~335 living alumni. They belong in `private-data/` (gitignored). `ClassRosterEntry` rows are members-only and `noindex` for the same reason.
 - **Don't** pull production secrets into the local environment.
 - **Don't** delete records on production without explicit user confirmation. The P6b RGPD purge engine is the right tool for member deletions; for other test artifacts, surface what you'd delete and ask.
