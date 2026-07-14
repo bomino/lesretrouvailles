@@ -81,10 +81,18 @@ COPY --from=css-builder /build/static/ ./static/
 # Build-time steps that bake the image. SECRET_KEY etc. are dummies used only
 # to satisfy Django settings parsing; collectstatic and compilemessages do not
 # touch the database. Real values are injected by Railway at runtime.
+#
+# SITE_URL and RESEND_API_KEY are here for the same reason: staging.py fails
+# fast when they are missing (a magic link left pointing at localhost, or an
+# email backend with no key, are both silent until a member hits them). That
+# guard must fire on a real boot, not on a build step that sends no mail and
+# serves no links -- so the build gets a dummy, exactly like SECRET_KEY above.
 RUN SECRET_KEY=build-time-only-not-used \
     DJANGO_SETTINGS_MODULE=alumni.settings.staging \
     DATABASE_URL=postgres://x:x@localhost:5432/x \
     ALLOWED_HOSTS=localhost \
+    SITE_URL=https://build-time-only.invalid \
+    RESEND_API_KEY=build-time-only-not-used \
     BASIC_AUTH_REQUIRED=false \
     SECURE_SSL_REDIRECT=false \
     python manage.py compilemessages -l fr
@@ -93,6 +101,8 @@ RUN SECRET_KEY=build-time-only-not-used \
     DJANGO_SETTINGS_MODULE=alumni.settings.staging \
     DATABASE_URL=postgres://x:x@localhost:5432/x \
     ALLOWED_HOSTS=localhost \
+    SITE_URL=https://build-time-only.invalid \
+    RESEND_API_KEY=build-time-only-not-used \
     BASIC_AUTH_REQUIRED=false \
     SECURE_SSL_REDIRECT=false \
     python manage.py collectstatic --noinput
