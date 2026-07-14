@@ -56,6 +56,11 @@ class InMemoriamEntryAdmin(admin.ModelAdmin):
     )
 
     def save_model(self, request, obj, form, change):
+        # The AuditLog signals fire on save() and cannot see the request. Hand
+        # them the real actor, or publishing gets credited to whoever created
+        # the draft and archiving to nobody at all (F-10).
+        obj._audit_actor = request.user
+
         # 1. Detect transitions before mutating.
         if change:
             db_obj = type(obj).objects.get(pk=obj.pk)
@@ -76,7 +81,8 @@ class InMemoriamEntryAdmin(admin.ModelAdmin):
             old_public_id = obj.photo_public_id  # may be empty
             obj.photo_public_id = client.upload_file(upload, folder="memoriam")
             if old_public_id and old_public_id != obj.photo_public_id:
-                client.delete(old_public_id)
+                # AFTER the commit (F-25) — see memoires.admin for the rationale.
+                self._delete_photo_on_commit(old_public_id)
 
         # 3. Bump approved_content_version on text change.
         if text_changed:

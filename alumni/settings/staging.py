@@ -105,7 +105,27 @@ if STORAGE_BACKUP_REQUIRED and STORAGE_CLIENT_PATH.endswith("RealStorage"):
 # bouncing en masse" rollback — `railway variables --remove EMAIL_BACKEND`
 # / set it to the console backend — actually takes effect. Hardcoding it
 # here made that documented rollback a silent no-op.
+# F-29: these two fail SILENTLY, and the first symptom is user-visible.
+#
+# SITE_URL feeds every magic link. Left at base.py's http://localhost:8000
+# default, the roster import would DM ~200 members a link to their own machine
+# — and the operator would find out from the members.
+if SITE_URL.startswith("http://localhost"):  # noqa: F405
+    raise ImproperlyConfigured(
+        "SITE_URL is still the localhost default. Every magic link and email "
+        "URL would point at localhost. Set SITE_URL on the service."
+    )
+
 EMAIL_BACKEND = env("EMAIL_BACKEND", default="alumni.email.ResendBackend")
+
+# ResendBackend without a key does not fail loudly at boot — it fails at the
+# first send, which is the password-set email a new member is waiting for.
+if EMAIL_BACKEND.endswith("ResendBackend") and not RESEND_API_KEY:  # noqa: F405
+    raise ImproperlyConfigured(
+        "EMAIL_BACKEND is ResendBackend but RESEND_API_KEY is empty. Every "
+        "outbound email would fail at send time. Set RESEND_API_KEY, or point "
+        "EMAIL_BACKEND at the console backend."
+    )
 PASSWORD_RESET_TIMEOUT = 7 * 24 * 60 * 60  # 7 days for the post-approval password-set link
 
 # Every rate limiter (django-ratelimit decorators, allauth's login throttle)

@@ -11,6 +11,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.core.validators import validate_email
+from django.db import transaction
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -40,6 +41,24 @@ DIRECTORY_EMPTY_STATE_SUGGESTIONS: list[tuple[str, str]] = [
     ("Promotion 1983", "/annuaire/?year=1983"),
     ("Tous les membres", "/annuaire/"),
 ]
+
+
+def _delete_photo_on_commit(public_id: str) -> None:
+    """Drop a Cloudinary asset once the surrounding transaction commits.
+
+    Failures are logged, never raised: the DB change is already durable and the
+    user's action succeeded. Mirrors memoires.admin._delete_photo_on_commit.
+    """
+    if not public_id:
+        return
+
+    def _do_delete():
+        try:
+            get_client().delete(public_id)
+        except Exception:
+            logger.exception("Cloudinary delete failed for %s (orphaned asset)", public_id)
+
+    transaction.on_commit(_do_delete)
 
 
 def _client_ip(request) -> str:
@@ -123,7 +142,11 @@ def profile_edit_view(request):
             member_form.save()
             prefs_form.save()
             if old_photo_id and old_photo_id != new_photo_id:
-                get_client().delete(old_photo_id)
+                # After the commit, and never fatal: this ran synchronously
+                # right after the DB save, so a Cloudinary outage 500'd the
+                # member on an edit that had already succeeded. An orphaned
+                # asset is a cleanup chore; a 500 on a saved profile is a bug.
+                _delete_photo_on_commit(old_photo_id)
             messages.success(request, "Profil mis à jour.")
             return HttpResponseRedirect("/profil/")
         # Form invalid — if the failure is photo_public_id, return 400 (security signal).

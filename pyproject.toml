@@ -49,7 +49,19 @@ handbook = [
 ]
 
 [tool.setuptools]
-packages = ["alumni", "core", "members", "cooptation"]
+# Every app in INSTALLED_APPS. gestion/memoires/memoriam/aide were missing,
+# so a wheel or sdist build silently omitted four live apps (F-14).
+# alumni/tests/test_infra_hardening.py keeps this in sync.
+packages = [
+    "alumni",
+    "core",
+    "members",
+    "cooptation",
+    "gestion",
+    "memoires",
+    "memoriam",
+    "aide",
+]
 
 [tool.ruff]
 line-length = 100

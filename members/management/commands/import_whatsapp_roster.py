@@ -37,7 +37,8 @@ from members.models import VALID_CLASS_PATTERN, VALID_YEARS, Member
 
 User = get_user_model()
 
-PHONE_RE = re.compile(r"\+?\d{8,15}")
+#: 8-15 digits, applied AFTER stripping punctuation (see _validate_row).
+DIGITS_RE = re.compile(r"\d{8,15}")
 
 
 def _digits_only(phone: str) -> str:
@@ -47,6 +48,36 @@ def _digits_only(phone: str) -> str:
 
 def _parse_int_list(raw: str) -> list[int]:
     return [int(s.strip()) for s in (raw or "").split(",") if s.strip()]
+
+
+#: Extension -> MIME, matching alumni.cloudinary._STRIPPABLE_MIME_TYPES.
+_PHOTO_MIME_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+}
+
+
+class _TypedHandle:
+    """A file handle that also reports a content_type, like an UploadedFile."""
+
+    def __init__(self, fh, content_type: str):
+        self._fh = fh
+        self.content_type = content_type
+        self.name = getattr(fh, "name", "upload")
+
+    def read(self, *args):
+        return self._fh.read(*args)
+
+    def seek(self, *args):
+        return self._fh.seek(*args)
+
+
+def _typed_handle(fh, path: Path):
+    """Wrap a raw handle so the EXIF strip knows what format it is looking at."""
+    mime = _PHOTO_MIME_TYPES.get(path.suffix.lower(), "image/jpeg")
+    return _TypedHandle(fh, mime)
 
 
 def _parse_str_list(raw: str) -> list[str]:
@@ -63,7 +94,12 @@ def _validate_row(row: dict, line_no: int) -> list[str]:
     phone = row.get("whatsapp", "").strip()
     if not phone:
         errors.append("whatsapp is required")
-    elif not PHONE_RE.fullmatch(phone):
+    # Validate the DIGITS, not the raw string. Operators paste numbers straight
+    # off a WhatsApp contact card ("+227 90 00 01 23"); every gestion form
+    # strips punctuation before validating, and this one did not — so the bulk
+    # import rejected exactly the format the source data comes in, and someone
+    # had to hand-clean 200 rows.
+    elif not DIGITS_RE.fullmatch(_digits_only(phone)):
         errors.append(f"whatsapp '{phone}' is not a valid phone number")
     if not row.get("city", "").strip():
         errors.append("city is required")
@@ -323,7 +359,14 @@ class Command(BaseCommand):
 
             cloud = cloud_mod.get_client()
             with path.open("rb") as fh:
-                public_id = cloud.upload_file(fh, folder=f"members/{member.slug}")
+                # _strip_exif_metadata reads `content_type` off the file object
+                # and defaults to image/jpeg. A raw file handle has no such
+                # attribute, so every roster photo — PNG and WebP included —
+                # was announced as a JPEG and re-encoded as one.
+                public_id = cloud.upload_file(
+                    _typed_handle(fh, path),
+                    folder=f"members/{member.slug}",
+                )
             member.photo_public_id = public_id
             member.save(update_fields=["photo_public_id"])
             return True

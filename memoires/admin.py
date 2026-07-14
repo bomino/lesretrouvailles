@@ -79,7 +79,11 @@ class MemoryAdmin(admin.ModelAdmin):
             # open up in Phase 2.
             obj.photo_public_id = client.upload_file(upload, folder="memoires")
             if old_public_id and old_public_id != obj.photo_public_id:
-                client.delete(old_public_id)
+                # AFTER the commit (F-25). Destroying the old asset first meant
+                # that if the save then failed, the row still pointed at a
+                # public_id whose bytes were already gone — a broken image with
+                # no way back. An orphan is recoverable; a dangling row is not.
+                _delete_photo_on_commit(old_public_id)
         if not change:
             obj.created_by = request.user
         super().save_model(request, obj, form, change)

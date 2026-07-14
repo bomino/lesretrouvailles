@@ -44,14 +44,23 @@ def test_entry_with_zero_admins_is_unpublished(make_admin):
 
 
 @pytest.mark.django_db
-def test_entry_with_one_admin_is_unpublished(make_admin):
+def test_entry_with_one_admin_is_published(make_admin):
+    """F-12: this asserted the OPPOSITE, pinning a rule production abandoned.
+
+    Since P4d (single-admin governance) the landing page, the admin filter, the
+    stale-ghost cron and the launch audit all publish at ONE signoff — the
+    creating admin is auto-cosigned and the other staff get a notification, a
+    post-publication tripwire rather than a pre-publication gate. Only
+    `is_published` still said two, and this test kept it that way: a passing
+    suite that contradicted the running site.
+    """
     from members.models import PublicSearchEntry
 
     e = PublicSearchEntry.objects.create(
         first_name="Idrissa", last_name_initial="S.", years_at_ceg=[1980]
     )
     e.added_by_admins.add(make_admin())
-    assert e.is_published is False
+    assert e.is_published is True
 
 
 @pytest.mark.django_db

@@ -87,3 +87,43 @@ def test_production_image_installs_every_runtime_dependency():
     missing_req = {d for d in declared if d not in requirements}
     assert not missing_docker, f"missing from Dockerfile pip list: {sorted(missing_docker)}"
     assert not missing_req, f"missing from requirements.txt: {sorted(missing_req)}"
+
+
+def test_prod_settings_fail_fast_on_missing_site_url_and_resend_key():
+    """F-29: staging/prod booted happily with SITE_URL still on localhost and no
+    RESEND_API_KEY. The first symptom is ~200 magic links pointing at
+    http://localhost:8000, DM'd to members — discovered by the members."""
+    src = _settings_source("staging")
+    assert "SITE_URL" in src and "RESEND_API_KEY" in src
+    assert src.count("ImproperlyConfigured") >= 3
+
+
+def test_pyproject_packages_lists_every_installed_app():
+    """F-14: gestion, memoires, memoriam and aide were missing from the packages
+    list, so a wheel/sdist build would silently omit four live apps."""
+    import tomllib
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    data = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    packages = set(data["tool"]["setuptools"]["packages"])
+
+    from django.conf import settings
+
+    local_apps = {
+        app
+        for app in settings.INSTALLED_APPS
+        if not app.startswith(("django.", "allauth")) and "." not in app
+    }
+    missing = local_apps - packages
+    assert not missing, f"apps missing from pyproject packages: {sorted(missing)}"
+
+
+def test_staging_basic_auth_exposes_the_same_public_surface_as_prod():
+    """F-28: /aide/ and /guide/ are login-exempt in the app but were still
+    behind staging's basic-auth gate, so staging could not be used to check the
+    pages an anonymous member actually lands on."""
+    from core.middleware import BASIC_AUTH_PUBLIC_PREFIXES
+
+    assert "/aide/" in BASIC_AUTH_PUBLIC_PREFIXES
+    assert "/guide/" in BASIC_AUTH_PUBLIC_PREFIXES

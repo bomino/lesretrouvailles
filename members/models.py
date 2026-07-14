@@ -209,10 +209,12 @@ class PublicSearchEntry(models.Model):
     Strict minimum-PII shape (master spec § 6.5): first name + last initial
     + years only. The model has no email/city/profession fields by design.
 
-    Publication is gated by added_by_admins.count() >= 2 — there is no
-    'is_published' boolean a single admin can toggle. Removal is signaled
-    by setting removed_at; removed entries never publish even if they have
-    many admin signoffs.
+    Publication is gated by added_by_admins.count() >= 1 (P4d single-admin
+    governance: the creating admin is auto-cosigned and a notification email
+    goes to the other staff, replacing the old 2-signoff pre-publication gate
+    with a post-publication tripwire). There is no 'is_published' boolean a
+    single admin can toggle. Removal is signaled by setting removed_at; removed
+    entries never publish even if they have many signoffs.
     """
 
     first_name = models.CharField(max_length=60, verbose_name="Prénom")
@@ -282,13 +284,18 @@ class PublicSearchEntry(models.Model):
 
     @property
     def is_published(self) -> bool:
-        """True if 2+ admins have signed and the entry has not been removed.
+        """True if an admin has signed and the entry has not been removed.
 
-        Issues a SELECT COUNT(*) query each call. For bulk rendering (e.g.,
-        the public landing's ghost list), prefer the annotated queryset:
-            qs.annotate(n=Count("added_by_admins")).filter(n__gte=2)
+        >= 1, not >= 2. The landing page, the admin filter, the stale-ghost cron
+        and the launch-readiness audit ALL publish at one signoff (P4d); only
+        this property still said two, so any future caller would have got the
+        opposite answer from the page it describes.
+
+        Issues a SELECT COUNT(*) per call. For bulk rendering (the public
+        landing's ghost list), prefer the annotated queryset:
+            qs.annotate(n=Count("added_by_admins")).filter(n__gte=1)
         """
-        return self.removed_at is None and self.added_by_admins.count() >= 2
+        return self.removed_at is None and self.added_by_admins.count() >= 1
 
     @property
     def first_year(self) -> int | None:

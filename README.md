@@ -50,7 +50,7 @@ Suite (Phase 2 — backlog dans [`docs/superpowers/STATUS.md`](docs/superpowers/
 
 - Python 3.12+
 - Docker (pour Postgres en local)
-- Node.js 20+ (pour Tailwind build, optionnel — les CSS sont versionnés dans `static/`)
+- Node.js 20+ — **requis** pour builder le CSS. `static/css/output.css` est *généré*, pas versionné (`.gitignore`) : lancez `make css` après un clone, sinon le site s'affiche sans styles. Le Dockerfile et la CI le buildent automatiquement.
 
 ### Installation
 

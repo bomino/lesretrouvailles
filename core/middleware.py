@@ -16,7 +16,16 @@ BASIC_AUTH_PUBLIC_EXACT = {"/", "/sitemap.xml", "/robots.txt"}
 
 # Prefix-matched bypasses for paths with sub-routes. "/inscription/" covers
 # both the form and its success page; "/static/" covers all assets.
-BASIC_AUTH_PUBLIC_PREFIXES = ("/static/", "/inscription/", "/retrait/")
+# Paths that are public in the APP (LOGIN_REQUIRED_WHITELIST) must also be
+# public on staging, or staging cannot be used to check the pages an
+# anonymous member actually lands on. /aide/ and /guide/ were missing (F-28).
+BASIC_AUTH_PUBLIC_PREFIXES = (
+    "/static/",
+    "/inscription/",
+    "/retrait/",
+    "/aide/",
+    "/guide/",
+)
 
 
 class BasicAuthMiddleware:

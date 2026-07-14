@@ -29,6 +29,7 @@ from cooptation.services import (
     reject_application,
 )
 from members.models import AuditLog, Member
+from members.search import search_members_staff
 from memoires.models import Memory
 
 from .decorators import staff_required
@@ -78,20 +79,7 @@ def member_list_view(request):
 
     q = (request.GET.get("q") or "").strip()[:80]
     if q:
-        needle = Lower(Unaccent(Value(q)))
-        qs = qs.annotate(
-            first_lc=Lower(Unaccent(F("first_name"))),
-            last_lc=Lower(Unaccent(F("last_name"))),
-            nick_lc=Lower(Unaccent(F("nickname"))),
-            city_lc=Lower(Unaccent(F("city"))),
-        ).filter(
-            Q(first_lc__contains=needle)
-            | Q(last_lc__contains=needle)
-            | Q(nick_lc__contains=needle)
-            | Q(city_lc__contains=needle)
-            | Q(user__username__icontains=q)
-            | Q(user__email__icontains=q)
-        )
+        qs = search_members_staff(qs, q)
 
     qs = qs.order_by("last_name", "first_name")
 

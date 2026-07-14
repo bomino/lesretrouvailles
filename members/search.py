@@ -150,3 +150,53 @@ def search_members(qs: QuerySet, q: str) -> QuerySet:
     if longest is None or len(longest) < _TRIGRAM_MIN_TOKEN_LEN:
         return filtered  # empty, no fallback applicable
     return _trigram_fallback(qs, longest)
+
+
+def _staff_token_block(token: str) -> Q:
+    """Per-token union for the STAFF search (gestion console).
+
+    Deliberately different from `_token_block`:
+
+    - No `show_city` gate. That toggle hides a member's city from other
+      *members*; staff already read the full record on the detail page, so
+      gating it here would only hide it from the one person entitled to see it.
+    - Adds the login identity (`user.username`, `user.email`) and the messaging
+      identity (`Member.whatsapp`). The two are decoupled on purpose (CLAUDE.md),
+      and an operator working from a WhatsApp DM has the *number*, so both must
+      match. Only username was searchable before.
+    """
+    needle = Lower(Unaccent(Value(token)))
+    return (
+        Q(first_lc__contains=needle)
+        | Q(last_lc__contains=needle)
+        | Q(nick_lc__contains=needle)
+        | Q(city_lc__contains=needle)
+        | Q(country_lc__contains=needle)
+        | Q(prof_lc__contains=needle)
+        | Q(user__username__icontains=token)
+        | Q(user__email__icontains=token)
+        | Q(whatsapp__icontains=token)
+    )
+
+
+def search_members_staff(qs: QuerySet, q: str) -> QuerySet:
+    """Multi-token AND search for the gestion console.
+
+    The console used to match the entire query as a single substring, so an
+    operator typing the natural thing — a full name — got zero results, because
+    "Alpha Bravo" is a substring of neither `first_name` nor `last_name`. The
+    member-facing Annuaire had already been fixed; the console had drifted.
+
+    No trigram fallback here: staff searches are usually an exact lookup of
+    someone they are already talking to, and a fuzzy fallback that silently
+    returns a *different* member is worse than an empty result when the next
+    click suspends an account.
+    """
+    tokens = [t for t in q.split() if t]
+    if not tokens:
+        return qs
+
+    qs = _annotate_lc(qs)
+    for token in tokens:
+        qs = qs.filter(_staff_token_block(token))
+    return qs

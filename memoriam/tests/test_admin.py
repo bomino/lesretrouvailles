@@ -88,9 +88,21 @@ def test_save_model_deletes_old_public_id_on_replacement(
         files={"upload": upload},
     )
     assert form.is_valid(), form.errors
-    admin.save_model(_admin_request(user), entry, form, change=True)
+
+    from django.test import TestCase
 
     client = get_client()
+
+    # F-25: the old asset must survive until the DB save is durable. Destroying
+    # it first meant that if the save then failed, the row still pointed at a
+    # public_id whose bytes were already gone — a broken image with no way back.
+    with TestCase.captureOnCommitCallbacks(execute=False) as callbacks:
+        admin.save_model(_admin_request(user), entry, form, change=True)
+        assert "memoriam/old-id" not in client.delete_calls, "deleted before commit"
+
+    # ...and it IS deleted once the transaction commits.
+    for callback in callbacks:
+        callback()
     assert "memoriam/old-id" in client.delete_calls
 
 

@@ -69,7 +69,12 @@ def test_photo_rejected_when_public_id_outside_member_folder(consenting_client):
 
 
 @pytest.mark.django_db
-def test_old_photo_deleted_on_replacement(consenting_client, monkeypatch):
+def test_old_photo_deleted_on_replacement(
+    consenting_client, monkeypatch, django_capture_on_commit_callbacks
+):
+    """The delete is deferred to transaction.on_commit (F-26): a Cloudinary
+    outage must not roll back a profile the member already saved. The asset is
+    still deleted — just after the row is durable, not before."""
     from alumni.cloudinary import FakeCloudinary
     from members import views as members_views
 
@@ -81,24 +86,26 @@ def test_old_photo_deleted_on_replacement(consenting_client, monkeypatch):
     monkeypatch.setattr(members_views, "get_client", lambda: fake)
 
     new_id = f"members/{member.slug}/new_photo"
-    consenting_client.post(
-        "/profil/",
-        {
-            "nickname": "",
-            "city": "Niamey",
-            "country": "Niger",
-            "profession": "",
-            "show_email": "on",
-            "show_whatsapp": "on",
-            "show_city": "on",
-            "digest_weekly": "",
-            "in_memoriam_alerts": "on",
-            "event_alerts": "",
-            "tag_alerts": "on",
-            "data_saver": "",
-            "photo_public_id": new_id,
-        },
-    )
+    with django_capture_on_commit_callbacks(execute=True):
+        consenting_client.post(
+            "/profil/",
+            {
+                "nickname": "",
+                "city": "Niamey",
+                "country": "Niger",
+                "profession": "",
+                "show_email": "on",
+                "show_whatsapp": "on",
+                "show_city": "on",
+                "digest_weekly": "",
+                "in_memoriam_alerts": "on",
+                "event_alerts": "",
+                "tag_alerts": "on",
+                "data_saver": "",
+                "photo_public_id": new_id,
+            },
+        )
+
     member.refresh_from_db()
     assert member.photo_public_id == new_id
     assert f"members/{member.slug}/old_photo" in fake.delete_calls
