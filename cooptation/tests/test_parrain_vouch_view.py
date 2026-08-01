@@ -144,3 +144,46 @@ def test_non_staff_parrain_can_view_and_submit_vouch(client, make_cooptation_req
     assert response.status_code == 302
     req.refresh_from_db()
     assert req.response == "accepted"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("decided_status", ["approved", "rejected", "purged"])
+def test_vouch_closed_when_application_already_decided(parrain_client, decided_status):
+    """H1 (2026-08-01 review): a late vouch on a decided application must not
+    flip it back to awaiting_admin — a rejected app pulled out of
+    status='rejected' also escapes the 180-day retention purge, and an
+    approved one becomes re-decidable, stranding the created account."""
+    req = parrain_client.request_obj
+    app = req.application
+    app.status = decided_status
+    app.save()
+
+    response = parrain_client.get(f"/cooptation/{req.token}/")
+    assert response.status_code == 410
+
+    response = parrain_client.post(
+        f"/cooptation/{req.token}/", {"response": "accepted", "comment": ""}
+    )
+    assert response.status_code == 410
+
+    req.refresh_from_db()
+    app.refresh_from_db()
+    assert req.response == "pending"  # nothing recorded
+    assert app.status == decided_status  # decision not reversed
+
+
+@pytest.mark.django_db
+def test_vouch_on_decided_application_sends_no_candidate_email(parrain_client, settings):
+    """The accepted/refused emails announce the parrain's response to the
+    candidate — sending one after the admin already decided contradicts the
+    decision email the candidate got."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from alumni.email import FakeResendBackend
+
+    req = parrain_client.request_obj
+    app = req.application
+    app.status = "rejected"
+    app.save()
+
+    parrain_client.post(f"/cooptation/{req.token}/", {"response": "accepted", "comment": ""})
+    assert FakeResendBackend.sent_messages == []
