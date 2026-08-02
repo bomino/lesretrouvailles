@@ -30,7 +30,7 @@
              aria-label="Filtrer par statut"
              class="mb-4 flex flex-wrap gap-2">
             {% for filter_value, filter_label in filter_chips %}
-                <a href="?status={{ filter_value }}{% if q %}&q={{ q }}{% endif %}"
+                <a href="?status={{ filter_value }}{% if q %}&q={{ q|urlencode }}{% endif %}"
                    class="rounded-full px-3 py-1.5 text-sm border min-h-tap inline-flex items-center {% if status == filter_value %}border-tertiary bg-tertiary/10 text-tertiary font-medium{% else %}border-secondary/20 bg-base-200 text-primary hover:bg-base-300{% endif %}"
                    {% if status == filter_value %}aria-current="true"{% endif %}>{{ filter_label }}</a>
             {% endfor %}
@@ -85,13 +85,13 @@
             <nav aria-label="Pagination"
                  class="mt-6 flex items-center justify-center gap-2">
                 {% if page.has_previous %}
-                    <a href="?page={{ page.previous_page_number }}{% if status != 'all' %}&status={{ status }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+                    <a href="?page={{ page.previous_page_number }}{% if status != 'all' %}&status={{ status }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}"
                        class="rounded-lg border border-secondary/20 px-3 py-1.5 text-sm min-h-tap inline-flex items-center"
                        aria-label="Page précédente">Précédent</a>
                 {% endif %}
                 <span class="text-sm text-secondary" aria-current="page">Page {{ page.number }} sur {{ page.paginator.num_pages }}</span>
                 {% if page.has_next %}
-                    <a href="?page={{ page.next_page_number }}{% if status != 'all' %}&status={{ status }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+                    <a href="?page={{ page.next_page_number }}{% if status != 'all' %}&status={{ status }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}"
                        class="rounded-lg border border-secondary/20 px-3 py-1.5 text-sm min-h-tap inline-flex items-center"
                        aria-label="Page suivante">Suivant</a>
                 {% endif %}

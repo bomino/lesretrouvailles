@@ -71,14 +71,14 @@
         <nav class="mt-6 flex items-center justify-between text-sm"
              aria-label="Pagination">
             {% if page.has_previous %}
-                <a href="?{% if q %}q={{ q }}&{% endif %}status={{ status }}&page={{ page.previous_page_number }}"
+                <a href="?{% if q %}q={{ q|urlencode }}&{% endif %}status={{ status }}&page={{ page.previous_page_number }}"
                    class="rounded-lg border border-secondary/20 px-3 py-2 min-h-tap hover:border-tertiary/40 hover:text-tertiary transition">← Précédent</a>
             {% else %}
                 <span></span>
             {% endif %}
             <span class="text-secondary">Page {{ page.number }} / {{ page.paginator.num_pages }}</span>
             {% if page.has_next %}
-                <a href="?{% if q %}q={{ q }}&{% endif %}status={{ status }}&page={{ page.next_page_number }}"
+                <a href="?{% if q %}q={{ q|urlencode }}&{% endif %}status={{ status }}&page={{ page.next_page_number }}"
                    class="rounded-lg border border-secondary/20 px-3 py-2 min-h-tap hover:border-tertiary/40 hover:text-tertiary transition">Suivant →</a>
             {% else %}
                 <span></span>

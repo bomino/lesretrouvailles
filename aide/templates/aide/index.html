@@ -72,8 +72,8 @@
                       aria-hidden="true">🔎</span>
                 <p class="mt-4 text-base font-medium">{% trans "Aucune question ne correspond à votre recherche." %}</p>
                 <p class="mx-auto mt-2 max-w-md text-sm text-secondary">
-                    {% blocktrans %}Pour plus de détails, consultez le <a href="{% endblocktrans %}{% url 'member_guide' %}{% blocktrans %}"
-    class="underline hover:text-tertiary">guide membre complet</a>, ou écrivez à l'administrateur via WhatsApp.{% endblocktrans %}
+                    {% url 'member_guide' as guide_url %}
+                    {% blocktrans %}Pour plus de détails, consultez le <a href="{{ guide_url }}" class="underline hover:text-tertiary">guide membre complet</a>, ou écrivez à l'administrateur via WhatsApp.{% endblocktrans %}
                 </p>
                 <p class="mt-6">
                     <a href="{% url 'aide:index' %}"

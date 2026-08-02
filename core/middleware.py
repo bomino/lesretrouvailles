@@ -1,4 +1,5 @@
 import base64
+import secrets
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -72,7 +73,11 @@ class BasicAuthMiddleware:
             try:
                 creds = base64.b64decode(header[6:]).decode("utf-8")
                 user, _, pwd = creds.partition(":")
-                if user == self.username and pwd == self.password:
+                # Constant-time comparison; both parts evaluated
+                # unconditionally so the username check can't short-circuit.
+                user_ok = secrets.compare_digest(user, self.username)
+                pwd_ok = secrets.compare_digest(pwd, self.password)
+                if user_ok and pwd_ok:
                     return self.get_response(request)
             except (ValueError, UnicodeDecodeError):
                 pass

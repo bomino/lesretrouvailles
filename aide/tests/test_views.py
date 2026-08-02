@@ -134,3 +134,13 @@ def test_plain_aide_gets_do_not_consume_no_results_budget(client_anon):
 
     client_anon.get(reverse("aide:index"), {"q": "zzz_definitely_no_match_zzz"})
     assert AuditLog.objects.filter(action="aide.query.no_results").count() == 1
+
+
+@pytest.mark.django_db
+def test_empty_state_links_to_member_guide(client):
+    """T7 (2026-08-01 review tail): the empty-state guide link was split
+    across two blocktrans fragments ending mid-attribute. The rebuilt single
+    blocktrans must keep the link working."""
+    response = client.get("/aide/", {"q": "zzzz-aucun-resultat"})
+    assert response.status_code == 200
+    assert 'href="/guide/"' in response.content.decode()
