@@ -61,11 +61,19 @@ def test_detail_archived_404(authed_member_client, make_memoriam_entry):
 @pytest.mark.django_db
 def test_detail_strips_script_tags_from_tribute(authed_member_client, make_memoriam_entry):
     """Defense in depth: even if a malicious admin writes <script> in tribute,
-    the rendered detail page must not contain executable script tags."""
+    the rendered detail page must not contain the injected script.
+
+    Assert on the PAYLOAD, not on `<script>` bytes anywhere in the page —
+    base.html legitimately carries an inline nav script, so the old
+    page-wide assertion only held while every template script tag happened
+    to have attributes."""
     client, _ = authed_member_client
     entry = make_memoriam_entry(
-        tribute="Hommage. <script>alert('xss')</script> **fin**",
+        tribute="Hommage. <script>alert('xss-tribute')</script> **fin**",
     )
     resp = client.get(f"/in-memoriam/{entry.pk}/")
     assert resp.status_code == 200
-    assert b"<script>" not in resp.content
+    # bleach strips the TAG and keeps the inner text: the page must never
+    # contain the executable form, while the naked text is harmless.
+    assert b"<script>alert" not in resp.content
+    assert b"alert('xss-tribute')" in resp.content

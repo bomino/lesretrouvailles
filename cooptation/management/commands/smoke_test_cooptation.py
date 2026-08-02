@@ -241,6 +241,17 @@ class Command(BaseCommand):
         # approve_application splits full_name on whitespace, so the smoke
         # candidate's Member.first_name is exactly SMOKE_TAG.
         AdminApplication.objects.filter(full_name__startswith=SMOKE_TAG).delete()
+
+        # Parrain side FIRST: delete Members (FK on user) then the User rows.
+        # The candidate SKIP below returns early, and running the parrain
+        # cleanup after it used to strand SmokeParrain1/2 as active members
+        # visible in the live /annuaire/ until a later successful run.
+        for email in (SMOKE_PARRAIN_1_EMAIL, SMOKE_PARRAIN_2_EMAIL):
+            user = User.objects.filter(email=email).first()
+            if user is not None:
+                Member.objects.filter(user=user).delete()
+                user.delete()
+
         candidate_user = User.objects.filter(email=candidate_email).first()
         if candidate_user is not None:
             smoke_member = Member.objects.filter(
@@ -254,9 +265,3 @@ class Command(BaseCommand):
                 return
             smoke_member.delete()
             candidate_user.delete()
-        # Parrain side: delete Members first (FK on user) then the User rows.
-        for email in (SMOKE_PARRAIN_1_EMAIL, SMOKE_PARRAIN_2_EMAIL):
-            user = User.objects.filter(email=email).first()
-            if user is not None:
-                Member.objects.filter(user=user).delete()
-                user.delete()

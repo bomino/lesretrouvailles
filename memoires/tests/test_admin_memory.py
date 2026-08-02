@@ -166,3 +166,52 @@ def test_delete_memory_removes_cloudinary_photo(fake_cloudinary, make_admin_user
         admin_obj.delete_model(req, memory)
 
     assert "memoires/orphan-candidate" in cloud_mod.get_client().delete_calls
+
+
+@pytest.mark.django_db
+def test_hard_delete_writes_audit_row(make_admin_user, settings):
+    """T8 (2026-08-01 review tail): /admin/ hard delete is this admin's one
+    remaining purpose, and it left no AuditLog trail."""
+    from django.contrib.admin.sites import site
+
+    from members.models import AuditLog
+    from memoires.admin import MemoryAdmin
+    from memoires.models import Memory
+
+    settings.CLOUDINARY_CLIENT_PATH = "alumni.cloudinary.FakeCloudinary"
+    admin_user = make_admin_user()
+    memory = Memory.objects.create(
+        photo_public_id="memoires/audit-del",
+        caption="Souvenir à supprimer pour test",
+        status="draft",
+        created_by=admin_user,
+    )
+
+    class FakeReq:
+        user = admin_user
+
+    admin_obj = MemoryAdmin(Memory, site)
+    memory_pk = memory.pk  # delete() sets instance.pk to None
+    admin_obj.delete_model(FakeReq(), memory)
+
+    log = AuditLog.objects.get(action="memoires.memory.deleted", target_id=str(memory_pk))
+    assert log.metadata["caption_preview"].startswith("Souvenir à supprimer")
+    assert log.actor == admin_user
+
+
+@pytest.mark.django_db
+def test_admin_upload_form_enforces_size_and_mime():
+    """Mirror of the gestion form's guards on the admin form."""
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from memoires.forms import MemoryAdminForm
+
+    big = SimpleUploadedFile("big.jpg", b"x" * (8 * 1024 * 1024 + 1), content_type="image/jpeg")
+    form = MemoryAdminForm(data={"caption": "c", "status": "draft"}, files={"upload": big})
+    form.is_valid()
+    assert "upload" in form.errors
+
+    pdf = SimpleUploadedFile("x.pdf", b"%PDF-1.4", content_type="application/pdf")
+    form = MemoryAdminForm(data={"caption": "c", "status": "draft"}, files={"upload": pdf})
+    form.is_valid()
+    assert "upload" in form.errors

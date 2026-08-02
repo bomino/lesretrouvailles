@@ -459,3 +459,80 @@ def test_dry_run_predicts_existing_and_duplicate_skips(fake_clients, tmp_path, s
     output = out.getvalue()
     assert "would skip (already exist): 1" in output
     assert "duplicates in CSV:         1" in output
+
+
+@pytest.mark.django_db
+def test_magic_links_csv_appends_across_runs(fake_clients, tmp_path, settings):
+    """T6 (2026-08-01 review tail): the links CSV was opened in write mode —
+    a second batch run truncated the previous run's links, destroying URLs
+    that had not been DM-forwarded yet (each exists nowhere else)."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    links = tmp_path / "links.csv"
+
+    _write_csv(tmp_path / "r1.csv", [_row(first_name="Un", whatsapp="+22790000001", email="")])
+    call_command(
+        "import_whatsapp_roster",
+        str(tmp_path / "r1.csv"),
+        "--magic-links-out",
+        str(links),
+        stdout=StringIO(),
+    )
+    assert "22790000001" in links.read_text(encoding="utf-8")
+
+    _write_csv(tmp_path / "r2.csv", [_row(first_name="Deux", whatsapp="+22790000002", email="")])
+    call_command(
+        "import_whatsapp_roster",
+        str(tmp_path / "r2.csv"),
+        "--magic-links-out",
+        str(links),
+        stdout=StringIO(),
+    )
+    combined = links.read_text(encoding="utf-8")
+    assert "22790000001" in combined  # first run's links survive the re-run
+    assert "22790000002" in combined
+    assert combined.count("magic_link_url") == 1  # single header
+
+
+@pytest.mark.django_db(transaction=True)
+def test_photo_upload_runs_outside_the_row_transaction(fake_clients, tmp_path, monkeypatch):
+    """T6: the Cloudinary upload (network I/O) ran INSIDE the per-row
+    transaction, holding a DB transaction open per slow upload; a crash
+    between upload and commit orphaned the asset. The row must commit first;
+    the photo attaches afterwards."""
+    from django.db import connection
+    from PIL import Image
+
+    from alumni import cloudinary as cloud_mod
+    from members.models import Member
+
+    photos = tmp_path / "photos"
+    photos.mkdir()
+    Image.new("RGB", (5, 5), color="red").save(photos / "p.jpg")
+    _write_csv(
+        tmp_path / "r.csv",
+        [_row(first_name="Photo", whatsapp="+22790000009", email="", photo_filename="p.jpg")],
+    )
+
+    seen = {}
+    client = cloud_mod.get_client()
+    real_upload = client.upload_file
+
+    def spy(fh, folder=""):
+        seen["in_atomic_block"] = connection.in_atomic_block
+        return real_upload(fh, folder=folder)
+
+    monkeypatch.setattr(client, "upload_file", spy)
+
+    call_command(
+        "import_whatsapp_roster",
+        str(tmp_path / "r.csv"),
+        "--magic-links-out",
+        str(tmp_path / "l.csv"),
+        "--photos-dir",
+        str(photos),
+        stdout=StringIO(),
+    )
+
+    assert seen["in_atomic_block"] is False  # upload after the row committed
+    member = Member.objects.get(user__username="22790000009")
+    assert member.photo_public_id  # and the photo still attached

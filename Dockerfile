@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # ---- Stage 1: build CSS with Tailwind ----
-FROM node:20-alpine AS css-builder
+FROM node:22-alpine AS css-builder
 
 WORKDIR /build
 
@@ -9,7 +9,6 @@ COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
 COPY tailwind.config.js postcss.config.js tailwind.theme.json ./
-COPY DESIGN.md ./
 COPY static/ ./static/
 COPY templates/ ./templates/
 COPY core/ ./core/

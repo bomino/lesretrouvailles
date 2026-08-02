@@ -786,3 +786,27 @@ def test_admin_action_reports_incomplete_instead_of_500(
     assert Member.objects.filter(id=target_id).exists()  # not purged
     body = resp.content.decode()
     assert "nothing was purged" in body  # PurgeIncomplete's own message, surfaced
+
+
+@pytest.mark.django_db
+def test_purge_deletes_the_members_live_sessions(fake_clients, make_member, client):
+    """T6 (2026-08-01 review tail): sessions are not FK-linked to User, so a
+    purged member's session row (with _auth_user_id in the blob) survived
+    until natural expiry — up to 90 days of RGPD residual. The docstring
+    claimed sessions were swept; now they actually are."""
+    from django.contrib.sessions.models import Session
+
+    from members.services import rgpd_purge_member
+
+    member = make_member()
+    user = member.user
+    user.set_password("x")
+    user.save()
+    assert client.login(username=user.username, password="x")
+
+    uid = str(user.pk)
+    assert any(s.get_decoded().get("_auth_user_id") == uid for s in Session.objects.all())
+
+    rgpd_purge_member(member, actor=None)
+
+    assert not any(s.get_decoded().get("_auth_user_id") == uid for s in Session.objects.all())

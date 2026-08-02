@@ -17,7 +17,9 @@ import hmac
 import logging
 from typing import Any
 
+from django.contrib.sessions.models import Session
 from django.db import transaction
+from django.utils import timezone
 
 from alumni import cloudinary as cloud_mod
 from alumni import storage as storage_mod
@@ -123,6 +125,11 @@ def claim_entry(entry: ClassRosterEntry, *, member: Member, actor) -> ClassRoste
 @transaction.atomic
 def unclaim_entry(entry: ClassRosterEntry, *, member: Member, actor) -> ClassRosterEntry:
     """Unlink. Only the claimer, or staff, may do this."""
+    # Same lock discipline as claim_entry: operate on the row as it is NOW,
+    # not on the possibly-stale instance the view fetched — concurrent
+    # unclaims otherwise both pass the checks and double-write audit rows.
+    entry = ClassRosterEntry.objects.select_for_update().get(pk=entry.pk)
+
     if entry.member_id is None:
         return entry  # idempotent
     is_staff = bool(getattr(actor, "is_staff", False))
@@ -370,8 +377,16 @@ def rgpd_purge_member(
                 app.purge()
 
         # Step 8: cascade-delete via the User row (sweeps Member, prefs,
-        # consent records, sessions; SET_NULLs the audit-log actor refs)
+        # consent records; SET_NULLs the audit-log actor refs). Sessions are
+        # NOT part of the cascade — django.contrib.sessions rows have no FK
+        # to User, so a live session blob (carrying _auth_user_id) survived
+        # until natural expiry: up to 90 days of RGPD residual, and this
+        # comment used to claim otherwise. Sweep them explicitly.
         user = member.user
+        uid = str(user.pk)
+        for session in Session.objects.filter(expire_date__gte=timezone.now()):
+            if session.get_decoded().get("_auth_user_id") == uid:
+                session.delete()
         user.delete()
 
     # --- Step 9: audit (after commit so its presence == "fully complete") --

@@ -239,3 +239,23 @@ def test_annuaire_facet_only_no_results_logs(consenting_client, make_member):
     rows = AuditLog.objects.filter(action="directory.query.no_results")
     assert rows.count() == 1
     assert rows.first().metadata.get("city") == "Atlantis"
+
+
+@pytest.mark.django_db
+def test_like_wildcards_in_tokens_are_literal(make_member):
+    """T6 (2026-08-01 review tail): Django does NOT escape LIKE wildcards in
+    an expression RHS, so q='%' matched every member and '_' acted as a
+    one-char wildcard. Tokens must match literally."""
+    from members.search import search_members_staff
+
+    make_member(first_name="Alpha", last_name="One")
+    make_member(first_name="Beta", last_name="Two")
+    qs = Member.objects.filter(status="active")
+
+    assert search_members(qs, "%").count() == 0
+    # Staff path (no fuzzy fallback, same lc-annotation engine): the
+    # underscore must not act as a one-char wildcard.
+    assert search_members_staff(qs, "_lpha").count() == 0
+    # A literal % in a profile stays findable.
+    make_member(first_name="Gamma", last_name="Cent", profession="Agent 100%")
+    assert search_members_staff(qs, "100%").count() == 1

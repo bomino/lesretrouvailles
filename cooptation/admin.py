@@ -1,4 +1,7 @@
+import time
+
 from django.contrib import admin, messages
+from django.contrib.messages.api import MessageFailure
 from django.utils.html import format_html
 
 from . import services
@@ -89,11 +92,19 @@ class AdminApplicationAdmin(admin.ModelAdmin):
             super().message_user(
                 request, message, level=level, extra_tags=extra_tags, fail_silently=fail_silently
             )
-        except (TypeError, Exception):
+        except (TypeError, MessageFailure):
+            # Plumbing-only tolerance: CLI/smoke callers pass bare fake
+            # request objects (not HttpRequest → TypeError) or requests
+            # without the messages middleware (→ MessageFailure). The old
+            # blanket `except Exception` also discarded real per-row
+            # warnings, letting an admin believe a bulk approve fully
+            # succeeded when rows were refused. Anything else propagates.
             pass
 
     @admin.action(description="Approuver les candidatures sélectionnées")
     def approve_action(self, request, queryset):
+        from members.models import AuditLog
+
         approved = 0
         for app in queryset:
             try:
@@ -104,11 +115,32 @@ class AdminApplicationAdmin(admin.ModelAdmin):
                 )
             else:
                 approved += 1
+                # The /gestion/ path writes gestion.application.approved; this
+                # bulk path wrote nothing — the only trace was mutable row
+                # state (reviewed_by), thinner than the audit conventions.
+                AuditLog.objects.create(
+                    actor=request.user,
+                    action="cooptation.application.approved",
+                    target_type="cooptation.AdminApplication",
+                    target_id=str(app.pk),
+                    metadata={
+                        "candidate_full_name": app.full_name,
+                        "candidate_email": app.email,
+                    },
+                )
         self.message_user(request, f"{approved} candidature(s) approuvée(s).", messages.SUCCESS)
 
     @admin.action(description="Rejeter les candidatures sélectionnées")
     def reject_action(self, request, queryset):
-        reason = (request.POST.get("reason") or "Demande non éligible").strip()
+        # The changelist action POST carries no reason field — no admin UI
+        # ever supplied one, so a request.POST.get("reason") read here was
+        # dead code implying a per-rejection-reason feature that doesn't
+        # exist. This bulk action is explicitly generic; reasoned rejections
+        # go through /gestion/ (ApplicationRejectForm), whose note reaches
+        # the candidate's rejection email.
+        reason = "Demande non éligible"
+        from members.models import AuditLog
+
         rejected = 0
         for app in queryset:
             try:
@@ -119,6 +151,17 @@ class AdminApplicationAdmin(admin.ModelAdmin):
                 )
             else:
                 rejected += 1
+                AuditLog.objects.create(
+                    actor=request.user,
+                    action="cooptation.application.rejected",
+                    target_type="cooptation.AdminApplication",
+                    target_id=str(app.pk),
+                    metadata={
+                        "candidate_full_name": app.full_name,
+                        "candidate_email": app.email,
+                        "note": reason,
+                    },
+                )
         self.message_user(request, f"{rejected} candidature(s) rejetée(s).", messages.WARNING)
 
     @admin.action(description="Renvoyer le lien de mot de passe (candidats déjà approuvés)")
@@ -128,13 +171,23 @@ class AdminApplicationAdmin(admin.ModelAdmin):
             from django.contrib.auth import get_user_model
 
             User = get_user_model()  # noqa: N806
-            user = User.objects.filter(email=app.email).first()
+            # approve_application creates the account with username=email;
+            # the email field is mutable and NOT unique. Username is the
+            # stable key — matching on email alone silently skipped users
+            # whose address was later corrected, or picked an arbitrary
+            # account among shared-email duplicates.
+            user = (
+                User.objects.filter(username=app.email).first()
+                or User.objects.filter(email=app.email).order_by("pk").first()
+            )
             if not user:
                 continue
             from .services import _build_password_set_url
 
             send_application_approved(app, password_set_url=_build_password_set_url(user))
             sent += 1
+            # Same Resend pacing as the other bulk senders (429 risk).
+            time.sleep(0.5)
         self.message_user(request, f"{sent} email(s) renvoyé(s).", messages.SUCCESS)
 
 

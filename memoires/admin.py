@@ -94,9 +94,29 @@ class MemoryAdmin(admin.ModelAdmin):
         delete commits — otherwise the photo stays permanently fetchable at
         its res.cloudinary.com URL."""
         _delete_photo_on_commit(obj.photo_public_id)
+        self._audit_delete(request, obj)
         super().delete_model(request, obj)
 
     def delete_queryset(self, request, queryset):
         for obj in queryset:
             _delete_photo_on_commit(obj.photo_public_id)
+            self._audit_delete(request, obj)
         super().delete_queryset(request, queryset)
+
+    @staticmethod
+    def _audit_delete(request, obj) -> None:
+        # A hard delete previously left only Django's LogEntry (prunable, no
+        # readable metadata). Capture before the row goes.
+        from members.models import AuditLog
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action="memoires.memory.deleted",
+            target_type="memoires.Memory",
+            target_id=str(obj.pk),
+            metadata={
+                "caption_preview": obj.caption[:60],
+                "public_id": obj.photo_public_id,
+                "status": obj.status,
+            },
+        )

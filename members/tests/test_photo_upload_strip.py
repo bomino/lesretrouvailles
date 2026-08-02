@@ -188,3 +188,29 @@ def test_non_staff_cannot_upload_on_behalf_of_another_member(
     folder = cloud_mod.get_client().upload_calls[-1]["folder"]
 
     assert folder == f"members/{consenting_client.member.slug}/", "folder must ignore member_slug"
+
+
+@pytest.mark.django_db
+def test_upload_rejects_bytes_that_are_not_an_image(consenting_client, settings):
+    """T6 (2026-08-01 review tail): the MIME check trusted the browser-supplied
+    content_type header; real enforcement leaned on Pillow/Cloudinary failing
+    later. The view must sniff the actual bytes and 400 authoritatively."""
+    settings.CLOUDINARY_CLIENT_PATH = "alumni.cloudinary.FakeCloudinary"
+    response = _upload(
+        consenting_client,
+        b"%PDF-1.4 definitely not pixels",
+        name="x.jpg",
+        content_type="image/jpeg",
+    )
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_upload_rejects_valid_image_of_disallowed_format(consenting_client, settings):
+    """A real GIF smuggled under an image/jpeg header must be rejected too:
+    the allowed set is JPEG/PNG/WebP, decided from the bytes."""
+    settings.CLOUDINARY_CLIENT_PATH = "alumni.cloudinary.FakeCloudinary"
+    buf = BytesIO()
+    Image.new("P", (5, 5)).save(buf, format="GIF")
+    response = _upload(consenting_client, buf.getvalue(), name="x.jpg", content_type="image/jpeg")
+    assert response.status_code == 400

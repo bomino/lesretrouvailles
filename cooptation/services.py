@@ -9,7 +9,7 @@ from datetime import timedelta
 from allauth.account.forms import default_token_generator as allauth_token_generator
 from allauth.account.utils import user_pk_to_url_str
 from django.contrib.auth import get_user_model
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -83,7 +83,18 @@ def approve_application(application: AdminApplication, *, reviewed_by) -> tuple:
             "refusing to adopt an existing account."
         )
     with transaction.atomic():
-        user = User.objects.create(username=application.email, email=application.email)
+        # The exists() check above is check-then-act: two concurrent
+        # approvals both pass it, and the loser hits IntegrityError on the
+        # unique username. Callers only handle ApprovalError, so the raw
+        # IntegrityError 500ed the gestion view and aborted the admin bulk
+        # action mid-queryset. Map it to the exception they already catch.
+        try:
+            user = User.objects.create(username=application.email, email=application.email)
+        except IntegrityError as e:
+            raise ApprovalError(
+                f"A user already exists with email or username {application.email!r}; "
+                "refusing to adopt an existing account."
+            ) from e
         user.set_unusable_password()
         user.is_active = True
         user.save()
@@ -194,4 +205,22 @@ def reject_application(application: AdminApplication, *, reviewed_by, note: str)
 
 
 def purge_application(application: AdminApplication) -> None:
+    # The purge clears review_note and every PII field, so without this row
+    # there is no durable trace the application existed or when it was purged.
+    # Like rgpd.member.purged, metadata deliberately stores a salted hash and
+    # never the name — a readable identity would defeat the purge.
+    from members.models import AuditLog
+    from members.services import _audit_email_hash
+
+    metadata = {
+        "status_before": application.status,
+        "email_hash": _audit_email_hash(application.email) if application.email else "",
+    }
     application.purge()
+    AuditLog.objects.create(
+        actor=None,
+        action="cooptation.application.purged",
+        target_type="cooptation.AdminApplication",
+        target_id=str(application.pk),
+        metadata=metadata,
+    )

@@ -70,6 +70,19 @@ def nominate_view(request):
     if request.method == "POST":
         form = NominationForm(request.POST)
         if form.is_valid():
+            # Resolve the Member BEFORE consuming the quota: an authenticated
+            # account with no Member row (superuser, co-admin service account)
+            # used to burn its 1/day quota, hit a raw 404, and lose the typed
+            # form. A friendly error beats both.
+            member = Member.objects.filter(user=request.user).first()
+            if member is None:
+                form.add_error(
+                    None,
+                    "Votre compte n'est associé à aucun profil membre — une "
+                    "nomination doit venir d'un profil membre. Contactez "
+                    "l'administrateur.",
+                )
+                return render(request, "memoriam/nominate.html", {"form": form})
             # Consume the 1/d quota only on a submission that will actually
             # save — a validation error plus a retry used to lock the member
             # out for 24h behind a bare English 403.
@@ -88,7 +101,7 @@ def nominate_view(request):
                     status=429,
                 )
             nom = form.save(commit=False)
-            nom.nominator = get_object_or_404(Member, user=request.user)
+            nom.nominator = member
             nom.save()
             try:
                 send_nomination_received_to_admins(nom)

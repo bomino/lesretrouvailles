@@ -1,4 +1,5 @@
 import base64
+import secrets
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -72,11 +73,55 @@ class BasicAuthMiddleware:
             try:
                 creds = base64.b64decode(header[6:]).decode("utf-8")
                 user, _, pwd = creds.partition(":")
-                if user == self.username and pwd == self.password:
+                # Constant-time comparison; both parts evaluated
+                # unconditionally so the username check can't short-circuit.
+                user_ok = secrets.compare_digest(user, self.username)
+                pwd_ok = secrets.compare_digest(pwd, self.password)
+                if user_ok and pwd_ok:
                     return self.get_response(request)
             except (ValueError, UnicodeDecodeError):
                 pass
 
         response = HttpResponse("Authentication required", status=401)
         response["WWW-Authenticate"] = 'Basic realm="Staging"'
+        return response
+
+
+# Report-only CSP (2026-08-01 review). Origins mirror what the templates
+# actually load: vendored htmx + our static (self), the Cloudflare analytics
+# beacon, Cloudinary-hosted photos. 'unsafe-inline' for scripts/styles is
+# required by the existing inline nav/copy scripts and Tailwind inline
+# styles; tightening to nonces is part of the enforcement flip, not this
+# observation phase.
+CSP_REPORT_ONLY_POLICY = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data: https://res.cloudinary.com; "
+    "connect-src 'self' https://cloudflareinsights.com https://static.cloudflareinsights.com; "
+    "font-src 'self'; "
+    "frame-ancestors 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'"
+)
+
+
+class ContentSecurityPolicyReportOnlyMiddleware:
+    """Emit Content-Security-Policy-Report-Only on every response.
+
+    Several templates render admin-authored markdown via |safe (bleach-cleaned
+    and safe today), and there was no CSP as a second layer should a future
+    sink ever be fed member input. Report-only cannot break a page — browsers
+    log violations to the console instead of blocking — so this is the
+    observation phase of the standard rollout: flip to the enforcing header
+    (and nonce the inline scripts) only once real browsing shows no
+    violations.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        response.headers.setdefault("Content-Security-Policy-Report-Only", CSP_REPORT_ONLY_POLICY)
         return response

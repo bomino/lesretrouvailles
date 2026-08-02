@@ -25,11 +25,6 @@ def health(_request):
     return JsonResponse(payload, status=status_code)
 
 
-# Kept temporarily so older imports/redirects don't 500 during the migration.
-def landing_placeholder(request):
-    return render(request, "core/landing_placeholder.html")
-
-
 @require_http_methods(["GET"])
 def landing_view(request):
     """The public landing page. Anonymous visitors get the recruitment-shaped

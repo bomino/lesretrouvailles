@@ -208,3 +208,70 @@ def test_staging_basic_auth_exposes_the_same_public_surface_as_prod():
 
     assert "/aide/" in BASIC_AUTH_PUBLIC_PREFIXES
     assert "/guide/" in BASIC_AUTH_PUBLIC_PREFIXES
+
+
+def _root():
+    from pathlib import Path
+
+    return Path(__file__).resolve().parents[2]
+
+
+def test_node_toolchain_is_supported():
+    """T9 (2026-08-01 review tail): Node 20 went EOL in April 2026 — the CSS
+    toolchain was building on an unsupported runtime in both build paths."""
+    dockerfile = (_root() / "Dockerfile").read_text(encoding="utf-8")
+    ci = (_root() / ".github" / "workflows" / "test.yml").read_text(encoding="utf-8")
+    assert "node:20" not in dockerfile
+    assert "node:22" in dockerfile
+    assert 'node-version: "20"' not in ci
+    assert 'node-version: "22"' in ci
+
+
+def test_dockerignore_covers_private_data_and_all_test_dirs():
+    """T9: the per-dir COPYs keep roster data out of the IMAGE, but a local
+    docker build shipped the real-names workbooks to the Docker daemon in the
+    build context. And six apps' test suites were COPYed into the prod image
+    (inert but bloat)."""
+    di = (_root() / ".dockerignore").read_text(encoding="utf-8")
+    for pattern in (
+        "private-data/",
+        "*.xlsx",
+        "cooptation/tests/",
+        "gestion/tests/",
+        "memoires/tests/",
+        "memoriam/tests/",
+        "aide/tests/",
+        "alumni/tests/",
+    ):
+        assert pattern in di, f"missing from .dockerignore: {pattern}"
+
+
+def test_stray_shell_artifact_is_gone():
+    """The empty file `5.2` (unquoted `pip install django >5.2` redirect,
+    committed in 7a325c1) must stay deleted."""
+    assert not (_root() / "5.2").exists()
+
+
+def test_compose_app_service_has_healthcheck():
+    compose = (_root() / "docker-compose.yml").read_text(encoding="utf-8")
+    assert compose.count("healthcheck:") == 2  # db AND app
+
+
+def test_report_only_csp_is_wired_in_prod_shape():
+    """T9: several templates render markdown via |safe (bleach-cleaned, safe
+    today) and there was no CSP as a second layer. Report-only cannot break
+    anything; enforcement is a later, deliberate flip."""
+    from django.http import HttpResponse
+    from django.test import RequestFactory
+
+    from core.middleware import ContentSecurityPolicyReportOnlyMiddleware
+
+    mw = ContentSecurityPolicyReportOnlyMiddleware(lambda r: HttpResponse())
+    response = mw(RequestFactory().get("/"))
+    policy = response.headers["Content-Security-Policy-Report-Only"]
+    assert "default-src 'self'" in policy
+    assert "res.cloudinary.com" in policy  # avatars must not report as violations
+    assert "static.cloudflareinsights.com" in policy  # analytics beacon likewise
+
+    src = _settings_source("staging")
+    assert "ContentSecurityPolicyReportOnlyMiddleware" in src

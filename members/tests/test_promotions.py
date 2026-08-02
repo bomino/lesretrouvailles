@@ -399,3 +399,33 @@ def test_member_may_claim_one_entry_per_year(consenting_client, make_roster_entr
     a.refresh_from_db()
     b.refresh_from_db()
     assert a.member_id == member.pk and b.member_id == member.pk
+
+
+@pytest.mark.django_db(transaction=True)
+def test_unclaim_locks_the_row_like_claim_does(make_member):
+    """T6 (2026-08-01 review tail): claim_entry re-fetches under
+    select_for_update (documented rationale inline); unclaim_entry operated
+    on the possibly-stale instance passed in from the view."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from members.models import ClassRosterEntry
+    from members.services import unclaim_entry
+
+    member = make_member(first_name="Alpha", last_name="Mononyme")
+    entry = ClassRosterEntry.objects.create(
+        source_ref="lock:1",
+        school_year_start=1980,
+        class_label="6eB",
+        first_name="Alpha",
+        last_name="Mononyme",
+        member=member,
+    )
+
+    with CaptureQueriesContext(connection) as ctx:
+        unclaim_entry(entry, member=member, actor=member.user)
+
+    locked = [q["sql"] for q in ctx.captured_queries if "FOR UPDATE" in q["sql"]]
+    assert any("classrosterentry" in q.lower() for q in locked)
+    entry.refresh_from_db()
+    assert entry.member_id is None

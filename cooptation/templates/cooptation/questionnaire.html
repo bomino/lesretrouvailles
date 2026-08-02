@@ -12,6 +12,10 @@
             </h1>
             <p class="mt-4 text-secondary">{% trans "Cooptation expirée — quelques questions pour valider votre identité." %}</p>
         </header>
+        {% if error %}
+            <div class="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800"
+                 role="alert">{{ error }}</div>
+        {% endif %}
         <form method="post"
               class="rounded-2xl bg-base-200 border border-secondary/15 p-6 shadow-sm space-y-5">
             {% csrf_token %}

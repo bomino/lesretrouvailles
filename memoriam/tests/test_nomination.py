@@ -158,3 +158,29 @@ def test_nomination_rejects_years_outside_1980_1985(authed_member_client, fake_e
     from memoriam.models import InMemoriamNomination
 
     assert not InMemoriamNomination.objects.filter(proposed_name="Hors Plage").exists()
+
+
+@pytest.mark.django_db
+def test_nomination_by_user_without_member_row_gets_error_not_404(client, make_admin_user):
+    """T8 (2026-08-01 review tail): the 1/day quota was consumed BEFORE the
+    Member lookup could 404 — a staff/service account with no Member row
+    burned its quota, got a raw 404, and lost the typed form."""
+    user = make_admin_user()  # superuser service account, no Member row
+    client.force_login(user)
+
+    resp = client.post(
+        "/in-memoriam/nominer/",
+        {
+            "proposed_name": "Camarade Disparu",
+            "proposed_nickname": "",
+            "proposed_years": "1980",
+            "personal_memory": "Souvenir.",
+            "family_contact_hint": "",
+        },
+    )
+    assert resp.status_code == 200  # form re-rendered, not a 404
+    assert "profil membre" in resp.content.decode().lower()
+
+    from memoriam.models import InMemoriamNomination
+
+    assert InMemoriamNomination.objects.count() == 0

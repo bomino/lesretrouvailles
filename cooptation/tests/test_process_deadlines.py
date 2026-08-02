@@ -383,7 +383,9 @@ def test_digest_fires_on_jan_1_when_purges_in_window(make_admin, settings):
 
 @pytest.mark.django_db
 def test_digest_does_not_fire_on_other_days(make_admin, settings):
-    """Jan 2 must not fire the digest even with recent purges."""
+    """Outside the day 1-7 window the digest stays silent. (Jan 2-7 now DO
+    fire when day 1 was missed — see test_digest_recovers_from_missed_first_day;
+    the old `day == 1` policy silently skipped a whole quarter.)"""
     from freezegun import freeze_time
 
     from alumni.email import FakeResendBackend
@@ -401,7 +403,7 @@ def test_digest_does_not_fire_on_other_days(make_admin, settings):
         )
 
     FakeResendBackend.sent_messages.clear()
-    with freeze_time("2026-01-02"):
+    with freeze_time("2026-01-15"):
         call_command("process_cooptation_deadlines")
 
     digests = [m for m in FakeResendBackend.sent_messages if "Revue trimestrielle" in m["subject"]]
@@ -706,3 +708,102 @@ def test_one_failed_reminder_does_not_abort_the_run(make_cooptation_request, mon
     assert req_ok.reminder_sent_at is not None
     assert "Done." in out.getvalue()  # later stages ran
     assert f"req={req_fail.pk}" in err.getvalue()  # failure is logged, not swallowed
+
+
+@pytest.mark.django_db
+def test_stale_undecided_applications_are_purged_with_audit_trail(make_application, settings):
+    """T5 (2026-08-01 review tail): retention_until was only ever set on
+    rejection, so an application parked in awaiting_admin forever kept full
+    PII (name, email, WhatsApp, IP) indefinitely — outside the 180-day window
+    rejected candidates get. The purge also now leaves a durable audit row
+    (hash, not name — a name would defeat the purge)."""
+    from cooptation.models import AdminApplication
+    from members.models import AuditLog
+
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    old = make_application(
+        full_name="Stale Undecided", email="stale@example.test", status="awaiting_admin"
+    )
+    AdminApplication.objects.filter(pk=old.pk).update(
+        submitted_at=timezone.now() - timedelta(days=200)
+    )
+    recent = make_application(status="awaiting_admin")
+
+    call_command("process_cooptation_deadlines")
+
+    old.refresh_from_db()
+    recent.refresh_from_db()
+    assert old.status == "purged"
+    assert old.full_name == "" and old.email == ""
+    assert recent.status == "awaiting_admin"  # still actionable
+
+    log = AuditLog.objects.get(action="cooptation.application.purged", target_id=str(old.pk))
+    assert log.metadata["status_before"] == "awaiting_admin"
+    assert "stale" not in str(log.metadata).lower()  # no PII in the trail
+
+
+@pytest.mark.django_db
+def test_digest_recovers_from_missed_first_day(make_admin, settings):
+    """T5: `now.day == 1` silently skipped a whole quarter when the cron
+    missed the 1st. The window is now days 1-7, guarded by a sent-marker."""
+    from freezegun import freeze_time
+
+    from alumni.email import FakeResendBackend
+    from members.models import PublicSearchEntry
+
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    a, b = make_admin(), make_admin()
+    with freeze_time("2025-12-15"):
+        e = PublicSearchEntry.objects.create(
+            first_name="X", last_name_initial="X.", years_at_ceg=[1980]
+        )
+        e.added_by_admins.add(a, b)
+        PublicSearchEntry.objects.filter(pk=e.pk).update(
+            added_at=timezone.now() - timedelta(days=400)
+        )
+
+    FakeResendBackend.sent_messages.clear()
+    with freeze_time("2026-01-03"):  # cron missed Jan 1 and 2
+        call_command("process_cooptation_deadlines")
+
+    digests = [m for m in FakeResendBackend.sent_messages if "Revue trimestrielle" in m["subject"]]
+    assert len(digests) == 1
+
+
+@pytest.mark.django_db
+def test_digest_sends_once_per_quarter_and_not_outside_window(make_admin, settings):
+    """T5: a second run in the window must not double-send (there was no sent
+    marker), and runs after day 7 must stay silent."""
+    from freezegun import freeze_time
+
+    from alumni.email import FakeResendBackend
+    from members.models import PublicSearchEntry
+
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    a, b = make_admin(), make_admin()
+    with freeze_time("2025-12-15"):
+        e = PublicSearchEntry.objects.create(
+            first_name="X", last_name_initial="X.", years_at_ceg=[1980]
+        )
+        e.added_by_admins.add(a, b)
+        PublicSearchEntry.objects.filter(pk=e.pk).update(
+            added_at=timezone.now() - timedelta(days=400)
+        )
+
+    FakeResendBackend.sent_messages.clear()
+    with freeze_time("2026-01-01"):
+        call_command("process_cooptation_deadlines")
+    with freeze_time("2026-01-02"):  # second run inside the window
+        call_command("process_cooptation_deadlines")
+    digests = [m for m in FakeResendBackend.sent_messages if "Revue trimestrielle" in m["subject"]]
+    assert len(digests) == 1  # marker prevents the double-send
+
+    # Outside the window (no marker either): silent.
+    FakeResendBackend.sent_messages.clear()
+    from members.models import AuditLog
+
+    AuditLog.objects.filter(action="ghost.digest.sent").delete()
+    with freeze_time("2026-04-15"):
+        call_command("process_cooptation_deadlines")
+    digests = [m for m in FakeResendBackend.sent_messages if "Revue trimestrielle" in m["subject"]]
+    assert digests == []

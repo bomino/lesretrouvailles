@@ -72,6 +72,9 @@ BASIC_AUTH_USERNAME = env("BASIC_AUTH_USERNAME", default="")
 BASIC_AUTH_PASSWORD = env("BASIC_AUTH_PASSWORD", default="")
 
 MIDDLEWARE = ["core.middleware.BasicAuthMiddleware"] + MIDDLEWARE
+# Report-only CSP: observation before enforcement (see the middleware
+# docstring). Prod-shaped environments only — dev noise helps nobody.
+MIDDLEWARE = MIDDLEWARE + ["core.middleware.ContentSecurityPolicyReportOnlyMiddleware"]
 
 # Catch a deploy-time misconfiguration: the operator pointed at the real
 # Cloudinary client but forgot to set CLOUDINARY_CLOUD_NAME, so it would
