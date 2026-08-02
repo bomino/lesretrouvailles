@@ -119,6 +119,27 @@ def test_pyproject_packages_lists_every_installed_app():
     assert not missing, f"apps missing from pyproject packages: {sorted(missing)}"
 
 
+def test_allauth_throttles_see_the_real_client_ip():
+    """2026-08-01 review: RATELIMIT_IP_META_KEY fixed django-ratelimit's view
+    of the client IP behind Railway, but allauth has its own resolver that was
+    left on REMOTE_ADDR (the proxy) — every visitor shared one login/reset/
+    signup bucket, so a single attacker could exhaust the limits and lock all
+    members out of login. TRUSTED_PROXY_COUNT=1 makes allauth take the
+    rightmost X-Forwarded-For token, mirroring alumni/ratelimit.py."""
+    src = _settings_source("staging")
+    assert "ALLAUTH_TRUSTED_PROXY_COUNT = 1" in src
+
+    # Behavioral check of the exact allauth mechanism the setting drives.
+    from allauth.core.internal.httpkit import get_client_ip
+    from django.test import RequestFactory, override_settings
+
+    request = RequestFactory().get(
+        "/", REMOTE_ADDR="10.0.0.5", headers={"X-Forwarded-For": "1.2.3.4, 5.6.7.8"}
+    )
+    with override_settings(ALLAUTH_TRUSTED_PROXY_COUNT=1):
+        assert get_client_ip(request) == "5.6.7.8"  # rightmost = the Railway-observed hop
+
+
 def test_compose_prod_repro_can_boot_staging_settings():
     """H3 (2026-08-01 review): the b4d86d8 fail-fast guards were never
     reflected in docker-compose.yml, so `make docker-run` — the documented

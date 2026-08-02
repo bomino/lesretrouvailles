@@ -133,6 +133,13 @@ if EMAIL_BACKEND.endswith("ResendBackend") and not RESEND_API_KEY:  # noqa: F405
     )
 PASSWORD_RESET_TIMEOUT = 7 * 24 * 60 * 60  # 7 days for the post-approval password-set link
 
+# Allauth's login/reset/signup throttles key on ITS OWN client-IP resolver,
+# not on RATELIMIT_IP_META_KEY. Left at the default (REMOTE_ADDR = Railway's
+# edge proxy), every visitor shares one bucket: a single attacker can exhaust
+# the login/reset limits platform-wide. 1 = take the rightmost X-Forwarded-For
+# token — the hop Railway actually observed, same choice as alumni/ratelimit.py.
+ALLAUTH_TRUSTED_PROXY_COUNT = 1
+
 # Every rate limiter (django-ratelimit decorators, allauth's login throttle)
 # rides on the default cache. base.py falls back to a per-process LocMemCache
 # when neither CACHE_BACKEND=db nor REDIS_URL is set — behind N gunicorn
