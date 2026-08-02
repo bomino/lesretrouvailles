@@ -73,5 +73,7 @@ def test_detail_strips_script_tags_from_tribute(authed_member_client, make_memor
     )
     resp = client.get(f"/in-memoriam/{entry.pk}/")
     assert resp.status_code == 200
-    assert b"alert('xss-tribute')" not in resp.content
+    # bleach strips the TAG and keeps the inner text: the page must never
+    # contain the executable form, while the naked text is harmless.
     assert b"<script>alert" not in resp.content
+    assert b"alert('xss-tribute')" in resp.content
