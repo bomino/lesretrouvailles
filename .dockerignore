@@ -35,7 +35,12 @@ Screenshot*.png
 !.env.example
 docs/
 *.md
-!DESIGN.md
+# Defense-in-depth: the per-dir COPYs already keep roster data out of the
+# image, but without these the real-names workbooks still shipped to the
+# Docker daemon in the build context on every local build. Public repo,
+# ~335 living alumni — belt AND braces.
+private-data/
+*.xlsx
 # P8.1 — the runtime stage COPYs docs/guides/ into the image so /guide/
 # can render the canonical member guide. Negations here override the
 # `docs/` and `*.md` exclusions above; order matters in .dockerignore
@@ -50,6 +55,12 @@ static/css/output.css
 # Tests / dev-only
 core/tests/
 members/tests/
+cooptation/tests/
+gestion/tests/
+memoires/tests/
+memoriam/tests/
+aide/tests/
+alumni/tests/
 */migrations/__pycache__
 
 # Pre-commit

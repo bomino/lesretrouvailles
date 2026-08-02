@@ -5,9 +5,15 @@ on:
   pull_request:
     branches: [main, master]
 
+# A newer push supersedes the ~12-min suite still running for the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16-alpine
@@ -32,9 +38,12 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+          # Deps install from pyproject extras, not requirements.txt — key
+          # the wheel cache off the file that actually drives the install.
+          cache-dependency-path: pyproject.toml
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
       - run: sudo apt-get update && sudo apt-get install -y gettext
       - run: pip install -e ".[dev]"
@@ -63,6 +72,7 @@ jobs:
   # notice. This is what let Django sit on an EOL 5.0 with open advisories.
   dependency-audit:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -72,7 +82,7 @@ jobs:
       - run: pip-audit --desc
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
       - run: npm ci
       # Dev-only JS (Tailwind toolchain) never reaches production, so a dev
       # advisory should not block a deploy — but it should be visible.
@@ -80,6 +90,7 @@ jobs:
 
   docker-build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       # Dockerfile/.dockerignore regressions (a new app missing from the COPY
