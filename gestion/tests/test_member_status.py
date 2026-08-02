@@ -203,3 +203,72 @@ def test_member_status_rejects_invalid_target(client, coadmin_user, make_member)
     assert response.status_code == 302
     member.refresh_from_db()
     assert member.status == "active"
+
+
+@pytest.mark.django_db
+def test_suspend_rolls_back_completely_if_audit_write_fails(
+    client, coadmin_user, make_member, monkeypatch
+):
+    """M2 (2026-08-01 review): Member.status and User.is_active were saved in
+    separate non-atomic writes — a failure between them left a 'suspended'
+    member whose account could still log in (or the inverse). The whole
+    status change must commit or roll back as one unit."""
+    from members.models import AuditLog
+
+    member = make_member(status="active")
+    client.force_login(coadmin_user)
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("db hiccup")
+
+    monkeypatch.setattr(AuditLog.objects, "create", boom)
+
+    with pytest.raises(RuntimeError):
+        client.post(
+            f"/gestion/membres/{member.slug}/statut/",
+            {"target_status": "suspended"},
+        )
+
+    member.refresh_from_db()
+    member.user.refresh_from_db()
+    assert member.status == "active"  # rolled back together...
+    assert member.user.is_active is True  # ...not half-applied
+
+
+@pytest.mark.django_db
+def test_member_edit_rolls_back_email_change_if_audit_write_fails(
+    client, coadmin_user, make_member, monkeypatch
+):
+    """Same bug class in MemberAdminEditForm.save_with_audit: member save,
+    user email save, and the audit row must be one transaction."""
+    from members.models import AuditLog
+
+    member = make_member(status="active")
+    old_email = member.user.email
+    client.force_login(coadmin_user)
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("db hiccup")
+
+    monkeypatch.setattr(AuditLog.objects, "create", boom)
+
+    with pytest.raises(RuntimeError):
+        client.post(
+            f"/gestion/membres/{member.slug}/modifier/",
+            {
+                "first_name": member.first_name,
+                "last_name": member.last_name,
+                "nickname": "",
+                "years_attended": "1980, 1981, 1982, 1983",
+                "classes": "6e, 5e, 4e, 3e",
+                "city": member.city,
+                "country": member.country or "Niger",
+                "profession": "",
+                "email": "changed@example.test",
+                "whatsapp": "",
+            },
+        )
+
+    member.refresh_from_db()
+    member.user.refresh_from_db()
+    assert member.user.email == old_email  # user write rolled back with the rest

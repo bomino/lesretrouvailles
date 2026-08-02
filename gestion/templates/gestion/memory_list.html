@@ -3,6 +3,27 @@
 {% block gestion_title %}Souvenirs{% endblock %}
 {% block gestion_heading %}Mur des souvenirs — curation{% endblock %}
 {% block gestion_content %}
+    {% with flash=request.GET.flash %}
+        {% if flash == "created" or flash == "updated" or flash == "published" or flash == "unpublished" or flash == "noop" or flash == "bad_status" %}
+            <div class="mb-4 rounded-lg border border-tertiary/30 bg-tertiary/5 px-4 py-2.5 text-sm text-tertiary"
+                 role="status"
+                 aria-live="polite">
+                {% if flash == "created" %}
+                    Photo créée.
+                {% elif flash == "updated" %}
+                    Photo mise à jour.
+                {% elif flash == "published" %}
+                    Photo publiée.
+                {% elif flash == "unpublished" %}
+                    Photo dépubliée.
+                {% elif flash == "noop" %}
+                    Aucune modification.
+                {% elif flash == "bad_status" %}
+                    Statut invalide.
+                {% endif %}
+            </div>
+        {% endif %}
+    {% endwith %}
     <section aria-labelledby="filters-heading" class="mb-6">
         <h2 id="filters-heading" class="sr-only">Filtres</h2>
         <div role="group"

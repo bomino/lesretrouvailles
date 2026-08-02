@@ -155,36 +155,45 @@ def _flush_user_sessions(user) -> None:
 @staff_required
 @require_http_methods(["POST"])
 def member_status_view(request, slug):
-    member = get_object_or_404(Member.objects.select_related("user"), slug=slug)
     target = request.POST.get("target_status", "").strip()
 
-    if target not in ("active", "suspended"):
-        return _redirect_to_detail(member, flash="bad_status")
+    # Mirrors memory_status_view: Member.status, User.is_active, the session
+    # flush and the audit row must land (or roll back) as one unit — split
+    # writes could leave a "suspended" member whose account still logs in.
+    with transaction.atomic():
+        member = get_object_or_404(
+            Member.objects.select_related("user").select_for_update(), slug=slug
+        )
 
-    if member.status == target:
-        return _redirect_to_detail(member, flash="noop")
+        if target not in ("active", "suspended"):
+            return _redirect_to_detail(member, flash="bad_status")
 
-    member.status = target
-    member.save(update_fields=["status", "updated_at"])
+        if member.status == target:
+            return _redirect_to_detail(member, flash="noop")
 
-    # Suspension must actually revoke access: allauth/ModelBackend refuse
-    # inactive users at login, and the session flush kills any live session.
-    member.user.is_active = target == "active"
-    member.user.save(update_fields=["is_active"])
-    if target == "suspended":
-        _flush_user_sessions(member.user)
+        member.status = target
+        member.save(update_fields=["status", "updated_at"])
 
-    action = "gestion.member.suspended" if target == "suspended" else "gestion.member.reactivated"
-    AuditLog.objects.create(
-        actor=request.user,
-        action=action,
-        target_type="members.Member",
-        target_id=str(member.pk),
-        metadata={
-            "member_full_name": member.full_name,
-            "previous_status": "active" if target == "suspended" else "suspended",
-        },
-    )
+        # Suspension must actually revoke access: allauth/ModelBackend refuse
+        # inactive users at login, and the session flush kills any live session.
+        member.user.is_active = target == "active"
+        member.user.save(update_fields=["is_active"])
+        if target == "suspended":
+            _flush_user_sessions(member.user)
+
+        action = (
+            "gestion.member.suspended" if target == "suspended" else "gestion.member.reactivated"
+        )
+        AuditLog.objects.create(
+            actor=request.user,
+            action=action,
+            target_type="members.Member",
+            target_id=str(member.pk),
+            metadata={
+                "member_full_name": member.full_name,
+                "previous_status": "active" if target == "suspended" else "suspended",
+            },
+        )
 
     return _redirect_to_detail(member, flash=f"status_{target}")
 

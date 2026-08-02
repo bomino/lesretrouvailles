@@ -35,28 +35,10 @@
             {% endif %}
         </nav>
     </div>
-    {% with flash=request.GET.flash %}
-        {% if flash %}
-            <div class="mb-4 rounded-lg border border-tertiary/30 bg-tertiary/5 px-4 py-2.5 text-sm text-tertiary"
-                 role="status"
-                 aria-live="polite">
-                {% if flash == "created" %}
-                    Photo créée.
-                {% elif flash == "updated" %}
-                    Photo mise à jour.
-                {% elif flash == "published" %}
-                    Photo publiée.
-                {% elif flash == "unpublished" %}
-                    Photo dépubliée.
-                {% elif flash == "noop" %}
-                    Aucune modification.
-                {% elif flash == "bad_status" %}
-                    Statut invalide.
-                {% else %}
-                    {{ flash }}
-                {% endif %}
-            </div>
-        {% endif %}
-    {% endwith %}
+    {# Flash banners are page-owned (member_detail, application_detail,      #}
+    {# memory_list): a shared block here rendered memory-worded copy on      #}
+    {# member/cooptation flashes, and its raw {{ flash }} fallback reflected #}
+    {# arbitrary query text into a trusted-looking banner. Known tokens      #}
+    {# only, in the template that owns them.                                 #}
     {% block gestion_content %}{% endblock %}
 {% endblock %}

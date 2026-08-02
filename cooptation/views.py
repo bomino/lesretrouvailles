@@ -218,6 +218,21 @@ def parrain_vouch_view(request, token: str):
     if member is None or member.pk != cooptation_request.parrain_id:
         raise PermissionDenied("Cette invitation ne vous est pas adressée.")
 
+    # A vouch link must go dead the moment the application is decided.
+    # DECIDABLE_STATUSES deliberately lets the admin approve/reject while the
+    # cooptation is still running; without this gate a late second vouch would
+    # flip an approved app back to awaiting_admin (re-decidable, stranding the
+    # already-created account) or pull a rejected one out of status='rejected'
+    # — where the 180-day retention purge would no longer find it. Same bug
+    # class as the questionnaire gate below.
+    if cooptation_request.application.status not in ("cooptation_pending", "awaiting_admin"):
+        return render(
+            request,
+            "cooptation/parrain_vouch_done.html",
+            {"request_obj": cooptation_request, "application_decided": True},
+            status=410,
+        )
+
     if cooptation_request.response != "pending":
         return render(
             request,

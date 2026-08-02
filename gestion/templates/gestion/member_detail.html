@@ -20,6 +20,12 @@
         <div class="mb-4 rounded-lg border border-whatsapp-green/30 bg-whatsapp-green/10 px-4 py-3 text-sm text-whatsapp-green">
             Identifiant WhatsApp mis à jour.
         </div>
+    {% elif request.GET.flash == "noop" %}
+        <div class="mb-4 rounded-lg border border-secondary/20 bg-base-200 px-4 py-3 text-sm text-secondary">
+            Aucune modification.
+        </div>
+    {% elif request.GET.flash == "bad_status" %}
+        <div class="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">Statut invalide.</div>
     {% endif %}
     <section class="grid grid-cols-1 gap-6 md:grid-cols-3">
         <article class="md:col-span-2 rounded-2xl border border-secondary/15 bg-surface p-5 shadow-sm">

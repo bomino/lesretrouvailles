@@ -22,7 +22,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Q
 
 from members.models import Member
-from members.services import PurgeRefused, rgpd_purge_member
+from members.services import PurgeIncomplete, PurgeRefused, rgpd_purge_member
 
 
 def _format_summary(summary: dict, *, dry_run: bool) -> str:
@@ -158,6 +158,13 @@ class Command(BaseCommand):
             summary = rgpd_purge_member(member, actor=actor)
         except PurgeRefused as e:
             self.stderr.write(f"REFUSED: {e}")
+            sys.exit(1)
+        except PurgeIncomplete as e:
+            # External (Cloudinary/bucket) delete failed BEFORE any DB
+            # mutation; the exception text already says retrying is safe.
+            # Only the execute path can raise it — dry-run skips the
+            # external deletes entirely.
+            self.stderr.write(f"INCOMPLETE: {e}")
             sys.exit(1)
 
         self.stdout.write(_format_summary(summary, dry_run=False))
