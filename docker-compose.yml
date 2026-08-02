@@ -33,6 +33,12 @@ services:
       ALLOWED_HOSTS: localhost,127.0.0.1,app
       CSRF_TRUSTED_ORIGINS: http://localhost:8000
       SITE_URL: http://localhost:8000
+      # staging.py fails fast on a localhost SITE_URL (correct for a deploy,
+      # wrong here — this stack IS local); the opt-out is compose-only.
+      SITE_URL_ALLOW_LOCAL: "true"
+      # No Resend key in the local stack: use the console backend so the
+      # RESEND_API_KEY fail-fast guard (correctly) does not apply.
+      EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
       SECURE_SSL_REDIRECT: "false"
       BASIC_AUTH_REQUIRED: "true"
       BASIC_AUTH_USERNAME: admin

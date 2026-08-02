@@ -109,11 +109,16 @@ if STORAGE_BACKUP_REQUIRED and STORAGE_CLIENT_PATH.endswith("RealStorage"):
 #
 # SITE_URL feeds every magic link. Left at base.py's http://localhost:8000
 # default, the roster import would DM ~200 members a link to their own machine
-# — and the operator would find out from the members.
-if SITE_URL.startswith("http://localhost"):  # noqa: F405
+# — and the operator would find out from the members. 127.0.0.1 is the same
+# footgun spelled differently. docker-compose.yml (the local prod-repro
+# stack, where a localhost SITE_URL is the *correct* value) opts out
+# explicitly via SITE_URL_ALLOW_LOCAL — a deployed service never sets it.
+_local_site_url = SITE_URL.startswith(("http://localhost", "http://127.0.0.1"))  # noqa: F405
+if _local_site_url and not env.bool("SITE_URL_ALLOW_LOCAL", default=False):
     raise ImproperlyConfigured(
-        "SITE_URL is still the localhost default. Every magic link and email "
-        "URL would point at localhost. Set SITE_URL on the service."
+        "SITE_URL is still a localhost value. Every magic link and email "
+        "URL would point at localhost. Set SITE_URL on the service (or, for "
+        "the local docker-compose stack only, SITE_URL_ALLOW_LOCAL=true)."
     )
 
 EMAIL_BACKEND = env("EMAIL_BACKEND", default="alumni.email.ResendBackend")
