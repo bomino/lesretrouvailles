@@ -17,7 +17,7 @@ from .models import (
     PublicSearchEntry,
     RemovalRequest,
 )
-from .services import PurgeRefused, rgpd_purge_member
+from .services import PurgeIncomplete, PurgeRefused, rgpd_purge_member
 
 logger = logging.getLogger(__name__)
 
@@ -193,10 +193,14 @@ class MemberAdmin(admin.ModelAdmin):
         # All typed-emails match and no blockers. Execute.
         success = 0
         for plan in plans:
+            # PurgeIncomplete is the engine's "external delete failed, nothing
+            # was purged, safe to retry" signal — it fires before any DB
+            # mutation, so surfacing it and continuing the batch is safe.
+            # Uncaught it was a mid-batch 500 that also hid the success count.
             try:
                 rgpd_purge_member(plan["member"], actor=request.user)
                 success += 1
-            except PurgeRefused as e:
+            except (PurgeRefused, PurgeIncomplete) as e:
                 messages.error(request, f"{plan['member'].full_name}: {e}")
 
         if success:

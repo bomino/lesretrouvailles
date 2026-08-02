@@ -717,3 +717,72 @@ def test_purge_audit_hash_is_not_a_reversible_sha1(make_member, fake_clients):
     assert summary["email_hash"] != naive, "hash must not be a bare SHA1 of the email"
     assert settings.SECRET_KEY not in summary["email_hash"]
     assert len(summary["email_hash"]) >= 12
+
+
+# -------- PurgeIncomplete reaches the operator (2026-08-01 review, M1) --------
+
+
+@pytest.mark.django_db
+def test_cli_purge_reports_incomplete_instead_of_traceback(fake_clients, make_member, monkeypatch):
+    """PurgeIncomplete — the engine's designed 'external delete failed,
+    nothing was purged, safe to retry' signal — propagated as a raw traceback
+    through the CLI instead of the message it carefully composes."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    from alumni import cloudinary as cloud_mod
+    from members.models import Member
+
+    member = make_member(photo_public_id="members/incomplete/cli")
+    member_id = member.id
+
+    def _boom(public_id):
+        raise RuntimeError("cloudinary down")
+
+    monkeypatch.setattr(cloud_mod.get_client(), "delete", _boom)
+
+    err = StringIO()
+    with pytest.raises(SystemExit) as exc:
+        call_command("rgpd_purge_member", member.user.email, "--yes", stderr=err)
+    assert exc.value.code == 1
+    assert "INCOMPLETE" in err.getvalue()
+    assert "idempotent" in err.getvalue()  # the retry guidance reaches the operator
+    assert Member.objects.filter(id=member_id).exists()  # nothing was purged
+
+
+@pytest.mark.django_db
+def test_admin_action_reports_incomplete_instead_of_500(
+    fake_clients, make_member, monkeypatch, client
+):
+    """Same failure through the admin bulk action: the operator must get the
+    error banner and the success count, not a mid-batch 500."""
+    from alumni import cloudinary as cloud_mod
+    from members.models import Member
+
+    target = make_member(photo_public_id="members/incomplete/admin")
+    target_id = target.id
+    target_email = target.user.email
+
+    def _boom(public_id):
+        raise RuntimeError("cloudinary down")
+
+    monkeypatch.setattr(cloud_mod.get_client(), "delete", _boom)
+
+    admin = _make_admin_user()
+    client.force_login(admin)
+
+    resp = client.post(
+        "/admin/members/member/",
+        {
+            "action": "rgpd_purge_action",
+            "_selected_action": [str(target_id)],
+            "apply": "1",
+            f"confirm_email_{target_id}": target_email,
+        },
+        follow=True,
+    )
+    assert resp.status_code == 200  # no 500
+    assert Member.objects.filter(id=target_id).exists()  # not purged
+    body = resp.content.decode()
+    assert "nothing was purged" in body  # PurgeIncomplete's own message, surfaced
