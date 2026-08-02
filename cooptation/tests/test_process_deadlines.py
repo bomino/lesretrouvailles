@@ -666,3 +666,43 @@ def test_old_removal_requests_are_purged(make_admin, settings):
     assert RemovalRequest.objects.filter(pk=pending_old.pk).exists(), (
         "a still-pending request is actionable — do not purge it"
     )
+
+
+@pytest.mark.django_db
+def test_one_failed_reminder_does_not_abort_the_run(make_cooptation_request, monkeypatch, settings):
+    """M2 (2026-08-01 review): a single Resend failure in the J+7 loop raised
+    out of handle(), cancelling that day's J+14 expiries and every retention
+    purge. Each reminder must be isolated like _expire_j14's sends, and a
+    failed send must leave reminder_sent_at NULL so it is retried tomorrow."""
+    from io import StringIO
+
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from cooptation import emails
+
+    soon = timezone.now() + timedelta(days=3)
+    req_fail = make_cooptation_request(expires_at=soon)
+    req_ok = make_cooptation_request(expires_at=soon)
+
+    real_send = emails.send_parrain_reminder
+
+    def flaky(req):
+        if req.pk == req_fail.pk:
+            raise RuntimeError("resend 500")
+        real_send(req)
+
+    monkeypatch.setattr(emails, "send_parrain_reminder", flaky)
+    monkeypatch.setattr(
+        "cooptation.management.commands.process_cooptation_deadlines.time.sleep",
+        lambda s: None,
+    )
+
+    out = StringIO()
+    err = StringIO()
+    call_command("process_cooptation_deadlines", stdout=out, stderr=err)  # must not raise
+
+    req_fail.refresh_from_db()
+    req_ok.refresh_from_db()
+    assert req_fail.reminder_sent_at is None  # retried tomorrow
+    assert req_ok.reminder_sent_at is not None
+    assert "Done." in out.getvalue()  # later stages ran
+    assert f"req={req_fail.pk}" in err.getvalue()  # failure is logged, not swallowed

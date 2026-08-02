@@ -92,7 +92,17 @@ class Command(BaseCommand):
         )
         count = 0
         for req in qs:
-            emails.send_parrain_reminder(req)
+            # Same per-item isolation as _expire_j14's sends: one Resend
+            # failure must not raise out of handle() — everything after this
+            # stage (J+14 expiry, retention purges) would silently be skipped
+            # for the day. The send happens BEFORE the stamp on purpose: a
+            # failed send leaves reminder_sent_at NULL, so the reminder is
+            # retried on the next run instead of being permanently skipped.
+            try:
+                emails.send_parrain_reminder(req)
+            except Exception as e:  # noqa: BLE001
+                self.stderr.write(f"  ERROR reminder req={req.pk}: {e}")
+                continue
             req.reminder_sent_at = now
             req.save()
             count += 1
