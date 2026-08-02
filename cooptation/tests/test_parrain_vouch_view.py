@@ -211,3 +211,24 @@ def test_vouch_recorded_even_if_candidate_email_fails(parrain_client, settings, 
 
     req.refresh_from_db()
     assert req.response == "accepted"  # the response survived the outage
+
+
+@pytest.mark.django_db(transaction=True)
+def test_vouch_post_locks_all_sibling_requests(parrain_client):
+    """T2 (2026-08-01 review tail): under READ COMMITTED, two
+    near-simultaneous vouches each saw the sibling as still pending, so
+    neither flipped the application to awaiting_admin — it sat in
+    cooptation_pending until the next day's cron healed it. The POST must
+    take FOR UPDATE locks on every request of the application before
+    writing and resolving the outcome."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    req = parrain_client.request_obj
+    with CaptureQueriesContext(connection) as ctx:
+        response = parrain_client.post(
+            f"/cooptation/{req.token}/", {"response": "accepted", "comment": ""}
+        )
+    assert response.status_code == 302
+    locked_queries = [q["sql"] for q in ctx.captured_queries if "FOR UPDATE" in q["sql"]]
+    assert any("cooptation_cooptationrequest" in q for q in locked_queries)

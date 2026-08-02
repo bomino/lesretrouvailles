@@ -362,3 +362,31 @@ def test_reject_email_failure_does_not_roll_back_the_rejection(
     app.refresh_from_db()
     assert app.status == "rejected"
     assert app.retention_until is not None
+
+
+@pytest.mark.django_db
+def test_approve_maps_integrity_error_to_approval_error(make_application, monkeypatch):
+    """T2 (2026-08-01 review tail): the duplicate-User guard is check-then-act.
+    Two concurrent approvals both pass the exists() check; the loser hits
+    IntegrityError on the unique username, which callers only catch as
+    ApprovalError — so it 500ed the gestion view and aborted the admin bulk
+    action mid-queryset. The race must surface as the exception the callers
+    already handle."""
+    from django.contrib.auth import get_user_model
+    from django.db import IntegrityError
+
+    from cooptation import services
+
+    app = make_application(status="awaiting_admin")
+    User = get_user_model()  # noqa: N806
+
+    def boom(**kwargs):
+        raise IntegrityError("duplicate key value violates unique constraint")
+
+    monkeypatch.setattr(User.objects, "create", boom)
+
+    with pytest.raises(services.ApprovalError):
+        services.approve_application(app, reviewed_by=None)
+
+    app.refresh_from_db()
+    assert app.status == "awaiting_admin"  # nothing half-applied

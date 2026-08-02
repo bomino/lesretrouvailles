@@ -255,10 +255,32 @@ def parrain_vouch_view(request, token: str):
         form = ParrainVouchForm(request.POST)
         if form.is_valid():
             with transaction.atomic():
-                cooptation_request.response = form.cleaned_data["response"]
-                cooptation_request.comment = form.cleaned_data["comment"]
-                cooptation_request.responded_at = timezone.now()
-                cooptation_request.save()
+                # Lock ALL of this application's requests before writing.
+                # Under READ COMMITTED, two near-simultaneous vouches each
+                # saw the sibling as still pending, so neither flipped the
+                # app to awaiting_admin — it sat in cooptation_pending until
+                # the next day's cron healed it (admin queue lagged a day).
+                locked_rows = {
+                    r.pk: r
+                    for r in CooptationRequest.objects.select_for_update().filter(
+                        application_id=cooptation_request.application_id
+                    )
+                }
+                locked = locked_rows[cooptation_request.pk]
+                if locked.response != "pending":
+                    # Double-submit race: the first POST won while this one
+                    # waited on the lock. Idempotent — show the done page.
+                    return render(
+                        request,
+                        "cooptation/parrain_vouch_done.html",
+                        {"request_obj": locked},
+                        status=410,
+                    )
+                locked.response = form.cleaned_data["response"]
+                locked.comment = form.cleaned_data["comment"]
+                locked.responded_at = timezone.now()
+                locked.save()
+                cooptation_request = locked
 
                 outcome = _resolve_outcome(cooptation_request.application)
                 if outcome != "pending":
