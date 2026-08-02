@@ -166,3 +166,30 @@ def test_admin_resend_password_link_finds_user_by_username(superuser, make_appli
 
     admin_obj.resend_password_link_action(FakeReq(), AdminApplication.objects.filter(pk=app.pk))
     assert len(FakeResendBackend.sent_messages) == 1
+
+
+@pytest.mark.django_db
+def test_admin_approve_and_reject_actions_write_audit_rows(superuser, make_application, settings):
+    """T5 (2026-08-01 review tail): the /admin/ bulk approve/reject left no
+    AuditLog trail (the /gestion/ path writes gestion.* rows; the admin path
+    wrote nothing — the only trace was mutable row state)."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from cooptation.admin import AdminApplicationAdmin
+    from cooptation.models import AdminApplication
+    from members.models import AuditLog
+
+    admin_obj = AdminApplicationAdmin(AdminApplication, site)
+
+    class FakeReq:
+        user = superuser
+
+    approved = make_application(full_name="Audit Approved", email="aa@example.test")
+    admin_obj.approve_action(FakeReq(), AdminApplication.objects.filter(pk=approved.pk))
+    log = AuditLog.objects.get(action="cooptation.application.approved", target_id=str(approved.pk))
+    assert log.actor == superuser
+    assert log.metadata["candidate_full_name"] == "Audit Approved"
+
+    rejected = make_application(full_name="Audit Rejected", email="ar@example.test")
+    admin_obj.reject_action(FakeReq(), AdminApplication.objects.filter(pk=rejected.pk))
+    log = AuditLog.objects.get(action="cooptation.application.rejected", target_id=str(rejected.pk))
+    assert log.metadata["candidate_full_name"] == "Audit Rejected"

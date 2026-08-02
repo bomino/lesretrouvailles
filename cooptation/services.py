@@ -205,4 +205,22 @@ def reject_application(application: AdminApplication, *, reviewed_by, note: str)
 
 
 def purge_application(application: AdminApplication) -> None:
+    # The purge clears review_note and every PII field, so without this row
+    # there is no durable trace the application existed or when it was purged.
+    # Like rgpd.member.purged, metadata deliberately stores a salted hash and
+    # never the name — a readable identity would defeat the purge.
+    from members.models import AuditLog
+    from members.services import _audit_email_hash
+
+    metadata = {
+        "status_before": application.status,
+        "email_hash": _audit_email_hash(application.email) if application.email else "",
+    }
     application.purge()
+    AuditLog.objects.create(
+        actor=None,
+        action="cooptation.application.purged",
+        target_type="cooptation.AdminApplication",
+        target_id=str(application.pk),
+        metadata=metadata,
+    )

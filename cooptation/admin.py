@@ -103,6 +103,8 @@ class AdminApplicationAdmin(admin.ModelAdmin):
 
     @admin.action(description="Approuver les candidatures sélectionnées")
     def approve_action(self, request, queryset):
+        from members.models import AuditLog
+
         approved = 0
         for app in queryset:
             try:
@@ -113,6 +115,19 @@ class AdminApplicationAdmin(admin.ModelAdmin):
                 )
             else:
                 approved += 1
+                # The /gestion/ path writes gestion.application.approved; this
+                # bulk path wrote nothing — the only trace was mutable row
+                # state (reviewed_by), thinner than the audit conventions.
+                AuditLog.objects.create(
+                    actor=request.user,
+                    action="cooptation.application.approved",
+                    target_type="cooptation.AdminApplication",
+                    target_id=str(app.pk),
+                    metadata={
+                        "candidate_full_name": app.full_name,
+                        "candidate_email": app.email,
+                    },
+                )
         self.message_user(request, f"{approved} candidature(s) approuvée(s).", messages.SUCCESS)
 
     @admin.action(description="Rejeter les candidatures sélectionnées")
@@ -124,6 +139,8 @@ class AdminApplicationAdmin(admin.ModelAdmin):
         # go through /gestion/ (ApplicationRejectForm), whose note reaches
         # the candidate's rejection email.
         reason = "Demande non éligible"
+        from members.models import AuditLog
+
         rejected = 0
         for app in queryset:
             try:
@@ -134,6 +151,17 @@ class AdminApplicationAdmin(admin.ModelAdmin):
                 )
             else:
                 rejected += 1
+                AuditLog.objects.create(
+                    actor=request.user,
+                    action="cooptation.application.rejected",
+                    target_type="cooptation.AdminApplication",
+                    target_id=str(app.pk),
+                    metadata={
+                        "candidate_full_name": app.full_name,
+                        "candidate_email": app.email,
+                        "note": reason,
+                    },
+                )
         self.message_user(request, f"{rejected} candidature(s) rejetée(s).", messages.WARNING)
 
     @admin.action(description="Renvoyer le lien de mot de passe (candidats déjà approuvés)")

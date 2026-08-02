@@ -349,6 +349,12 @@ class AuditLog(models.Model):
         ("memoires.memory.unpublished", "Souvenir dépublié"),
         ("promotions.entry.claimed", "Fiche de classe revendiquée"),
         ("promotions.entry.unclaimed", "Revendication de fiche de classe retirée"),
+        ("cooptation.application.approved", "Candidature approuvée (admin)"),
+        ("cooptation.application.rejected", "Candidature rejetée (admin)"),
+        ("cooptation.application.purged", "Candidature purgée (rétention)"),
+        ("ghost.digest.sent", "Digest trimestriel fantômes envoyé"),
+        ("memoires.memory.deleted", "Souvenir supprimé définitivement (admin)"),
+        ("memoriam.entry.deleted", "Fiche In Memoriam supprimée définitivement (admin)"),
     ]
 
     actor = models.ForeignKey(

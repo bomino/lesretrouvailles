@@ -39,7 +39,14 @@ QUESTIONNAIRE_GRACE_DAYS = 7
 GHOST_STALE_THRESHOLD_DAYS = 365
 GHOST_DIGEST_LOOKBACK_DAYS = 90
 GHOST_DIGEST_QUARTERLY_MONTHS = (1, 4, 7, 10)
+# Fire window inside a quarter month: any run on days 1-7 sends the digest
+# once (guarded by the ghost.digest.sent AuditLog marker).
+GHOST_DIGEST_WINDOW_DAYS = 7
 GHOST_STALE_REMOVED_REASON = "Périmée — non renouvelée par les admins"
+
+# Applications the admin never decided keep full PII in awaiting_admin; align
+# their retention with the 180 days rejected candidates already get.
+UNDECIDED_RETENTION_DAYS = 180
 
 # P6c: AuditLog retention. Master spec §9.4 — "Logs d'audit : Conservés 12 mois
 # pour sécurité/légal puis purgés." Applies uniformly across all action types
@@ -65,9 +72,20 @@ class Command(BaseCommand):
         stale_apps = self._sweep_stale_questionnaires(now)
         ghosts_purged = self._purge_stale_ghosts(now)
         digest_sent = 0
-        if now.day == 1 and now.month in GHOST_DIGEST_QUARTERLY_MONTHS:
-            digest_sent = self._send_quarterly_ghost_digest(now)
+        # Days 1-7 (not `day == 1`): a cron missed on the 1st used to skip a
+        # whole quarter. The ghost.digest.sent marker makes the window
+        # idempotent — one digest per quarter month, however many runs land
+        # inside it.
+        if now.month in GHOST_DIGEST_QUARTERLY_MONTHS and now.day <= GHOST_DIGEST_WINDOW_DAYS:
+            already_sent = AuditLog.objects.filter(
+                action="ghost.digest.sent",
+                created_at__year=now.year,
+                created_at__month=now.month,
+            ).exists()
+            if not already_sent:
+                digest_sent = self._send_quarterly_ghost_digest(now)
         purged_apps = self._purge_old_rejections(now)
+        purged_undecided = self._purge_stale_undecided(now)
         purged_audit = self._purge_old_audit_logs(now)
         purged_removals = self._purge_old_removal_requests(now)
         self.stdout.write(
@@ -75,6 +93,7 @@ class Command(BaseCommand):
                 f"Done. reminders={sent_reminders} expired={expired_apps} "
                 f"stale={stale_apps} ghosts_purged={ghosts_purged} "
                 f"digest_sent={digest_sent} purged={purged_apps} "
+                f"undecided_purged={purged_undecided} "
                 f"audit_purged={purged_audit} removals_purged={purged_removals}"
             )
         )
@@ -253,10 +272,42 @@ class Command(BaseCommand):
             currently_listed=currently_listed,
             since=since,
         )
+        # The sent marker handle() checks before firing again this month.
+        # Written only after a successful send, so a failed send retries on
+        # the next run inside the window.
+        AuditLog.objects.create(
+            actor=None,
+            action="ghost.digest.sent",
+            target_type="members.PublicSearchEntry",
+            target_id="",
+            metadata={
+                "purged_count": len(purged),
+                "listed_count": len(currently_listed),
+                "window_start": since.date().isoformat(),
+            },
+        )
         return len(purged)
 
     def _purge_old_rejections(self, now) -> int:
         qs = AdminApplication.objects.filter(status="rejected", retention_until__lte=now)
+        count = 0
+        for app in qs:
+            services.purge_application(app)
+            count += 1
+        return count
+
+    def _purge_stale_undecided(self, now) -> int:
+        """Purge applications stuck in awaiting_admin past the retention window.
+
+        retention_until is only ever set on rejection, so an application the
+        admin never decided kept full PII (name, email, WhatsApp, IP)
+        indefinitely — while a *rejected* candidate's data was erased after
+        180 days. An undecided candidate must not be retained longer than a
+        refused one. 180 days of admin inaction is a de-facto refusal; the
+        candidate can always reapply.
+        """
+        cutoff = now - timedelta(days=UNDECIDED_RETENTION_DAYS)
+        qs = AdminApplication.objects.filter(status="awaiting_admin", submitted_at__lte=cutoff)
         count = 0
         for app in qs:
             services.purge_application(app)
