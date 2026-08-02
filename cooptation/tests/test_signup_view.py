@@ -422,3 +422,45 @@ def test_unknown_parrain_error_does_not_echo_email_or_confirm_membership_state(
     # The old message echoed the probed address back inside the error text.
     assert "inactif : probe@example.test" not in body
     assert "inconnu ou inactif : probe@example.test" not in body
+
+
+@pytest.mark.django_db
+def test_signup_blocks_duplicate_in_flight_application(
+    client, active_member, second_active_member, settings
+):
+    """T4 (2026-08-01 review tail): nothing prevented the same candidate email
+    from submitting repeatedly — each duplicate fanned out 5 emails (including
+    fresh parrain invitations) and each had to be rejected individually,
+    starting its own 180-day PII-retention clock."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from alumni.email import FakeResendBackend
+    from cooptation.models import AdminApplication
+
+    payload = _form_payload(active_member, second_active_member)
+    assert client.post("/inscription/", payload).status_code == 302
+    assert AdminApplication.objects.count() == 1
+
+    FakeResendBackend.sent_messages.clear()
+    response = client.post("/inscription/", payload)
+    assert response.status_code == 200  # re-rendered with an error
+    assert "déjà en cours" in response.content.decode()
+    assert AdminApplication.objects.count() == 1  # no duplicate row
+    assert FakeResendBackend.sent_messages == []  # no duplicate fan-out
+
+
+@pytest.mark.django_db
+def test_signup_allows_reapplication_after_rejection(
+    client, active_member, second_active_member, settings
+):
+    """Only IN-FLIGHT applications block: a rejected (or purged) candidate may
+    genuinely reapply later."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from cooptation.models import AdminApplication
+
+    payload = _form_payload(active_member, second_active_member)
+    client.post("/inscription/", payload)
+    AdminApplication.objects.update(status="rejected")
+
+    response = client.post("/inscription/", payload)
+    assert response.status_code == 302
+    assert AdminApplication.objects.count() == 2

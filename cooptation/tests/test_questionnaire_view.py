@@ -169,3 +169,50 @@ def test_questionnaire_still_accepted_after_stale_sweep(expired_application_with
     )
     assert response.status_code == 302
     assert QuestionnaireResponse.objects.filter(application=app).count() == 3
+
+
+@pytest.mark.django_db
+def test_questionnaire_rejects_all_blank_submission(expired_application_with_token):
+    """T4 (2026-08-01 review tail): an all-blank POST used to store three
+    empty responses and flip the application to awaiting_admin — consuming the
+    candidate's only remaining path with nothing for the admin to read."""
+    from cooptation.models import QuestionnaireResponse
+
+    app = expired_application_with_token
+    response = Client().post("/questionnaire/abc123/", {"q1": "", "q2": "  ", "q3": ""})
+    assert response.status_code == 200  # re-rendered with an error, not accepted
+    assert "au moins une" in response.content.decode().lower()
+
+    app.refresh_from_db()
+    assert app.status == "cooptation_pending"  # not flipped
+    assert QuestionnaireResponse.objects.count() == 0  # nothing stored
+    # The candidate can still submit for real afterwards.
+    response = Client().post(
+        "/questionnaire/abc123/", {"q1": "alpha", "q2": "gamma", "q3": "souvenir"}
+    )
+    assert response.status_code == 302
+    app.refresh_from_db()
+    assert app.status == "awaiting_admin"
+
+
+@pytest.mark.django_db
+def test_questionnaire_with_zero_active_questions_flips_to_awaiting_admin(make_application):
+    """With no active KnowledgeQuestion, a POST created zero responses, so the
+    responses.exists() "done" gate never engaged and the form stayed live
+    forever. Nothing to ask means nothing to wait for: hand the application to
+    the admin and show the done page."""
+    app = make_application(email="zq@example.test", status="cooptation_pending")
+    app.cooptation_outcome = "expired"
+    app.questionnaire_token = "zerotok"
+    app.save()
+
+    response = Client().post("/questionnaire/zerotok/", {})
+    assert response.status_code == 302
+
+    app.refresh_from_db()
+    assert app.status == "awaiting_admin"
+
+    # The link is now dead (gate: awaiting_admin is allowed but the flip
+    # happened — a second GET shows the done page, not a live form).
+    response = Client().get("/questionnaire/zerotok/")
+    assert response.status_code == 410

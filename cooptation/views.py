@@ -91,6 +91,27 @@ def signup_view(request):
             if form.cleaned_data.get("website_url"):
                 return HttpResponseRedirect("/inscription/merci/")
 
+            # One in-flight application per candidate email. Each duplicate
+            # used to fan out 5 emails (including fresh parrain invitations)
+            # and had to be rejected individually — each rejection starting
+            # its own 180-day PII-retention clock. Terminal states do not
+            # block: a rejected/purged candidate may genuinely reapply, and
+            # an approved one is caught by approve's User-exists check.
+            email = form.cleaned_data.get("email", "")
+            if (
+                email
+                and AdminApplication.objects.filter(
+                    email__iexact=email,
+                    status__in=("cooptation_pending", "awaiting_admin"),
+                ).exists()
+            ):
+                form.add_error(
+                    "email",
+                    "Une candidature avec cet email est déjà en cours. "
+                    "Vos parrains ont bien reçu la demande — inutile de la renvoyer.",
+                )
+                return render(request, "cooptation/signup.html", {"form": form})
+
             # .filter().first(), not .get(): User.email is not unique and a
             # shared family email would raise MultipleObjectsReturned — a 500
             # for the candidate on a submission the form already validated.
@@ -362,11 +383,42 @@ def questionnaire_view(request, token: str):
 
     questions = list(KnowledgeQuestion.objects.filter(is_active=True))
 
+    if not questions:
+        # Operator misconfiguration: zero active questions. With no rows to
+        # create, the responses.exists() "done" gate above never engages, so
+        # the form used to stay live (and re-submittable) forever. Nothing
+        # to ask means nothing to wait for: a POST hands the application to
+        # the admin; a GET just shows the done page (GET must not mutate).
+        if request.method == "POST":
+            if application.status == "cooptation_pending":
+                application.status = "awaiting_admin"
+                application.save()
+            return HttpResponseRedirect(f"/questionnaire/{token}/")
+        if application.status == "awaiting_admin":
+            return render(
+                request, "cooptation/questionnaire_done.html", {"unknown": False}, status=410
+            )
+
     if request.method == "POST":
+        answers = {
+            q.position: (request.POST.get(f"q{q.position}") or "").strip() for q in questions
+        }
+        if not any(answers.values()):
+            # All-blank submissions used to be stored and still flip the
+            # application to awaiting_admin — consuming the candidate's only
+            # remaining path with nothing for the admin to read.
+            return render(
+                request,
+                "cooptation/questionnaire.html",
+                {
+                    "questions": questions,
+                    "error": "Veuillez répondre à au moins une question.",
+                },
+            )
         try:
             with transaction.atomic():
                 for q in questions:
-                    answer = (request.POST.get(f"q{q.position}") or "").strip()
+                    answer = answers[q.position]
                     grade = _grade_closed(answer, q.answer_keys) if q.kind == "closed" else None
                     QuestionnaireResponse.objects.create(
                         application=application,
