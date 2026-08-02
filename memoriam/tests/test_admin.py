@@ -247,3 +247,57 @@ def test_delete_entry_removes_cloudinary_photo(
 
     client = cloud_mod.get_client()
     assert "memoriam/deceased-photo" in client.delete_calls
+
+
+@pytest.mark.django_db
+def test_hard_delete_writes_audit_row(make_admin_user, settings):
+    """T8 (2026-08-01 review tail): deleting a family-consented tribute is the
+    single most auditable action in this app, and it left no AuditLog row —
+    only Django's prunable LogEntry."""
+    from django.contrib.admin.sites import site
+
+    from members.models import AuditLog
+    from memoriam.admin import InMemoriamEntryAdmin
+    from memoriam.models import InMemoriamEntry
+
+    settings.CLOUDINARY_CLIENT_PATH = "alumni.cloudinary.FakeCloudinary"
+    admin_user = make_admin_user()
+    entry = InMemoriamEntry.objects.create(
+        full_name="Regretté Camarade",
+        status="draft",
+        created_by=admin_user,
+    )
+
+    class FakeReq:
+        user = admin_user
+
+    admin_obj = InMemoriamEntryAdmin(InMemoriamEntry, site)
+    entry_pk = entry.pk  # delete() sets instance.pk to None
+    admin_obj.delete_model(FakeReq(), entry)
+
+    log = AuditLog.objects.get(action="memoriam.entry.deleted", target_id=str(entry_pk))
+    assert log.metadata["full_name"] == "Regretté Camarade"
+    assert log.actor == admin_user
+
+
+@pytest.mark.django_db
+def test_admin_upload_form_enforces_size_and_mime(make_admin_user):
+    """The admin upload field had only a client-side accept attr — no 8 MB
+    cap, no MIME check (the gestion form has both)."""
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from memoriam.forms import InMemoriamEntryAdminForm
+
+    big = SimpleUploadedFile("big.jpg", b"x" * (8 * 1024 * 1024 + 1), content_type="image/jpeg")
+    form = InMemoriamEntryAdminForm(
+        data={"full_name": "X", "status": "draft"}, files={"upload": big}
+    )
+    form.is_valid()
+    assert "upload" in form.errors
+
+    pdf = SimpleUploadedFile("x.pdf", b"%PDF-1.4", content_type="application/pdf")
+    form = InMemoriamEntryAdminForm(
+        data={"full_name": "X", "status": "draft"}, files={"upload": pdf}
+    )
+    form.is_valid()
+    assert "upload" in form.errors

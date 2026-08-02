@@ -113,12 +113,32 @@ class InMemoriamEntryAdmin(admin.ModelAdmin):
         request. Deleting the DB row used to leave the deceased's photo
         permanently fetchable at its res.cloudinary.com URL."""
         self._delete_photo_on_commit(obj.photo_public_id)
+        self._audit_delete(request, obj)
         super().delete_model(request, obj)
 
     def delete_queryset(self, request, queryset):
         for obj in queryset:
             self._delete_photo_on_commit(obj.photo_public_id)
+            self._audit_delete(request, obj)
         super().delete_queryset(request, queryset)
+
+    @staticmethod
+    def _audit_delete(request, obj) -> None:
+        # Withdrawing a family-consented tribute is the most auditable act in
+        # this app, and it previously left only Django's prunable LogEntry.
+        from members.models import AuditLog
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action="memoriam.entry.deleted",
+            target_type="memoriam.InMemoriamEntry",
+            target_id=str(obj.pk),
+            metadata={
+                "full_name": obj.full_name,
+                "status": obj.status,
+                "family_consent_giver": obj.family_consent_giver,
+            },
+        )
 
     @staticmethod
     def _delete_photo_on_commit(public_id: str) -> None:
