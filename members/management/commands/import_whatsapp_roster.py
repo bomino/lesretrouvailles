@@ -230,12 +230,18 @@ class Command(BaseCommand):
             nonlocal links_file, links_writer
             if links_writer is None:
                 magic_links_path.parent.mkdir(parents=True, exist_ok=True)
-                links_file = magic_links_path.open("w", newline="", encoding="utf-8")
+                # Append, never truncate: a second batch run (e.g. after
+                # fixing validation errors) used to destroy the previous
+                # run's links — URLs that exist nowhere else if they had not
+                # been DM-forwarded yet. Header only when the file is new.
+                is_new = not magic_links_path.exists() or magic_links_path.stat().st_size == 0
+                links_file = magic_links_path.open("a", newline="", encoding="utf-8")
                 links_writer = csv.DictWriter(
                     links_file,
                     fieldnames=["whatsapp", "full_name", "magic_link_url"],
                 )
-                links_writer.writeheader()
+                if is_new:
+                    links_writer.writeheader()
             links_writer.writerow(link_row)
             links_file.flush()
 
@@ -250,13 +256,19 @@ class Command(BaseCommand):
             try:
                 with transaction.atomic():
                     user, member = self._create_user_and_member(row, username)
-                    if photos_dir and row.get("photo_filename"):
-                        if self._upload_photo(member, photos_dir, row["photo_filename"]):
-                            photos_uploaded += 1
                 created += 1
             except Exception as e:  # noqa: BLE001
                 self.stderr.write(f"  ERROR {phone}: {e}")
                 continue
+
+            # Photo AFTER the commit: the Cloudinary upload is network I/O
+            # and used to hold the row's DB transaction open for its whole
+            # duration; a crash between upload and commit also orphaned the
+            # asset. _upload_photo warns-and-returns-False on failure, so a
+            # bad photo never costs the created account.
+            if photos_dir and row.get("photo_filename"):
+                if self._upload_photo(member, photos_dir, row["photo_filename"]):
+                    photos_uploaded += 1
 
             password_set_url = _build_password_set_url(user)
             email = (row.get("email") or "").strip()

@@ -405,3 +405,24 @@ def test_confirm_post_survives_email_outage(client, entry, settings, monkeypatch
     entry.refresh_from_db()
     assert rreq.status == "confirmed"
     assert entry.removed_at is not None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_confirm_post_takes_a_row_lock(client, entry, settings):
+    """T6 (2026-08-01 review tail): two concurrent confirm POSTs both read
+    status == pending_confirmation and each wrote 2 audit rows and sent 3
+    emails. The POST must re-check under a FOR UPDATE lock."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from members.models import RemovalRequest
+
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    rreq = RemovalRequest.objects.create(entry=entry, requester_email="lock@y.test")
+
+    with CaptureQueriesContext(connection) as ctx:
+        response = client.post(f"/retrait/confirme/{rreq.confirm_token}/")
+    assert response.status_code == 200
+
+    locked = [q["sql"] for q in ctx.captured_queries if "FOR UPDATE" in q["sql"]]
+    assert any("removalrequest" in q.lower() for q in locked)

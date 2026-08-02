@@ -27,10 +27,14 @@ class Command(BaseCommand):
     def handle(self, *args, **opts):
         user_model = get_user_model()
         email = opts["email"]
-        user, created = user_model.objects.get_or_create(
-            email=email,
-            defaults={"username": email},
-        )
+        # filter().first(), not get_or_create: email is NOT unique on User,
+        # so two accounts sharing an address raised MultipleObjectsReturned.
+        # Attach to the oldest account, matching the resend-action convention.
+        user = user_model.objects.filter(email=email).order_by("pk").first()
+        created = False
+        if user is None:
+            user = user_model.objects.create(username=email, email=email)
+            created = True
         if opts["password"]:
             user.set_password(opts["password"])
         elif created:
@@ -51,8 +55,9 @@ class Command(BaseCommand):
         try:
             member.full_clean()
         except ValidationError as e:
+            # Runs after update_or_create persisted, so @transaction.atomic
+            # (via the CommandError) is what actually rolls the write back.
             raise CommandError(str(e)) from None
-        member.save()
 
         # Ensure NotificationPreference exists
         NotificationPreference.objects.get_or_create(member=member)

@@ -137,3 +137,29 @@ def test_create_member_password_explicit_sets_usable_password():
     )
     user = get_user_model().objects.get(email="x@example.test")
     assert user.check_password("test-pw-1")
+
+
+@pytest.mark.django_db
+def test_create_member_tolerates_duplicate_emails():
+    """T6 (2026-08-01 review tail): get_or_create(email=...) on the non-unique
+    email field raised MultipleObjectsReturned when two accounts shared an
+    address. The command must attach to the oldest account instead."""
+    from django.contrib.auth import get_user_model
+    from django.core.management import call_command
+
+    from members.models import Member
+
+    User = get_user_model()  # noqa: N806
+    first = User.objects.create_user(username="dup1", email="dup@example.test", password="x")
+    User.objects.create_user(username="dup2", email="dup@example.test", password="x")
+
+    call_command(
+        "create_member",
+        email="dup@example.test",
+        first_name="Dup",
+        last_name="Licate",
+        years=[1980],
+        classes=["6e"],
+        city="Niamey",
+    )
+    assert Member.objects.filter(user=first).exists()

@@ -30,11 +30,14 @@ from .search import search_members
 
 logger = logging.getLogger(__name__)
 
+ALLOWED_UPLOAD_TYPES = frozenset({"image/jpeg", "image/png", "image/webp"})
+# The real formats behind ALLOWED_UPLOAD_TYPES, as Pillow names them —
+# the authoritative check sniffs bytes, not the client-supplied header.
+ALLOWED_UPLOAD_FORMATS = frozenset({"JPEG", "PNG", "WEBP"})
+
 # Hardcoded suggestion chips rendered in the empty-state when /annuaire/
 # returns zero results post-fallback. Tuneable; a future enhancement
 # could derive these from top-N city/year counts in real data.
-ALLOWED_UPLOAD_TYPES = frozenset({"image/jpeg", "image/png", "image/webp"})
-
 DIRECTORY_EMPTY_STATE_SUGGESTIONS: list[tuple[str, str]] = [
     ("Niamey", "/annuaire/?city=Niamey"),
     ("Zinder", "/annuaire/?city=Zinder"),
@@ -202,6 +205,27 @@ def photo_upload_view(request):
     if upload.size > UPLOAD_MAX_BYTES:
         return JsonResponse({"error": "Photo trop lourde. Maximum : 5 Mo."}, status=400)
     if (upload.content_type or "") not in ALLOWED_UPLOAD_TYPES:
+        return JsonResponse(
+            {"error": "Format non supporté. Utilisez JPG, PNG ou WebP."}, status=400
+        )
+
+    # The content_type above is a client-supplied header — spoofable. Decide
+    # from the actual bytes: Pillow identifies the real format without a full
+    # decode, so non-images and smuggled formats get an authoritative 400
+    # here instead of leaning on Pillow/Cloudinary failing deeper in the
+    # pipeline.
+    from PIL import Image, UnidentifiedImageError
+
+    try:
+        with Image.open(upload) as probe:
+            real_format = (probe.format or "").upper()
+    except (UnidentifiedImageError, OSError):
+        return JsonResponse(
+            {"error": "Format non supporté. Utilisez JPG, PNG ou WebP."}, status=400
+        )
+    finally:
+        upload.seek(0)
+    if real_format not in ALLOWED_UPLOAD_FORMATS:
         return JsonResponse(
             {"error": "Format non supporté. Utilisez JPG, PNG ou WebP."}, status=400
         )
@@ -601,33 +625,47 @@ def removal_confirm_view(request, confirm_token: str):
         )
 
     # POST — execute the removal: set entry.removed_at, write 2 AuditLog
-    # entries, send 2 emails, mark the request confirmed.
-    entry = rreq.entry
-    entry.removed_at = now
-    entry.removed_reason = (rreq.reason or "Retrait demandé par la personne concernée")[:200]
-    entry.save(update_fields=["removed_at", "removed_reason"])
+    # entries, mark the request confirmed, then send 2 emails post-commit.
+    # Re-check under a FOR UPDATE lock: two concurrent POSTs (double-click,
+    # two devices) both read pending_confirmation and each duplicated the
+    # audit rows and emails.
+    with transaction.atomic():
+        rreq = RemovalRequest.objects.select_related("entry").select_for_update().get(pk=rreq.pk)
+        if rreq.status != "pending_confirmation":
+            # The first POST won while this one waited on the lock —
+            # idempotent success page, no second round of side effects.
+            return render(
+                request,
+                "members/removal_confirmed.html",
+                {"entry": rreq.entry, "request": rreq},
+            )
 
-    rreq.status = "confirmed"
-    rreq.confirmed_at = now
-    rreq.save(update_fields=["status", "confirmed_at"])
+        entry = rreq.entry
+        entry.removed_at = now
+        entry.removed_reason = (rreq.reason or "Retrait demandé par la personne concernée")[:200]
+        entry.save(update_fields=["removed_at", "removed_reason"])
 
-    AuditLog.objects.create(
-        actor=None,
-        action="ghost.removal.confirmed",
-        target_type="members.RemovalRequest",
-        target_id=str(rreq.pk),
-        metadata={"requester_email": rreq.requester_email},
-    )
-    AuditLog.objects.create(
-        actor=None,
-        action="ghost.removal.executed",
-        target_type="members.PublicSearchEntry",
-        target_id=str(entry.pk),
-        metadata={
-            "removal_request_id": rreq.pk,
-            "reason_at_request": rreq.reason,
-        },
-    )
+        rreq.status = "confirmed"
+        rreq.confirmed_at = now
+        rreq.save(update_fields=["status", "confirmed_at"])
+
+        AuditLog.objects.create(
+            actor=None,
+            action="ghost.removal.confirmed",
+            target_type="members.RemovalRequest",
+            target_id=str(rreq.pk),
+            metadata={"requester_email": rreq.requester_email},
+        )
+        AuditLog.objects.create(
+            actor=None,
+            action="ghost.removal.executed",
+            target_type="members.PublicSearchEntry",
+            target_id=str(entry.pk),
+            metadata={
+                "removal_request_id": rreq.pk,
+                "reason_at_request": rreq.reason,
+            },
+        )
 
     # Best-effort: the removal is already executed and audited — a Resend
     # outage must not 500 the success page.
