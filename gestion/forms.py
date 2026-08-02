@@ -7,6 +7,7 @@ import re
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.postgres.forms import SimpleArrayField
+from django.db import transaction
 
 from members.models import VALID_CLASS_PATTERN, VALID_YEARS, AuditLog, Member
 from memoires.models import Memory
@@ -133,25 +134,28 @@ class MemberAdminEditForm(forms.ModelForm):
         old_email = self.instance.user.email
         email_changed = new_email != old_email
 
-        member = super().save()
+        # Member save, User email save, and the audit row are one unit — a
+        # failure between them must not leave a half-applied edit.
+        with transaction.atomic():
+            member = super().save()
 
-        if email_changed:
-            member.user.email = new_email
-            member.user.save(update_fields=["email"])
-            if "email" not in changed:
-                changed.append("email")
+            if email_changed:
+                member.user.email = new_email
+                member.user.save(update_fields=["email"])
+                if "email" not in changed:
+                    changed.append("email")
 
-        if changed:
-            AuditLog.objects.create(
-                actor=actor,
-                action="gestion.member.edited",
-                target_type="members.Member",
-                target_id=str(member.pk),
-                metadata={
-                    "changed_fields": changed,
-                    "member_full_name": member.full_name,
-                },
-            )
+            if changed:
+                AuditLog.objects.create(
+                    actor=actor,
+                    action="gestion.member.edited",
+                    target_type="members.Member",
+                    target_id=str(member.pk),
+                    metadata={
+                        "changed_fields": changed,
+                        "member_full_name": member.full_name,
+                    },
+                )
         return changed
 
 
@@ -217,6 +221,7 @@ class MemberUsernameChangeForm(forms.Form):
             )
         return value
 
+    @transaction.atomic
     def save_with_audit(self, *, actor) -> str:
         new_username = self.cleaned_data["new_username"]
         old_username = self.member.user.username
