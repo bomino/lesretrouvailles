@@ -260,17 +260,28 @@ def parrain_vouch_view(request, token: str):
                 cooptation_request.responded_at = timezone.now()
                 cooptation_request.save()
 
-                if cooptation_request.response == "accepted":
-                    emails.send_cooptation_accepted(cooptation_request)
-                else:
-                    emails.send_cooptation_refused(cooptation_request)
-
                 outcome = _resolve_outcome(cooptation_request.application)
                 if outcome != "pending":
                     app = cooptation_request.application
                     app.cooptation_outcome = outcome
                     app.status = "awaiting_admin"
                     app.save()
+
+            # Committed. The candidate email is best-effort from here — sent
+            # inside the transaction, a Resend outage rolled back the
+            # parrain's recorded response and 500ed the page (the same
+            # pattern approve/reject_application already fixed).
+            try:
+                if cooptation_request.response == "accepted":
+                    emails.send_cooptation_accepted(cooptation_request)
+                else:
+                    emails.send_cooptation_refused(cooptation_request)
+            except Exception:
+                logger.exception(
+                    "parrain_vouch: candidate email failed for request %s "
+                    "(the response WAS recorded)",
+                    cooptation_request.pk,
+                )
 
             return HttpResponseRedirect(f"/cooptation/{token}/")
     else:

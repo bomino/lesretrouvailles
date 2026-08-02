@@ -537,7 +537,13 @@ def removal_request_form_view(request, entry_token: str):
                 "reason": reason,
             },
         )
-        members_emails.send_removal_confirmation_pending(rreq)
+        # Best-effort: the request row is committed. Unwrapped, a Resend
+        # outage 500ed the requester AFTER persistence, and their natural
+        # retry created a duplicate pending request.
+        try:
+            members_emails.send_removal_confirmation_pending(rreq)
+        except Exception:
+            logger.exception("removal request %s recorded but confirmation email failed", rreq.pk)
         return HttpResponseRedirect("/retrait/merci/")
 
     return render(request, "members/removal_request_form.html", {"entry": entry})
@@ -623,8 +629,16 @@ def removal_confirm_view(request, confirm_token: str):
         },
     )
 
-    members_emails.send_removal_completed(rreq)
-    members_emails.send_admin_removal_notification(rreq)
+    # Best-effort: the removal is already executed and audited — a Resend
+    # outage must not 500 the success page.
+    for send in (
+        members_emails.send_removal_completed,
+        members_emails.send_admin_removal_notification,
+    ):
+        try:
+            send(rreq)
+        except Exception:
+            logger.exception("removal %s executed but notification email failed", rreq.pk)
 
     return render(
         request,

@@ -187,3 +187,27 @@ def test_vouch_on_decided_application_sends_no_candidate_email(parrain_client, s
 
     parrain_client.post(f"/cooptation/{req.token}/", {"response": "accepted", "comment": ""})
     assert FakeResendBackend.sent_messages == []
+
+
+@pytest.mark.django_db
+def test_vouch_recorded_even_if_candidate_email_fails(parrain_client, settings, monkeypatch):
+    """T1 (2026-08-01 review tail): the accepted/refused emails were sent
+    INSIDE the vouch transaction — a Resend outage rolled back the parrain's
+    recorded response and 500ed the page (the exact pattern the approve/reject
+    services already fixed)."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    from cooptation import views as coop_views
+
+    def boom(req):
+        raise RuntimeError("resend down")
+
+    monkeypatch.setattr(coop_views.emails, "send_cooptation_accepted", boom)
+
+    req = parrain_client.request_obj
+    response = parrain_client.post(
+        f"/cooptation/{req.token}/", {"response": "accepted", "comment": ""}
+    )
+    assert response.status_code == 302
+
+    req.refresh_from_db()
+    assert req.response == "accepted"  # the response survived the outage
