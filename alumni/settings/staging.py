@@ -150,6 +150,35 @@ if EMAIL_BACKEND.endswith("ResendBackend") and not RESEND_API_KEY:  # noqa: F405
     )
 PASSWORD_RESET_TIMEOUT = 7 * 24 * 60 * 60  # 7 days for the post-approval password-set link
 
+# Error tracking. LOGGING is console-only and there are no ADMINS, so until
+# now nothing *pushed* a failure at the owner — the August 2026 cron outage
+# ran for 4+ weeks unnoticed. Opt-in via SENTRY_DSN (absent = off, which is
+# what the Docker build steps need). Every event is scrubbed by
+# alumni.sentry.scrub_event: this platform carries single-use credentials in
+# URL paths, and a raw request URL in a third-party dashboard is a leak.
+SENTRY_DSN = env("SENTRY_DSN", default="")
+# Report-only CSP collector (review L42): Sentry's security endpoint, so the
+# observation phase records violations instead of logging them to each
+# visitor's console. Empty DSN → no report-uri, header unchanged.
+from alumni.sentry import csp_report_uri  # noqa: E402
+
+CSP_REPORT_URI = csp_report_uri(SENTRY_DSN)
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    from alumni.sentry import scrub_event
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration()],
+        environment=env("RAILWAY_ENVIRONMENT", default="staging"),
+        release=env("RAILWAY_GIT_COMMIT_SHA", default=None),
+        send_default_pii=False,
+        traces_sample_rate=0.0,
+        before_send=scrub_event,
+    )
+
 # Allauth's login/reset/signup throttles key on ITS OWN client-IP resolver,
 # not on RATELIMIT_IP_META_KEY. Left at the default (REMOTE_ADDR = Railway's
 # edge proxy), every visitor shares one bucket: a single attacker can exhaust
