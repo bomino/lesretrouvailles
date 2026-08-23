@@ -79,8 +79,10 @@ except ImportError:  # pragma: no cover
     _GunicornLogger = object
 
 
-#: gunicorn access-log atoms that can contain a URL: request line, path, query.
-_URL_ATOMS = ("r", "U", "q")
+#: gunicorn access-log atoms that can contain a URL: request line, path, query,
+#: and the Referer — every asset or next-page request after a token page carries
+#: the token URL there, so the default %(f)s atom leaked what the request line hid.
+_URL_ATOMS = ("r", "U", "q", "f")
 
 
 def redact_atoms(atoms: dict) -> dict:
