@@ -216,3 +216,28 @@ def test_questionnaire_with_zero_active_questions_flips_to_awaiting_admin(make_a
     # happened — a second GET shows the done page, not a live form).
     response = Client().get("/questionnaire/zerotok/")
     assert response.status_code == 410
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("decided_status", ["approved", "rejected"])
+def test_questionnaire_does_not_overwrite_decision_made_during_request(
+    expired_application_with_token, monkeypatch, decided_status
+):
+    """M4 (2026-08-22 review): same race as the vouch view — the gate ran on a
+    stale object and the commit did a full-field save() of status='awaiting_admin',
+    reversing an admin decision that landed mid-request."""
+    from cooptation import views as coop_views
+    from cooptation.models import QuestionnaireResponse
+    from cooptation.tests.test_parrain_vouch_view import _DecideOnAtomic
+
+    app = expired_application_with_token
+    monkeypatch.setattr(coop_views, "transaction", _DecideOnAtomic(app, decided_status))
+
+    response = Client().post(
+        "/questionnaire/abc123/", {"q1": "alpha", "q2": "gamma", "q3": "souvenir"}
+    )
+
+    assert response.status_code == 410
+    app.refresh_from_db()
+    assert app.status == decided_status
+    assert not QuestionnaireResponse.objects.filter(application=app).exists()

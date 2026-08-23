@@ -232,3 +232,56 @@ def test_vouch_post_locks_all_sibling_requests(parrain_client):
     assert response.status_code == 302
     locked_queries = [q["sql"] for q in ctx.captured_queries if "FOR UPDATE" in q["sql"]]
     assert any("cooptation_cooptationrequest" in q for q in locked_queries)
+
+
+class _DecideOnAtomic:
+    """Stand-in for `django.db.transaction` that flips the application to a
+    decided status the moment the view opens its transaction — i.e. after the
+    outer status gate ran on the cached object, before any row is written.
+    That is exactly when a concurrent admin approve/reject lands."""
+
+    def __init__(self, app, status):
+        from django.db import transaction
+
+        self._real = transaction
+        self._app = app
+        self._status = status
+
+    def atomic(self, *args, **kwargs):
+        from cooptation.models import AdminApplication
+
+        AdminApplication.objects.filter(pk=self._app.pk).update(status=self._status)
+        return self._real.atomic(*args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("decided_status", ["approved", "rejected"])
+def test_vouch_does_not_overwrite_decision_made_during_request(
+    parrain_client, monkeypatch, decided_status
+):
+    """M4 (2026-08-22 review): the decided gate ran outside the transaction on
+    a stale object, and the commit wrote app.status='awaiting_admin'
+    unconditionally — an admin decision that landed in between was silently
+    reversed (re-decidable approved app; rejected app escaping the purge)."""
+    from cooptation import views as coop_views
+
+    req = parrain_client.request_obj
+    app = req.application
+    # Make this the deciding vouch: the sibling already accepted.
+    from cooptation.models import CooptationRequest
+
+    CooptationRequest.objects.filter(application=app).exclude(pk=req.pk).update(response="accepted")
+    monkeypatch.setattr(coop_views, "transaction", _DecideOnAtomic(app, decided_status))
+
+    response = parrain_client.post(
+        f"/cooptation/{req.token}/", {"response": "accepted", "comment": ""}
+    )
+
+    assert response.status_code == 410
+    app.refresh_from_db()
+    req.refresh_from_db()
+    assert app.status == decided_status
+    assert req.response == "pending"
