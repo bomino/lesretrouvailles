@@ -193,3 +193,56 @@ def test_admin_approve_and_reject_actions_write_audit_rows(superuser, make_appli
     admin_obj.reject_action(FakeReq(), AdminApplication.objects.filter(pk=rejected.pk))
     log = AuditLog.objects.get(action="cooptation.application.rejected", target_id=str(rejected.pk))
     assert log.metadata["candidate_full_name"] == "Audit Rejected"
+
+
+@pytest.mark.django_db
+def test_admin_status_is_readonly_on_change_form(superuser, make_application):
+    """A free `status` select let an operator set rejected/purged by hand —
+    skipping reject_application (no rejected_at/retention_until, so
+    _purge_old_rejections never matched) or purge() (PII kept under a
+    'purged' label). Terminal transitions only flow through the services."""
+    from cooptation.admin import AdminApplicationAdmin
+    from cooptation.models import AdminApplication
+
+    app = make_application()
+    admin = AdminApplicationAdmin(AdminApplication, site)
+
+    class FakeReq:
+        user = superuser
+
+    assert "status" in admin.get_readonly_fields(FakeReq(), app)
+
+
+@pytest.mark.django_db
+def test_admin_requeue_action_moves_stuck_cooptation_to_awaiting_admin(superuser, make_application):
+    """Replaces the guide's 'hand-edit Status to awaiting_admin' remediation
+    for an application whose cooptation stalled."""
+    from cooptation.admin import AdminApplicationAdmin
+    from cooptation.models import AdminApplication
+
+    app = make_application(status="cooptation_pending")
+    admin = AdminApplicationAdmin(AdminApplication, site)
+
+    class FakeReq:
+        user = superuser
+
+    admin.requeue_action(FakeReq(), AdminApplication.objects.filter(pk=app.pk))
+    app.refresh_from_db()
+    assert app.status == "awaiting_admin"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("status", ["awaiting_admin", "approved", "rejected", "purged"])
+def test_admin_requeue_action_refuses_every_other_status(superuser, make_application, status):
+    from cooptation.admin import AdminApplicationAdmin
+    from cooptation.models import AdminApplication
+
+    app = make_application(status=status)
+    admin = AdminApplicationAdmin(AdminApplication, site)
+
+    class FakeReq:
+        user = superuser
+
+    admin.requeue_action(FakeReq(), AdminApplication.objects.filter(pk=app.pk))
+    app.refresh_from_db()
+    assert app.status == status

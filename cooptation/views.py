@@ -276,6 +276,20 @@ def parrain_vouch_view(request, token: str):
         form = ParrainVouchForm(request.POST)
         if form.is_valid():
             with transaction.atomic():
+                # Lock the application row FIRST and re-run the decided gate
+                # on the fresh row: the gate above ran on a cached object, and
+                # an admin approve/reject that landed in between used to be
+                # overwritten by the unconditional awaiting_admin write below.
+                app = AdminApplication.objects.select_for_update().get(
+                    pk=cooptation_request.application_id
+                )
+                if app.status not in ("cooptation_pending", "awaiting_admin"):
+                    return render(
+                        request,
+                        "cooptation/parrain_vouch_done.html",
+                        {"request_obj": cooptation_request, "application_decided": True},
+                        status=410,
+                    )
                 # Lock ALL of this application's requests before writing.
                 # Under READ COMMITTED, two near-simultaneous vouches each
                 # saw the sibling as still pending, so neither flipped the
@@ -303,12 +317,11 @@ def parrain_vouch_view(request, token: str):
                 locked.save()
                 cooptation_request = locked
 
-                outcome = _resolve_outcome(cooptation_request.application)
+                outcome = _resolve_outcome(app)
                 if outcome != "pending":
-                    app = cooptation_request.application
                     app.cooptation_outcome = outcome
                     app.status = "awaiting_admin"
-                    app.save()
+                    app.save(update_fields=["cooptation_outcome", "status"])
 
             # Committed. The candidate email is best-effort from here — sent
             # inside the transaction, a Resend outage rolled back the
@@ -390,9 +403,11 @@ def questionnaire_view(request, token: str):
         # to ask means nothing to wait for: a POST hands the application to
         # the admin; a GET just shows the done page (GET must not mutate).
         if request.method == "POST":
-            if application.status == "cooptation_pending":
-                application.status = "awaiting_admin"
-                application.save()
+            # Conditional UPDATE: a decision that landed since the gate above
+            # is left alone instead of being overwritten from the stale object.
+            AdminApplication.objects.filter(pk=application.pk, status="cooptation_pending").update(
+                status="awaiting_admin"
+            )
             return HttpResponseRedirect(f"/questionnaire/{token}/")
         if application.status == "awaiting_admin":
             return render(
@@ -417,6 +432,18 @@ def questionnaire_view(request, token: str):
             )
         try:
             with transaction.atomic():
+                # Lock the row and re-run the gate on it: the check above ran
+                # on a stale object, and the old full-field save() below wrote
+                # back status (and reviewed_by/rejected_at) over any admin
+                # decision that landed mid-request.
+                application = AdminApplication.objects.select_for_update().get(pk=application.pk)
+                if application.status not in ("cooptation_pending", "awaiting_admin"):
+                    return render(
+                        request,
+                        "cooptation/questionnaire_done.html",
+                        {"unknown": False},
+                        status=410,
+                    )
                 for q in questions:
                     answer = answers[q.position]
                     grade = _grade_closed(answer, q.answer_keys) if q.kind == "closed" else None
@@ -427,7 +454,7 @@ def questionnaire_view(request, token: str):
                         auto_grade=grade,
                     )
                 application.status = "awaiting_admin"
-                application.save()
+                application.save(update_fields=["status"])
         except IntegrityError:
             # Double-click race: the second POST passed the exists() check
             # before the first committed, then hit unique_together. The

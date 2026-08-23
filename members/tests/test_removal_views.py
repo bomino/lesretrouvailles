@@ -426,3 +426,24 @@ def test_confirm_post_takes_a_row_lock(client, entry, settings):
 
     locked = [q["sql"] for q in ctx.captured_queries if "FOR UPDATE" in q["sql"]]
     assert any("removalrequest" in q.lower() for q in locked)
+
+
+@pytest.mark.django_db
+def test_invalid_removal_posts_do_not_consume_the_rate_limit(client, entry, settings):
+    """M6 (2026-08-22 review): the decorator counted every POST before the
+    view ran, so malformed-email submissions and probes of unknown tokens
+    burned the 5/h bucket for everyone behind the same CGNAT IP. Only a
+    submission that validates may spend it (the memoriam.nominate pattern)."""
+    settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"
+    settings.RATELIMIT_ENABLE = True
+    from django.core.cache import cache
+
+    cache.clear()
+    url = f"/retrait/{entry.removal_token}/"
+    for _ in range(5):
+        assert client.post(url, {"email": "not-an-email"}).status_code == 400
+        assert client.post(url, {"email": ""}).status_code == 400
+        assert client.post("/retrait/nope-nope-nope/", {"email": "r@x.test"}).status_code == 404
+
+    response = client.post(f"/retrait/{entry.removal_token}/", {"email": "real@x.test"})
+    assert response.status_code == 302, "a valid first submission must still go through"

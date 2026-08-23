@@ -275,3 +275,12 @@ def test_report_only_csp_is_wired_in_prod_shape():
 
     src = _settings_source("staging")
     assert "ContentSecurityPolicyReportOnlyMiddleware" in src
+
+
+def test_prod_basic_auth_defaults_off():
+    """prod.py inherits staging's BASIC_AUTH_REQUIRED default of True. With
+    credentials copied over from staging the whole public site silently 401s
+    while the /health probe (which bypasses the gate) stays green. The fail-safe
+    direction for a public platform is open, with the env var as the opt-in."""
+    src = _settings_source("prod")
+    assert 'BASIC_AUTH_REQUIRED = env.bool("BASIC_AUTH_REQUIRED", default=False)' in src

@@ -103,3 +103,21 @@ def test_gunicorn_access_log_atoms_are_redacted():
 def test_settings_wire_the_filter_onto_the_console_handler(settings):
     console = settings.LOGGING["handlers"]["console"]
     assert "token_redaction" in console.get("filters", [])
+
+
+def test_gunicorn_referer_atom_is_redacted():
+    """The default access_log_format also prints %(f)s = HTTP_REFERER. Every
+    asset/next-page request that follows a token page carries that token URL
+    in its Referer, so redacting only the request line left the most common
+    navigation pattern leaking."""
+    from alumni.logging import redact_atoms
+
+    atoms = redact_atoms(
+        {
+            "r": "GET /static/css/output.css HTTP/1.1",
+            "f": "https://villageretrouvailles.com/cooptation/8f3d9a2b7c1e4f60/",
+        }
+    )
+
+    assert "8f3d9a2b7c1e4f60" not in atoms["f"], "token survived in the Referer"
+    assert atoms["f"] == "https://villageretrouvailles.com/cooptation/REDACTED/"

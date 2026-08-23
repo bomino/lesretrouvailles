@@ -535,10 +535,9 @@ Une `AdminApplication` peut rester coincée en `cooptation_pending` si les deux 
 1. **Cooptation → Admin Applications** filtrée par `status = cooptation_pending`.
 2. **Cooptation → Cooptation requests** filtrée par cette application : voyez l'état des deux requêtes (pending / accepted / refused / expired).
 3. Si les deux ont expiré sans réponse, le système envoie automatiquement un email de questionnaire au candidat (méthode 2 du master spec). Le statut devrait évoluer dans les 24 h après le passage du cron.
-4. Si rien ne bouge, intervenez manuellement depuis `/admin/cooptation/adminapplication/` :
-   - pour la faire remonter dans la file de revue, ouvrez la fiche et passez son champ **`Status`** à `awaiting_admin`, puis enregistrez ;
-   - pour la refuser, sélectionnez-la dans la liste et lancez l'action **« Rejeter les candidatures sélectionnées »**.
-   (Il n'existe pas d'action « Push to awaiting_admin » — les trois actions disponibles sont « Approuver… », « Rejeter… » et « Renvoyer le lien de mot de passe… ».)
+4. Si rien ne bouge, intervenez depuis `\admin\cooptation\adminapplication\` — le champ **`Status`** est en lecture seule, tout passe par les actions de la liste :
+   - pour la faire remonter dans la file de revue, sélectionnez-la et lancez l'action **« Remettre en file de revue (cooptation bloquée) »** (n'agit que sur les candidatures en « Cooptation en cours ») ;
+   - pour la refuser, lancez l'action **« Rejeter les candidatures sélectionnées »**.
 
 ---
 

@@ -272,3 +272,81 @@ def test_member_edit_rolls_back_email_change_if_audit_write_fails(
     member.refresh_from_db()
     member.user.refresh_from_db()
     assert member.user.email == old_email  # user write rolled back with the rest
+
+
+def _consent(member):
+    """A staff user who also has a Member row must have signed the charter,
+    or ConsentRequiredMiddleware redirects every /gestion/ hit to /charte/."""
+    from members.charters import CHARTER_CURRENT_VERSION
+    from members.models import ConsentRecord
+
+    ConsentRecord.objects.create(
+        member=member, charter_version=CHARTER_CURRENT_VERSION, ip_address="127.0.0.1"
+    )
+    return member
+
+
+@pytest.mark.django_db
+def test_member_status_refuses_self_suspension(client, coadmin_user, make_member):
+    """Suspension really revokes access now (is_active + session flush), so a
+    mis-click on one's own row would lock the co-admin out with no UI recovery."""
+    member = _consent(make_member(user=coadmin_user, status="active"))
+    client.force_login(coadmin_user)
+    response = client.post(
+        f"/gestion/membres/{member.slug}/statut/",
+        {"target_status": "suspended"},
+    )
+    assert response.status_code == 302
+    assert "flash=protected" in response["Location"]
+    member.refresh_from_db()
+    coadmin_user.refresh_from_db()
+    assert member.status == "active"
+    assert coadmin_user.is_active is True
+
+
+@pytest.mark.django_db
+def test_member_status_refuses_suspending_superuser(
+    client, coadmin_user, superadmin_user, make_member
+):
+    """The owner has no recovery path through /admin/ either (it requires
+    is_active), so a co-admin must not be able to suspend a superuser."""
+    member = make_member(user=superadmin_user, status="active")
+    client.force_login(coadmin_user)
+    response = client.post(
+        f"/gestion/membres/{member.slug}/statut/",
+        {"target_status": "suspended"},
+    )
+    assert "flash=protected" in response["Location"]
+    member.refresh_from_db()
+    superadmin_user.refresh_from_db()
+    assert member.status == "active"
+    assert superadmin_user.is_active is True
+
+
+@pytest.mark.django_db
+def test_member_status_reactivation_of_protected_account_still_allowed(
+    client, coadmin_user, superadmin_user, make_member
+):
+    """Only the suspend direction is guarded — reactivating is harmless."""
+    member = make_member(user=superadmin_user, status="suspended")
+    superadmin_user.is_active = False
+    superadmin_user.save(update_fields=["is_active"])
+    client.force_login(coadmin_user)
+    client.post(f"/gestion/membres/{member.slug}/statut/", {"target_status": "active"})
+    member.refresh_from_db()
+    assert member.status == "active"
+
+
+@pytest.mark.django_db
+def test_member_detail_hides_suspend_button_on_protected_rows(
+    client, coadmin_user, superadmin_user, make_member
+):
+    own = _consent(make_member(user=coadmin_user, status="active"))
+    owner = make_member(user=superadmin_user, status="active")
+    other = make_member(status="active")
+    client.force_login(coadmin_user)
+    for m in (own, owner):
+        html = client.get(f"/gestion/membres/{m.slug}/").content.decode()
+        assert "Suspendre le compte" not in html, m.slug
+    html = client.get(f"/gestion/membres/{other.slug}/").content.decode()
+    assert "Suspendre le compte" in html
