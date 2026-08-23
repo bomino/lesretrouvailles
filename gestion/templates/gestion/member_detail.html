@@ -26,6 +26,10 @@
         </div>
     {% elif request.GET.flash == "bad_status" %}
         <div class="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">Statut invalide.</div>
+    {% elif request.GET.flash == "protected" %}
+        <div class="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+            Ce compte ne peut pas être suspendu depuis la console (votre propre compte ou celui du super-administrateur).
+        </div>
     {% endif %}
     <section class="grid grid-cols-1 gap-6 md:grid-cols-3">
         <article class="md:col-span-2 rounded-2xl border border-secondary/15 bg-surface p-5 shadow-sm">
@@ -135,7 +139,7 @@
                class="block rounded-lg border border-tertiary/40 bg-white px-4 py-2 min-h-tap text-center text-sm font-medium text-tertiary hover:bg-base-200 transition">
                 Régénérer un lien de connexion
             </a>
-            {% if member.status == "active" %}
+            {% if member.status == "active" and member.user != request.user and not member.user.is_superuser %}
                 <form method="post"
                       action="{% url 'gestion:member_status' slug=member.slug %}">
                     {% csrf_token %}

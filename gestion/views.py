@@ -171,6 +171,14 @@ def member_status_view(request, slug):
         if member.status == target:
             return _redirect_to_detail(member, flash="noop")
 
+        # Suspension really revokes access (is_active + session flush), and
+        # neither /gestion/ nor /admin/ lets an inactive user back in — so a
+        # mis-click on one's own row or the owner's would need a DB fix.
+        if target == "suspended" and (
+            member.user_id == request.user.pk or member.user.is_superuser
+        ):
+            return _redirect_to_detail(member, flash="protected")
+
         member.status = target
         member.save(update_fields=["status", "updated_at"])
 
