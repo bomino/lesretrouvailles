@@ -135,6 +135,8 @@ For the current launch (May 2026): announcement posted ~2026-05-07; deadline 202
 
 ## Step 4 — Pilot batch (5-10 members)
 
+> **For the current launch this step is already largely done — as a repair, not an import.** The 18 members created by hand in May 2026 *are* the pilot cohort (they match `roster_pilot.xlsx` Sheet2 one-to-one), so importing them would create duplicates. The worksheet `private-data/pilot_repair.csv` (gitignored — real names and numbers, never commit it) lists, per member: the digit username to set, the WhatsApp number recovered from the workbook, the `/gestion/` actions (set whatsapp → change username → regenerate link → DM Template 3), and the rows needing judgment (three US numbers missing the leading `1`; three members with no phone on file). Work through it, then apply the 48-hour feedback questions below to those members. The import procedure that follows applies to a *future* pilot of genuinely new members. Note: the Google Sheet linked from `roster_pilot.xlsx` is not public (401) — export the form responses from your own Google account.
+
 Pick 5-10 trusted members (e.g., the WhatsApp group's most active or your closest co-founders). Make a `pilot.csv` with just those rows:
 
 > **Targeting production.** The import reads a CSV and photo directory that
