@@ -43,7 +43,12 @@ class AdminApplicationAdmin(admin.ModelAdmin):
     )
     list_filter = ("status", "cooptation_outcome", "country", "utm_source", "utm_campaign")
     search_fields = ("full_name", "email", "nickname")
+    # `status` is read-only on purpose: a free select let an operator set
+    # rejected/purged by hand, skipping reject_application (no rejected_at /
+    # retention_until, so the 180-day purge never matched) or purge() (PII
+    # kept under a "purged" label). Every transition goes through an action.
     readonly_fields = (
+        "status",
         "submitted_at",
         "reviewed_by",
         "rejected_at",
@@ -53,7 +58,7 @@ class AdminApplicationAdmin(admin.ModelAdmin):
         "questionnaire_token",
     )
     inlines = [CooptationRequestInline, QuestionnaireResponseInline]
-    actions = ["approve_action", "reject_action", "resend_password_link_action"]
+    actions = ["approve_action", "reject_action", "requeue_action", "resend_password_link_action"]
 
     def get_queryset(self, request):
         """Annotate the 24h same-IP count once for the whole changelist —
@@ -163,6 +168,24 @@ class AdminApplicationAdmin(admin.ModelAdmin):
                     },
                 )
         self.message_user(request, f"{rejected} candidature(s) rejetée(s).", messages.WARNING)
+
+    @admin.action(description="Remettre en file de revue (cooptation bloquée)")
+    def requeue_action(self, request, queryset):
+        """The one non-terminal transition an operator may force: a stalled
+        cooptation_pending application back into the admin queue. Replaces
+        the old hand-edit of `status` now that the field is read-only."""
+        moved = queryset.filter(status="cooptation_pending").update(status="awaiting_admin")
+        refused = queryset.count() - moved
+        if refused:
+            self.message_user(
+                request,
+                f"{refused} candidature(s) ignorée(s) : seules celles en « Cooptation en cours »"
+                " peuvent être remises en file.",
+                messages.WARNING,
+            )
+        self.message_user(
+            request, f"{moved} candidature(s) remise(s) en file de revue.", messages.SUCCESS
+        )
 
     @admin.action(description="Renvoyer le lien de mot de passe (candidats déjà approuvés)")
     def resend_password_link_action(self, request, queryset):
