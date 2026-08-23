@@ -53,6 +53,7 @@ security hole).
 
 | Variable | Value | Why |
 |----------|-------|-----|
+| `SENTRY_DSN` | from the Sentry project (Settings → Client Keys) | Error tracking. Absent = off. Set it on the app service **and both cron services** (`${{ lesretrouvailles.SENTRY_DSN }}`) — the crons are where failures went unseen for weeks in August 2026. Events pass through `alumni.sentry.scrub_event`, so token URLs never leave the box. |
 | `CACHE_BACKEND` | `db` | Postgres-backed cache so all gunicorn workers share the rate-limit counters. Without this, `WEB_CONCURRENCY=2` means each worker has its own counter and the per-user rate limit doubles. |
 | `SECURE_SSL_REDIRECT` | `true` | Force HTTPS (default in staging settings) |
 | `WEB_CONCURRENCY` | `2` | Gunicorn worker count. Hobby tier handles ~2 fine. |
