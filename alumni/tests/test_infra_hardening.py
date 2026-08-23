@@ -41,6 +41,42 @@ def test_email_backend_is_env_overridable(module):
     assert 'EMAIL_BACKEND = env("EMAIL_BACKEND"' in src
 
 
+def _staging_boot_env() -> dict:
+    """The env docker-compose gives the app service (minus DB — django.setup()
+    never connects). Every value is a non-secret placeholder."""
+    import os
+
+    return {
+        "DJANGO_SETTINGS_MODULE": "alumni.settings.staging",
+        "SECRET_KEY": "test-not-a-secret",
+        "DATABASE_URL": "postgres://x:x@localhost:5432/x",
+        "ALLOWED_HOSTS": "localhost",
+        "SITE_URL": "http://localhost:8000",
+        "SECURE_SSL_REDIRECT": "false",
+        "CLOUDINARY_CLIENT_PATH": "alumni.cloudinary.FakeCloudinary",
+        "CLOUDINARY_CLOUD_NAME": "fake-cloud",
+        "EMAIL_BACKEND": "django.core.mail.backends.console.EmailBackend",
+        "SITE_URL_ALLOW_LOCAL": "true",
+        # Windows subprocesses need SYSTEMROOT for socket/crypto init.
+        "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),
+    }
+
+
+def _boot_staging(env: dict):
+    """django.setup() under staging settings in a subprocess; prints BOOTED."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    return subprocess.run(
+        [sys.executable, "-c", 'import django; django.setup(); print("BOOTED")'],
+        capture_output=True,
+        text=True,
+        cwd=Path(__file__).resolve().parents[2],
+        env=env,
+    )
+
+
 def test_prod_shaped_settings_never_use_per_process_locmem_cache():
     """Every rate limiter rides on the default cache. With neither
     CACHE_BACKEND=db nor REDIS_URL set, staging/prod fell back to a
@@ -147,9 +183,6 @@ def test_compose_prod_repro_can_boot_staging_settings():
     must opt out of the localhost-SITE_URL guard explicitly and use the
     console email backend; the guard must also catch 127.0.0.1 (it
     string-matched only 'http://localhost')."""
-    import os
-    import subprocess
-    import sys
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[2]
@@ -163,30 +196,8 @@ def test_compose_prod_repro_can_boot_staging_settings():
 
     # Boot staging settings in a subprocess with the same env the compose
     # file gives the app service (minus DB — django.setup() never connects).
-    compose_env = {
-        "DJANGO_SETTINGS_MODULE": "alumni.settings.staging",
-        "SECRET_KEY": "test-not-a-secret",
-        "DATABASE_URL": "postgres://x:x@localhost:5432/x",
-        "ALLOWED_HOSTS": "localhost",
-        "SITE_URL": "http://localhost:8000",
-        "SECURE_SSL_REDIRECT": "false",
-        "CLOUDINARY_CLIENT_PATH": "alumni.cloudinary.FakeCloudinary",
-        "CLOUDINARY_CLOUD_NAME": "fake-cloud",
-        "EMAIL_BACKEND": "django.core.mail.backends.console.EmailBackend",
-        "SITE_URL_ALLOW_LOCAL": "true",
-        # Windows subprocesses need SYSTEMROOT for socket/crypto init.
-        "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),
-    }
-    boot = 'import django; django.setup(); print("BOOTED")'
-
-    def run(env):
-        return subprocess.run(
-            [sys.executable, "-c", boot],
-            capture_output=True,
-            text=True,
-            cwd=root,
-            env=env,
-        )
+    compose_env = _staging_boot_env()
+    run = _boot_staging
 
     result = run(compose_env)
     assert "BOOTED" in result.stdout, result.stderr
@@ -284,3 +295,26 @@ def test_prod_basic_auth_defaults_off():
     direction for a public platform is open, with the env var as the opt-in."""
     src = _settings_source("prod")
     assert 'BASIC_AUTH_REQUIRED = env.bool("BASIC_AUTH_REQUIRED", default=False)' in src
+
+
+def test_staging_refuses_an_email_backend_that_does_not_import():
+    """The prod service ran for weeks with EMAIL_BACKEND=django_resend.EmailBackend
+    — a module that exists nowhere in the image. The Resend guard only looks
+    at the *name* (endswith "ResendBackend"), so boot was green and every real
+    send would have raised ModuleNotFoundError at get_connection(). Resolve the
+    dotted path at boot: a typo'd backend must fail on deploy, not on the first
+    password-set email a new member is waiting for."""
+    env = {**_staging_boot_env(), "EMAIL_BACKEND": "django_resend.EmailBackend"}
+    result = _boot_staging(env)
+    assert "BOOTED" not in result.stdout
+    assert "ImproperlyConfigured" in result.stderr
+    assert "django_resend.EmailBackend" in result.stderr
+
+    # The real backend still boots (with a key, so the Resend guard is quiet).
+    env = {
+        **_staging_boot_env(),
+        "EMAIL_BACKEND": "alumni.email.ResendBackend",
+        "RESEND_API_KEY": "re_test",
+    }
+    result = _boot_staging(env)
+    assert "BOOTED" in result.stdout, result.stderr
