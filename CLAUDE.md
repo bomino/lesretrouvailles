@@ -296,7 +296,7 @@ The owner develops on Windows. The repo is cross-platform but:
 - Use `@pytest.mark.django_db` for DB tests.
 - Use `settings.EMAIL_BACKEND = "alumni.email.FakeResendBackend"` to avoid real sends in email-related tests.
 - Use `settings.CLOUDINARY_CLIENT_PATH = "alumni.cloudinary.FakeCloudinary"` and `settings.STORAGE_CLIENT_PATH = "alumni.storage.FakeStorage"` (call `reset_fake_client()` between tests for clean call lists).
-- Target full-suite count: `~520` at v1.0.0-soft-launch, `~622` at v1.1.0-gestion-console, `~683` at v1.2.0-self-service-help, `789` after the active-nav indicator, `869` after Promotions, `954` after the pre-launch hardening + hygiene sweep, `970` after the 2026-08-01 review-findings sweep, `1011` after the review-tail batch, `1028` after the 2026-08-22 review mediums, **`1029`** after the email-backend boot check. New work should add tests; the count should grow, not shrink.
+- Target full-suite count: `~520` at v1.0.0-soft-launch, `~622` at v1.1.0-gestion-console, `~683` at v1.2.0-self-service-help, `789` after the active-nav indicator, `869` after Promotions, `954` after the pre-launch hardening + hygiene sweep, `970` after the 2026-08-01 review-findings sweep, `1011` after the review-tail batch, `1028` after the 2026-08-22 review mediums, `1029` after the email-backend boot check, **`1038`** after Sentry. New work should add tests; the count should grow, not shrink.
 
 ---
 

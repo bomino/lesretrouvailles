@@ -57,7 +57,8 @@ RUN pip install --upgrade pip && pip install \
     "boto3>=1.34" \
     "redis>=5.0" \
     "resend>=2.0" \
-    "pillow>=10.0"
+    "pillow>=10.0" \
+    "sentry-sdk[django]>=2.0"
 
 # Copy source code
 COPY pyproject.toml ./

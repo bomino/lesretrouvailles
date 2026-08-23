@@ -1,5 +1,6 @@
 import base64
 import secrets
+from urllib.parse import urlsplit
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -120,8 +121,21 @@ class ContentSecurityPolicyReportOnlyMiddleware:
 
     def __init__(self, get_response):
         self.get_response = get_response
+        self.policy = _policy_with_report_uri(getattr(settings, "CSP_REPORT_URI", ""))
 
     def __call__(self, request):
         response = self.get_response(request)
-        response.headers.setdefault("Content-Security-Policy-Report-Only", CSP_REPORT_ONLY_POLICY)
+        response.headers.setdefault("Content-Security-Policy-Report-Only", self.policy)
         return response
+
+
+def _policy_with_report_uri(report_uri: str) -> str:
+    """Append a `report-uri` collector (Sentry's security endpoint, derived
+    from SENTRY_DSN) so the observation phase actually collects violations.
+    The collector's origin is added to connect-src so the report POST itself
+    is not a violation."""
+    if not report_uri:
+        return CSP_REPORT_ONLY_POLICY
+    origin = "{0.scheme}://{0.netloc}".format(urlsplit(report_uri))
+    policy = CSP_REPORT_ONLY_POLICY.replace("connect-src 'self'", f"connect-src 'self' {origin}", 1)
+    return f"{policy}; report-uri {report_uri}"

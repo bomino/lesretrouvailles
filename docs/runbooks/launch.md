@@ -77,6 +77,7 @@ Manual checks the audit can't do:
 - [ ] **DMARC** — follow [`dmarc.md`](dmarc.md) §1.1-§1.3 if you haven't yet. `dig TXT _dmarc.villageretrouvailles.com` should show `p=quarantine` (or stricter) + `rua=`.
 - [ ] **`backup_media` last run** — Railway dashboard → `media-backup-cron` → Deploys; confirm a successful run within the last 8 days.
 - [ ] **Restore drill** — first 90-day drill if not done yet, per [`restore.md`](restore.md) §4.
+- [ ] **Error alerts** — `SENTRY_DSN` set on `lesretrouvailles` **and** both cron services (`railway variables --service cooptation-cron --json | grep SENTRY_DSN`), Sentry weekly digest enabled. Without it, a failing cron or a 500 on a token page is only visible by opening Railway's logs by hand — which is how the August 2026 cron outage went unnoticed for a month.
 - [ ] **Promotions archive loaded** — the class-roster archive at `/promotions/` should already hold **352 entries across 11 classes** (6ème 1980-81 A-F, 6ème 1981-82 A-E). It was imported once and is **not** part of the per-launch flow; this is a verification, not a step to run.
 
   Log in as an admin and open **`/promotions/`** — it lists the 11 classes with a headcount each; they should total 352.
