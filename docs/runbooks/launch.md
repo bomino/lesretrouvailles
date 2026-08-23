@@ -8,23 +8,35 @@ This is a one-time procedure. Steps 0-7 happen sequentially over a few weeks; St
 
 ---
 
-## Step 0 — Pre-launch DB cleanup
+## Step 0 — Pre-launch DB state
 
-The 6 `Member` rows currently in production are dev fixtures from `members/fixtures/seed_members.json`. Delete them so the launch starts from a clean slate.
+> **History.** This step originally said "delete the 6 seed fixtures". That cleanup was done in May 2026, and production has held **real members ever since** — 18 rows as of 2026-08-23 (hand-created founders and co-admins, 2026-05-05 → 05-08; 7 have logged in, 11 never activated). **Do not delete anything in this step.** The "delete the test members" instruction is kept below only as the rollback for a future *staging* reset.
 
 ### 0.1 — Inspect first
 
+`railway ssh` strips quote characters, so `manage.py shell -c "..."` cannot work over it. Use the base64-script pattern: write a script with `import django; django.setup()` at the top, then
+
 ```bash
-railway ssh --service lesretrouvailles -- python manage.py shell -c \
-  "from members.models import Member; \
-   [print(m.id, m.full_name, m.user.email) for m in Member.objects.all()]"
+cat > probe.py <<'EOF'
+import django
+django.setup()
+from members.models import Member
+for m in Member.objects.select_related("user").order_by("pk"):
+    print(m.pk, m.full_name, m.status, "email" if m.user.email else "no-email",
+          "wa" if m.whatsapp else "no-wa", m.user.last_login and m.user.last_login.date())
+EOF
+B64=$(base64 -w0 probe.py)
+railway ssh --service lesretrouvailles -- \
+  "cd /app && echo $B64 | base64 -d > _probe.py && python _probe.py; rm -f _probe.py"
 ```
 
 > `railway ssh`, not `railway run`: anything that touches the DB must execute
 > *inside* Railway's network, because `DATABASE_URL` points at
 > `postgres.railway.internal` which does not resolve from your machine.
+> The script must land in `/app` — `python /tmp/x.py` puts `/tmp` on `sys.path`,
+> not the app, so `import alumni` fails.
 
-Confirm these are test rows (`First1 Last1` / `Niamey` / `Médecin`-type values), not real founders.
+Confirm every row is a real person. If any row is a leftover test fixture (`First1 Last1` / placeholder values), remove it with `rgpd_purge_member` — not with a bulk admin delete.
 
 ### 0.2 — Create the new super admin first
 
@@ -40,9 +52,9 @@ Use **your real email** + a strong password. This account:
 - Becomes the `actor` on cleanup-related audit log events
 - Eventually becomes a regular member after the import (you fill in your own row in the roster CSV)
 
-### 0.3 — Delete the test members
+### 0.3 — Delete the test members (staging reset only — NOT production)
 
-Sign in to `/admin/` → Members → select all rows → "Delete selected members". Cascades through `User` → `NotificationPreference` → `ConsentRecord` → `allauth.EmailAddress`.
+Only on a staging database seeded from `seed_members.json`: sign in to `/admin/` → Members → select all rows → "Delete selected members". Cascades through `User` → `NotificationPreference` → `ConsentRecord` → `allauth.EmailAddress`. On production, every `Member` row is a real person since May 2026 — use [`rgpd-purge.md`](rgpd-purge.md) for any individual removal.
 
 While in the admin, also clear:
 - Any `AdminApplication` rows from test cooptation runs
@@ -117,6 +129,7 @@ For the current launch (May 2026): announcement posted ~2026-05-07; deadline 202
 1. Copy [`roster_template.csv`](roster_template.csv) to `roster.csv` (next to wherever you'll run the import command).
 2. Fill in one row per member following the column reference in [`onboarding.md`](onboarding.md).
 3. Optionally collect WhatsApp profile photos into a `roster_photos/` folder (see onboarding.md "Photo prep").
+4. **Leave the members who already exist in production out of `roster.csv`.** The import is idempotent on `User.username` = WhatsApp digits, but the May 2026 founders were created by hand with non-digit usernames, so re-importing them would create a *second* account for the same person. For those who never activated, fix their existing row instead, from `/gestion/membres/<slug>/`: set `Member.whatsapp`, change the username to their digits via « Changer l'identifiant WhatsApp », then « Régénérer un lien de connexion » and DM it (Template 3 in `onboarding.md`). Get the list with the Step 0.1 probe (`no-wa` + `last_login = None` are the ones to fix).
 
 ---
 
@@ -132,16 +145,31 @@ Pick 5-10 trusted members (e.g., the WhatsApp group's most active or your closes
 > Postgres → Variables → `DATABASE_PUBLIC_URL`):
 >
 > ```bash
+> # `jq` is not installed on the dev box — read DATABASE_PUBLIC_URL from the
+> # Railway dashboard (Postgres → Variables) or:
+> #   railway variables --service Postgres --json | python -c "import sys,json;print(json.load(sys.stdin)['DATABASE_PUBLIC_URL'])"
 > export DJANGO_SETTINGS_MODULE=alumni.settings.prod
-> export DATABASE_URL="$(railway variables --service Postgres --json | jq -r .DATABASE_PUBLIC_URL)"
+> export DATABASE_URL="postgresql://...public proxy URL..."
 > export SITE_URL=https://villageretrouvailles.com
-> # plus the Resend + Cloudinary vars the import needs:
-> export RESEND_API_KEY=... CLOUDINARY_URL=... SECRET_KEY=...
+> export ALLOWED_HOSTS=villageretrouvailles.com
+> export SECRET_KEY=...                       # any value works for the import; use the real one
+> export RESEND_API_KEY=...                   # members WITH email get their activation email
+> export CLOUDINARY_CLIENT_PATH=alumni.cloudinary.RealCloudinary
+> export CLOUDINARY_CLOUD_NAME=... CLOUDINARY_API_KEY=... CLOUDINARY_API_SECRET=...
+> export CLOUDINARY_URL=cloudinary://...     # photos upload for real; omit --photos-dir to skip
 > ```
+>
+> The prod settings refuse to boot if any of these is wrong, which is the
+> safety net: a localhost `SITE_URL`, `RealCloudinary` paired with the
+> `fake-cloud` default, or the Resend backend with an empty key all raise
+> `ImproperlyConfigured` before a single row is written. `base.py` also reads
+> a local `.env` if present — exported variables win, but check that file
+> does not point `DATABASE_URL` at a dev database.
 >
 > Without `SITE_URL`, every magic link in the output CSV is built from the
 > `http://localhost:8000` default and every DM'd link is dead. Verify with a
-> one-row CSV before the full run.
+> one-row CSV before the full run. Do this in a terminal you close afterwards;
+> never paste these values into a chat or a commit.
 
 ```bash
 python manage.py import_whatsapp_roster pilot.csv \
@@ -261,8 +289,8 @@ If something goes wrong post-launch:
 
 ### Symptom: members can't log in (login form rejects credentials)
 
-1. Print the auth settings the running container actually loaded (they are hardcoded in `alumni/settings/base.py`, never read from env — grepping Railway variables for `ACCOUNT_LOGIN` always returns nothing):
-   `railway ssh --service lesretrouvailles -- python manage.py shell -c "from django.conf import settings; print(settings.ACCOUNT_LOGIN_METHODS, settings.SETTINGS_MODULE)"`
+1. Print the auth settings the running container actually loaded (they are hardcoded in `alumni/settings/base.py`, never read from env — grepping Railway variables for `ACCOUNT_LOGIN` always returns nothing). `railway ssh` strips quotes, so use the base64-script pattern from Step 0.1 with a script body of:
+   `import django; django.setup(); from django.conf import settings; print(settings.ACCOUNT_LOGIN_METHODS, settings.SETTINGS_MODULE)`
 2. Check the deploy log for tracebacks during the latest deployment.
 3. If it's bad enough, revert to the previous deployment via Railway dashboard → Deployments → previous successful one → "Redeploy".
 
