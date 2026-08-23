@@ -139,7 +139,11 @@ Create a second Railway service in the same project named `cooptation-cron`:
 - Build mode: same Dockerfile (shares image)
 - Start command override: `python manage.py process_cooptation_deadlines`
 - Schedule: `0 6 * * *` (daily 06:00 UTC)
-- Env: shares `DATABASE_URL`, `RESEND_API_KEY`, `SECRET_KEY`, `DJANGO_SETTINGS_MODULE`, `SITE_URL`, `DEFAULT_FROM_EMAIL`, `ALLOWED_HOSTS` from the app service. `SITE_URL` is **mandatory** — without it, the J+14 expiry email links to `http://localhost:8000` and parrains/candidates land on a dead URL. Set `BASIC_AUTH_REQUIRED=false` for the cron service (no web traffic).
+- Env: needs `DATABASE_URL`, `RESEND_API_KEY`, `SECRET_KEY`, `DJANGO_SETTINGS_MODULE`, `SITE_URL`, `EMAIL_BACKEND`, `DEFAULT_FROM_EMAIL`, `ALLOWED_HOSTS`. **Railway services do not inherit each other's variables** — use reference variables so the cron tracks the app service and you never paste a secret:
+  ```bash
+  railway variable set 'RESEND_API_KEY=${{lesretrouvailles.RESEND_API_KEY}}' 'SITE_URL=${{lesretrouvailles.SITE_URL}}' EMAIL_BACKEND=alumni.email.ResendBackend --service cooptation-cron
+  ```
+  `staging.py` refuses to boot when `SITE_URL` is a localhost value, when `EMAIL_BACKEND` does not import, or when it is the Resend backend with an empty `RESEND_API_KEY` — on a cron service that means every scheduled run dies at settings import (this is how both crons failed silently for weeks in August 2026: an empty `RESEND_API_KEY` here, no `SITE_URL` on `media-backup-cron`). Set `BASIC_AUTH_REQUIRED=false` for the cron service (no web traffic).
 
 Cap warning: Resend free tier 100 emails/day. With ~5 emails per cooptation, do not batch more than 50 candidates in a single onboarding session.
 

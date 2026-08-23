@@ -2,6 +2,7 @@
 
 import environ
 from django.core.exceptions import ImproperlyConfigured
+from django.utils.module_loading import import_string
 
 from .base import *  # noqa: F401,F403
 from .base import (
@@ -125,6 +126,19 @@ if _local_site_url and not env.bool("SITE_URL_ALLOW_LOCAL", default=False):
     )
 
 EMAIL_BACKEND = env("EMAIL_BACKEND", default="alumni.email.ResendBackend")
+
+# Resolve the dotted path now. Django only imports the backend at the first
+# get_connection(), so a value that exists nowhere in the image (prod ran for
+# weeks with django_resend.EmailBackend) boots green and fails on the first
+# password-set email a member is waiting for. The name-based Resend guard
+# below cannot see that case.
+try:
+    import_string(EMAIL_BACKEND)
+except ImportError as exc:
+    raise ImproperlyConfigured(
+        f"EMAIL_BACKEND {EMAIL_BACKEND!r} cannot be imported: {exc}. "
+        "This platform's backend is alumni.email.ResendBackend."
+    ) from exc
 
 # ResendBackend without a key does not fail loudly at boot — it fails at the
 # first send, which is the password-set email a new member is waiting for.
