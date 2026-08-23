@@ -501,23 +501,10 @@ from .models import RemovalRequest  # noqa: E402
 
 
 @require_http_methods(["GET", "POST"])
-@ratelimit(key="ip", rate="5/h", method="POST", block=False)
 def removal_request_form_view(request, entry_token: str):
     from .models import PublicSearchEntry
 
     entry = get_object_or_404(PublicSearchEntry, removal_token=entry_token)
-
-    if getattr(request, "limited", False):
-        # A bodiless 429 renders as a blank page — give the requester
-        # French copy and keep them on the form.
-        response = render(
-            request,
-            "members/removal_request_form.html",
-            {"entry": entry, "error": "Trop de demandes — merci de réessayer dans une heure."},
-            status=429,
-        )
-        response["Retry-After"] = "3600"
-        return response
 
     if request.method == "POST":
         email = (request.POST.get("email") or "").strip()[:254]
@@ -540,6 +527,29 @@ def removal_request_form_view(request, entry_token: str):
                 {"entry": entry, "error": "Adresse email invalide."},
                 status=400,
             )
+
+        # Spend the 5/h budget only on a submission that validates. As a
+        # view decorator it counted every POST first — malformed addresses
+        # and probes of unknown tokens exhausted the bucket for everyone
+        # behind the same carrier-NAT IP (the memoriam.nominate pattern).
+        if is_ratelimited(
+            request,
+            group="members.removal_request",
+            key="ip",
+            rate="5/h",
+            method="POST",
+            increment=True,
+        ):
+            # A bodiless 429 renders as a blank page — give the requester
+            # French copy and keep them on the form.
+            response = render(
+                request,
+                "members/removal_request_form.html",
+                {"entry": entry, "error": "Trop de demandes — merci de réessayer dans une heure."},
+                status=429,
+            )
+            response["Retry-After"] = "3600"
+            return response
 
         rreq = RemovalRequest.objects.create(
             entry=entry,
