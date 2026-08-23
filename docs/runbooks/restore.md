@@ -235,6 +235,13 @@ In the Railway dashboard, project `Retrouvailles`:
    BASIC_AUTH_REQUIRED=false
    SECURE_SSL_REDIRECT=false
 
+   # staging.py's boot guards need these even though backup_media sends no
+   # mail: a localhost SITE_URL or a Resend backend without a key refuses to
+   # boot, and on a cron service that means every weekly run dies at settings
+   # import (this cron failed silently for 4+ weeks in August 2026 without them).
+   SITE_URL=${{ lesretrouvailles.SITE_URL }}
+   EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
+
    STORAGE_CLIENT_PATH=alumni.storage.RealStorage
    STORAGE_BACKUP_REQUIRED=true
    STORAGE_BUCKET_NAME=${{ media-backup.BUCKET_NAME }}
